@@ -1,0 +1,40 @@
+import request from '@/utils/request'
+import type { Resume, Section } from '@/types/resume'
+
+export interface CreateResumeRequest {
+  title?: string
+  scene: string
+  targetPosition?: string
+  templateId: string
+}
+
+export interface UpdateResumeRequest {
+  title?: string
+  targetPosition?: string
+  templateId?: string
+  sections?: Section[]
+}
+
+export const resumeApi = {
+  create(data: CreateResumeRequest): Promise<Resume> {
+    return request.post('/resumes', data) as Promise<Resume>
+  },
+  list(page = 1, size = 20): Promise<{ list: Resume[]; total: number; page: number; size: number }> {
+    return request.get('/resumes', { params: { page, size } }) as Promise<{ list: Resume[]; total: number; page: number; size: number }>
+  },
+  get(id: string): Promise<Resume> {
+    return request.get(`/resumes/${id}`) as Promise<Resume>
+  },
+  update(id: string, data: UpdateResumeRequest): Promise<Resume> {
+    return request.put(`/resumes/${id}`, data) as Promise<Resume>
+  },
+  remove(id: string): Promise<void> {
+    return request.delete(`/resumes/${id}`) as Promise<void>
+  },
+  duplicate(id: string): Promise<{ id: string; title: string }> {
+    return request.post(`/resumes/${id}/duplicate`) as Promise<{ id: string; title: string }>
+  },
+  rename(id: string, title: string): Promise<Resume> {
+    return request.put(`/resumes/${id}/title`, { title }) as Promise<Resume>
+  }
+}

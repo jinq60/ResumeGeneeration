@@ -1,0 +1,9 @@
+package com.resume.ai.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.resume.ai.entity.AiCallLog;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface AiCallLogMapper extends BaseMapper<AiCallLog> {
+}

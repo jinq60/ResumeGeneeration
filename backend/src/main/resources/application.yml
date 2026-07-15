@@ -1,0 +1,148 @@
+spring:
+  application:
+    name: resume-generation
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 50MB
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+logging:
+  level:
+    com.resume: debug
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:cmVzdW1lLWdlbmVyYXRpb24tZGVmYXVsdC1zZWNyZXQta2V5LW11c3QtYmUtaXMtMzItYnl0ZXM=}
+    access-token-expiration: 3600000
+    refresh-token-expiration: 604800000
+  playwright:
+    chromium-args: --no-sandbox,--disable-setuid-sandbox
+
+app:
+  ai:
+    providers:
+      resume-review:
+        provider: qwen
+        model: qwen-turbo
+        timeout: 60s
+        retry: 2
+      resume-optimize:
+        provider: openai
+        model: gpt-4o-mini
+        timeout: 60s
+        retry: 2
+      avatar-optimize:
+        provider: openai
+        model: gpt-4o
+        timeout: 120s
+        retry: 1
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      base-url: https://api.openai.com
+    qwen:
+      api-key: ${DASHSCOPE_API_KEY:}
+      base-url: https://dashscope.aliyuncs.com
+    ernie:
+      api-key: ${ERNIE_API_KEY:}
+      secret-key: ${ERNIE_SECRET_KEY:}
+      base-url: https://aip.baidubce.com
+    thread-pool:
+      core-size: 4
+      max-size: 8
+      queue-capacity: 100
+    rate-limit:
+      max-concurrent-per-user: 3
+    prompts:
+      resume-review: |
+        你是一位资深HR和简历优化专家。请对以下简历进行全面点评。
+
+        简历内容：
+        {resumeContent}
+
+        岗位描述：
+        {jobDescription}
+
+        请以JSON格式返回，严格遵循以下结构（不要输出其他内容）：
+        {
+          "overallScore": <0-100整数>,
+          "dimensionScores": {
+            "completeness": <0-100>,
+            "structure": <0-100>,
+            "content": <0-100>,
+            "match": <0-100>,
+            "expression": <0-100>
+          },
+          "suggestions": [
+            {
+              "sectionType": "<模块类型>",
+              "title": "<建议标题>",
+              "problem": "<存在问题>",
+              "advice": "<修改建议>",
+              "priority": "high|medium|low"
+            }
+          ],
+          "highlights": ["<亮点1>", "<亮点2>"]
+        }
+      resume-optimize: |
+        你是一位资深简历优化专家。用户希望针对以下岗位JD优化简历，你需要逐模块分析差距并给出修改建议。
+
+        简历内容：
+        {resumeContent}
+
+        目标岗位JD：
+        {jobDescription}
+
+        请以JSON格式返回（不要输出其他内容）：
+        {
+          "matchScore": <0-100整数>,
+          "dimensionScores": {
+            "skills": <0-100>,
+            "experience": <0-100>,
+            "education": <0-100>,
+            "projects": <0-100>
+          },
+          "optimizations": [
+            {
+              "sectionId": "<模块ID>",
+              "sectionType": "<模块类型>",
+              "originalSummary": "<原始内容摘要>",
+              "optimizedContent": "<优化后的内容>",
+              "reasoning": "<修改原因>"
+            }
+          ],
+          "missingSkills": ["<缺失技能>"],
+          "recommendations": ["<整体建议>"]
+        }
+      avatar-optimize: |
+        你是一位专业证件照处理专家。请分析这张用户自拍照，描述如何将其优化为一寸证件照。
+        要求：背景替换为指定颜色，保持面部特征一致，提升画质，自然美颜。
+
+        目标背景色：{backgroundType}
+        风格要求：{style}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

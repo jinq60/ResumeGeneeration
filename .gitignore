@@ -1,0 +1,35 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Local agent settings
+.claude/settings.local.json
+
+# Build outputs
+dist/
+target/
+node_modules/
+
+# Uploads
+uploads/
+
+# Planning files (keep in repo for collaboration)
+# task_plan.md
+# findings.md
+# progress.md
