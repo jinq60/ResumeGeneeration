@@ -5,9 +5,11 @@
 ## 项目状态
 
 - **设计文档**：v1.1 已对齐，见 [设计文档](#设计文档)。
-- **后端完成度**：P0 约 75–80%，`mvn test` 44 个用例通过。
-- **前端完成度**：P0 约 25%，核心页面待实现。
-- **下一步**：代码与文档对齐（JSON 字段类型化、枚举常量、API 返回结构等），然后进入功能开发。
+- **后端完成度**：P0 约 75–80%，`mvn test` 74 个用例通过。
+- **前端完成度**：P0 约 25%，核心页面待实现；lint / build / unit tests 已通过。
+- **CI/CD**：GitHub Actions 已启用，覆盖 `production`、`develop`、`stable`。
+- **分支模型**：`production`（默认）/ `develop` / `stable`，详见 `docs/development-workflow.md`。
+- **下一步**：基于开发流程进入功能开发 / 服务器部署初始化。
 
 ## 项目结构
 
@@ -35,6 +37,7 @@ ResumeGeneeration/
 - `docs/environment.md`：环境变量说明
 - `docs/security-guide.md`：安全与隐私合规指南
 - `docs/api-changelog.md`：API 变更日志
+- `docs/development-workflow.md`：分支模型、CI/CD 与开发流程
 - `docs/adr/`：架构决策记录（ADR）
 - `docs/traceability-matrix.md`：需求追溯矩阵
 
