@@ -1,19 +1,42 @@
 <template>
   <div class="profile-form">
-    <el-form :model="formData" :rules="rules" label-width="100px" size="default">
-      <el-form-item label="姓名" prop="name">
-        <el-input v-model="formData.name" placeholder="请输入姓名" />
+    <el-form
+      :model="formData"
+      :rules="rules"
+      label-width="100px"
+      size="default"
+    >
+      <el-form-item
+        label="姓名"
+        prop="name"
+      >
+        <el-input
+          v-model="formData.name"
+          placeholder="请输入姓名"
+        />
       </el-form-item>
 
-      <el-form-item label="性别" prop="gender">
+      <el-form-item
+        label="性别"
+        prop="gender"
+      >
         <el-radio-group v-model="formData.gender">
-          <el-radio label="male">男</el-radio>
-          <el-radio label="female">女</el-radio>
-          <el-radio label="other">其他</el-radio>
+          <el-radio label="male">
+            男
+          </el-radio>
+          <el-radio label="female">
+            女
+          </el-radio>
+          <el-radio label="other">
+            其他
+          </el-radio>
         </el-radio-group>
       </el-form-item>
 
-      <el-form-item label="出生日期" prop="birthDate">
+      <el-form-item
+        label="出生日期"
+        prop="birthDate"
+      >
         <el-date-picker
           v-model="formData.birthDate"
           type="month"
@@ -23,44 +46,104 @@
         />
       </el-form-item>
 
-      <el-form-item label="手机号" prop="phone">
-        <el-input v-model="formData.phone" placeholder="请输入手机号" />
+      <el-form-item
+        label="手机号"
+        prop="phone"
+      >
+        <el-input
+          v-model="formData.phone"
+          placeholder="请输入手机号"
+        />
       </el-form-item>
 
-      <el-form-item label="邮箱" prop="email">
-        <el-input v-model="formData.email" placeholder="请输入邮箱" />
+      <el-form-item
+        label="邮箱"
+        prop="email"
+      >
+        <el-input
+          v-model="formData.email"
+          placeholder="请输入邮箱"
+        />
       </el-form-item>
 
-      <el-form-item label="所在城市" prop="city">
-        <el-input v-model="formData.city" placeholder="请输入所在城市" />
+      <el-form-item
+        label="所在城市"
+        prop="city"
+      >
+        <el-input
+          v-model="formData.city"
+          placeholder="请输入所在城市"
+        />
       </el-form-item>
 
-      <el-form-item label="目标岗位" prop="targetPosition">
-        <el-input v-model="formData.targetPosition" placeholder="请输入目标岗位" />
+      <el-form-item
+        label="目标岗位"
+        prop="targetPosition"
+      >
+        <el-input
+          v-model="formData.targetPosition"
+          placeholder="请输入目标岗位"
+        />
       </el-form-item>
 
-      <el-form-item label="期望薪资" prop="expectedSalary">
-        <el-input v-model="formData.expectedSalary" placeholder="请输入期望薪资" />
+      <el-form-item
+        label="期望薪资"
+        prop="expectedSalary"
+      >
+        <el-input
+          v-model="formData.expectedSalary"
+          placeholder="请输入期望薪资"
+        />
       </el-form-item>
 
-      <el-form-item label="到岗时间" prop="availability">
-        <el-input v-model="formData.availability" placeholder="请输入到岗时间" />
+      <el-form-item
+        label="到岗时间"
+        prop="availability"
+      >
+        <el-input
+          v-model="formData.availability"
+          placeholder="请输入到岗时间"
+        />
       </el-form-item>
 
-      <el-form-item label="个人网站" prop="personalWebsite">
-        <el-input v-model="formData.personalWebsite" placeholder="请输入个人网站链接" />
+      <el-form-item
+        label="个人网站"
+        prop="personalWebsite"
+      >
+        <el-input
+          v-model="formData.personalWebsite"
+          placeholder="请输入个人网站链接"
+        />
       </el-form-item>
 
-      <el-form-item label="GitHub" prop="github">
-        <el-input v-model="formData.github" placeholder="请输入GitHub链接" />
+      <el-form-item
+        label="GitHub"
+        prop="github"
+      >
+        <el-input
+          v-model="formData.github"
+          placeholder="请输入GitHub链接"
+        />
       </el-form-item>
 
-      <el-form-item label="作品集" prop="portfolio">
-        <el-input v-model="formData.portfolio" placeholder="请输入作品集链接" />
+      <el-form-item
+        label="作品集"
+        prop="portfolio"
+      >
+        <el-input
+          v-model="formData.portfolio"
+          placeholder="请输入作品集链接"
+        />
       </el-form-item>
 
-      <el-form-item label="头像URL" prop="avatarUrl">
-        <el-input v-model="formData.avatarUrl" placeholder="请输入头像URL" />
+      <el-form-item
+        label="头像URL"
+        prop="avatarUrl"
+      >
+        <el-input
+          v-model="formData.avatarUrl"
+          placeholder="请输入头像URL"
+        />
       </el-form-item>
 
       <el-divider>展示设置</el-divider>

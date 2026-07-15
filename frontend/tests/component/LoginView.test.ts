@@ -30,7 +30,7 @@ describe('LoginView', () => {
   })
 
   it('guest mode should call authApi.guest, update store and redirect', async () => {
-    ;(authApi.guest as any).mockResolvedValue({
+    (authApi.guest as any).mockResolvedValue({
       userId: 'guest_1',
       accessToken: 'guest_token',
       refreshToken: 'refresh',

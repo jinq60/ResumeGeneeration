@@ -2,7 +2,10 @@
   <div class="template-management">
     <div class="page-header">
       <h1>模板管理</h1>
-      <el-button type="primary" @click="handleAdd">
+      <el-button
+        type="primary"
+        @click="handleAdd"
+      >
         <el-icon><Plus /></el-icon>
         新增模板
       </el-button>
@@ -20,39 +23,106 @@
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
-      <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 150px; margin-left: 10px">
-        <el-option label="全部" value="" />
-        <el-option label="已上架" value="active" />
-        <el-option label="已下架" value="inactive" />
+      <el-select
+        v-model="statusFilter"
+        placeholder="状态筛选"
+        clearable
+        style="width: 150px; margin-left: 10px"
+      >
+        <el-option
+          label="全部"
+          value=""
+        />
+        <el-option
+          label="已上架"
+          value="active"
+        />
+        <el-option
+          label="已下架"
+          value="inactive"
+        />
       </el-select>
-      <el-button type="primary" @click="handleSearch">搜索</el-button>
+      <el-button
+        type="primary"
+        @click="handleSearch"
+      >
+        搜索
+      </el-button>
     </div>
 
     <div class="template-list">
-      <el-table :data="templateList" v-loading="loading">
-        <el-table-column label="缩略图" width="120">
+      <el-table
+        v-loading="loading"
+        :data="templateList"
+      >
+        <el-table-column
+          label="缩略图"
+          width="120"
+        >
           <template #default="{ row }">
             <div class="thumbnail">
-              <img v-if="row.thumbnailUrl" :src="row.thumbnailUrl" alt="缩略图" />
-              <div v-else class="no-thumbnail">暂无图片</div>
+              <img
+                v-if="row.thumbnailUrl"
+                :src="row.thumbnailUrl"
+                alt="缩略图"
+              >
+              <div
+                v-else
+                class="no-thumbnail"
+              >
+                暂无图片
+              </div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="code" label="模板编码" width="150" />
-        <el-table-column prop="name" label="模板名称" width="200" />
-        <el-table-column prop="category" label="分类" width="120" />
-        <el-table-column prop="sortOrder" label="排序" width="80" />
-        <el-table-column label="状态" width="100">
+        <el-table-column
+          prop="code"
+          label="模板编码"
+          width="150"
+        />
+        <el-table-column
+          prop="name"
+          label="模板名称"
+          width="200"
+        />
+        <el-table-column
+          prop="category"
+          label="分类"
+          width="120"
+        />
+        <el-table-column
+          prop="sortOrder"
+          label="排序"
+          width="80"
+        />
+        <el-table-column
+          label="状态"
+          width="100"
+        >
           <template #default="{ row }">
             <el-tag :type="row.status === 'active' ? 'success' : 'info'">
               {{ row.status === 'active' ? '已上架' : '已下架' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180" />
-        <el-table-column label="操作" fixed="right" width="200">
+        <el-table-column
+          prop="createdAt"
+          label="创建时间"
+          width="180"
+        />
+        <el-table-column
+          label="操作"
+          fixed="right"
+          width="200"
+        >
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button
+              link
+              type="primary"
+              @click="handleEdit(row)"
+            >
+              编辑
+            </el-button>
             <el-button
               link
               :type="row.status === 'active' ? 'warning' : 'success'"
@@ -60,7 +130,13 @@
             >
               {{ row.status === 'active' ? '下架' : '上架' }}
             </el-button>
-            <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button
+              link
+              type="danger"
+              @click="handleDelete"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -73,33 +149,83 @@
       width="600px"
       @close="handleDialogClose"
     >
-      <el-form :model="templateForm" :rules="formRules" ref="templateFormRef" label-width="100px">
-        <el-form-item label="模板编码" prop="code">
-          <el-input v-model="templateForm.code" placeholder="请输入模板编码" />
+      <el-form
+        ref="templateFormRef"
+        :model="templateForm"
+        :rules="formRules"
+        label-width="100px"
+      >
+        <el-form-item
+          label="模板编码"
+          prop="code"
+        >
+          <el-input
+            v-model="templateForm.code"
+            placeholder="请输入模板编码"
+          />
         </el-form-item>
-        <el-form-item label="模板名称" prop="name">
-          <el-input v-model="templateForm.name" placeholder="请输入模板名称" />
+        <el-form-item
+          label="模板名称"
+          prop="name"
+        >
+          <el-input
+            v-model="templateForm.name"
+            placeholder="请输入模板名称"
+          />
         </el-form-item>
-        <el-form-item label="模板分类" prop="category">
-          <el-select v-model="templateForm.category" placeholder="请选择分类">
-            <el-option label="简约风格" value="simple" />
-            <el-option label="商务风格" value="business" />
-            <el-option label="创意风格" value="creative" />
-            <el-option label="学术风格" value="academic" />
+        <el-form-item
+          label="模板分类"
+          prop="category"
+        >
+          <el-select
+            v-model="templateForm.category"
+            placeholder="请选择分类"
+          >
+            <el-option
+              label="简约风格"
+              value="simple"
+            />
+            <el-option
+              label="商务风格"
+              value="business"
+            />
+            <el-option
+              label="创意风格"
+              value="creative"
+            />
+            <el-option
+              label="学术风格"
+              value="academic"
+            />
           </el-select>
         </el-form-item>
-        <el-form-item label="缩略图" prop="thumbnailUrl">
+        <el-form-item
+          label="缩略图"
+          prop="thumbnailUrl"
+        >
           <el-upload
             class="thumbnail-uploader"
             :show-file-list="false"
             :on-success="handleUploadSuccess"
             :before-upload="beforeUpload"
           >
-            <img v-if="templateForm.thumbnailUrl" :src="templateForm.thumbnailUrl" class="thumbnail" />
-            <el-icon v-else class="uploader-icon"><Plus /></el-icon>
+            <img
+              v-if="templateForm.thumbnailUrl"
+              :src="templateForm.thumbnailUrl"
+              class="thumbnail"
+            >
+            <el-icon
+              v-else
+              class="uploader-icon"
+            >
+              <Plus />
+            </el-icon>
           </el-upload>
         </el-form-item>
-        <el-form-item label="模板描述" prop="description">
+        <el-form-item
+          label="模板描述"
+          prop="description"
+        >
           <el-input
             v-model="templateForm.description"
             type="textarea"
@@ -107,13 +233,27 @@
             placeholder="请输入模板描述"
           />
         </el-form-item>
-        <el-form-item label="排序" prop="sortOrder">
-          <el-input-number v-model="templateForm.sortOrder" :min="0" />
+        <el-form-item
+          label="排序"
+          prop="sortOrder"
+        >
+          <el-input-number
+            v-model="templateForm.sortOrder"
+            :min="0"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitLoading">确定</el-button>
+        <el-button @click="dialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="submitLoading"
+          @click="handleSubmit"
+        >
+          确定
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -125,10 +265,21 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules, UploadProps } from 'element-plus'
 
+interface TemplateItem {
+  id: string
+  code: string
+  name: string
+  category: string
+  thumbnailUrl: string
+  status: string
+  sortOrder: number
+  createdAt: string
+}
+
 const loading = ref(false)
 const searchKeyword = ref('')
 const statusFilter = ref('')
-const templateList = ref([])
+const templateList = ref<TemplateItem[]>([])
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增模板')
@@ -214,7 +365,7 @@ const handleToggleStatus = (row: any) => {
   })
 }
 
-const handleDelete = (row: any) => {
+const handleDelete = () => {
   ElMessageBox.confirm('确定要删除该模板吗？此操作不可恢复。', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
@@ -260,7 +411,7 @@ const resetForm = () => {
   })
 }
 
-const beforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
+const beforeUpload: UploadProps['beforeUpload'] = () => {
   // TODO: 文件上传前的验证
   return true
 }

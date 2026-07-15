@@ -13,8 +13,12 @@
               <el-icon><User /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ stats.totalUsers }}</div>
-              <div class="stat-label">用户总数</div>
+              <div class="stat-value">
+                {{ stats.totalUsers }}
+              </div>
+              <div class="stat-label">
+                用户总数
+              </div>
             </div>
           </div>
         </el-col>
@@ -24,8 +28,12 @@
               <el-icon><Document /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ stats.totalResumes }}</div>
-              <div class="stat-label">简历总数</div>
+              <div class="stat-value">
+                {{ stats.totalResumes }}
+              </div>
+              <div class="stat-label">
+                简历总数
+              </div>
             </div>
           </div>
         </el-col>
@@ -35,8 +43,12 @@
               <el-icon><Grid /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ stats.totalTemplates }}</div>
-              <div class="stat-label">模板数量</div>
+              <div class="stat-value">
+                {{ stats.totalTemplates }}
+              </div>
+              <div class="stat-label">
+                模板数量
+              </div>
             </div>
           </div>
         </el-col>
@@ -46,8 +58,12 @@
               <el-icon><TrendCharts /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ stats.todayActive }}</div>
-              <div class="stat-label">今日活跃</div>
+              <div class="stat-value">
+                {{ stats.todayActive }}
+              </div>
+              <div class="stat-label">
+                今日活跃
+              </div>
             </div>
           </div>
         </el-col>
@@ -63,7 +79,9 @@
             </div>
             <div class="chart-container">
               <!-- TODO: 集成图表组件 -->
-              <div class="chart-placeholder">图表区域</div>
+              <div class="chart-placeholder">
+                图表区域
+              </div>
             </div>
           </div>
         </el-col>
@@ -73,13 +91,21 @@
               <h3>最近活动</h3>
             </div>
             <div class="activity-list">
-              <div v-for="activity in recentActivities" :key="activity.id" class="activity-item">
+              <div
+                v-for="activity in recentActivities"
+                :key="activity.id"
+                class="activity-item"
+              >
                 <div class="activity-icon">
                   <el-icon><Clock /></el-icon>
                 </div>
                 <div class="activity-content">
-                  <div class="activity-title">{{ activity.title }}</div>
-                  <div class="activity-time">{{ activity.time }}</div>
+                  <div class="activity-title">
+                    {{ activity.title }}
+                  </div>
+                  <div class="activity-time">
+                    {{ activity.time }}
+                  </div>
                 </div>
               </div>
             </div>

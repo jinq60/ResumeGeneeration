@@ -4,12 +4,24 @@
       <h1>系统设置</h1>
     </div>
 
-    <el-tabs v-model="activeTab" class="settings-tabs">
-      <el-tab-pane label="基本设置" name="basic">
+    <el-tabs
+      v-model="activeTab"
+      class="settings-tabs"
+    >
+      <el-tab-pane
+        label="基本设置"
+        name="basic"
+      >
         <div class="settings-content">
-          <el-form :model="basicSettings" label-width="150px">
+          <el-form
+            :model="basicSettings"
+            label-width="150px"
+          >
             <el-form-item label="系统名称">
-              <el-input v-model="basicSettings.systemName" style="width: 400px" />
+              <el-input
+                v-model="basicSettings.systemName"
+                style="width: 400px"
+              />
             </el-form-item>
             <el-form-item label="系统描述">
               <el-input
@@ -20,10 +32,16 @@
               />
             </el-form-item>
             <el-form-item label="联系邮箱">
-              <el-input v-model="basicSettings.contactEmail" style="width: 400px" />
+              <el-input
+                v-model="basicSettings.contactEmail"
+                style="width: 400px"
+              />
             </el-form-item>
             <el-form-item label="客服电话">
-              <el-input v-model="basicSettings.contactPhone" style="width: 400px" />
+              <el-input
+                v-model="basicSettings.contactPhone"
+                style="width: 400px"
+              />
             </el-form-item>
             <el-form-item label="网站Logo">
               <el-upload
@@ -31,29 +49,65 @@
                 :show-file-list="false"
                 :on-success="handleLogoUploadSuccess"
               >
-                <img v-if="basicSettings.logoUrl" :src="basicSettings.logoUrl" class="logo" />
-                <el-icon v-else class="uploader-icon"><Plus /></el-icon>
+                <img
+                  v-if="basicSettings.logoUrl"
+                  :src="basicSettings.logoUrl"
+                  class="logo"
+                >
+                <el-icon
+                  v-else
+                  class="uploader-icon"
+                >
+                  <Plus />
+                </el-icon>
               </el-upload>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveBasicSettings">保存设置</el-button>
+              <el-button
+                type="primary"
+                @click="saveBasicSettings"
+              >
+                保存设置
+              </el-button>
             </el-form-item>
           </el-form>
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="安全设置" name="security">
+      <el-tab-pane
+        label="安全设置"
+        name="security"
+      >
         <div class="settings-content">
-          <el-form :model="securitySettings" label-width="150px">
+          <el-form
+            :model="securitySettings"
+            label-width="150px"
+          >
             <el-form-item label="密码最小长度">
-              <el-input-number v-model="securitySettings.minPasswordLength" :min="6" :max="20" />
+              <el-input-number
+                v-model="securitySettings.minPasswordLength"
+                :min="6"
+                :max="20"
+              />
             </el-form-item>
             <el-form-item label="密码复杂度">
               <el-checkbox-group v-model="securitySettings.passwordComplexity">
-                <el-checkbox label="包含数字" value="number" />
-                <el-checkbox label="包含大写字母" value="uppercase" />
-                <el-checkbox label="包含小写字母" value="lowercase" />
-                <el-checkbox label="包含特殊字符" value="special" />
+                <el-checkbox
+                  label="包含数字"
+                  value="number"
+                />
+                <el-checkbox
+                  label="包含大写字母"
+                  value="uppercase"
+                />
+                <el-checkbox
+                  label="包含小写字母"
+                  value="lowercase"
+                />
+                <el-checkbox
+                  label="包含特殊字符"
+                  value="special"
+                />
               </el-checkbox-group>
             </el-form-item>
             <el-form-item label="登录失败锁定">
@@ -76,19 +130,34 @@
               />
             </el-form-item>
             <el-form-item label="Token过期时间">
-              <el-input-number v-model="securitySettings.tokenExpiration" :min="30" :max="1440" />
+              <el-input-number
+                v-model="securitySettings.tokenExpiration"
+                :min="30"
+                :max="1440"
+              />
               <span style="margin-left: 10px">分钟</span>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveSecuritySettings">保存设置</el-button>
+              <el-button
+                type="primary"
+                @click="saveSecuritySettings"
+              >
+                保存设置
+              </el-button>
             </el-form-item>
           </el-form>
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="通知设置" name="notification">
+      <el-tab-pane
+        label="通知设置"
+        name="notification"
+      >
         <div class="settings-content">
-          <el-form :model="notificationSettings" label-width="150px">
+          <el-form
+            :model="notificationSettings"
+            label-width="150px"
+          >
             <el-form-item label="邮件通知">
               <el-switch v-model="notificationSettings.emailEnabled" />
             </el-form-item>
@@ -124,36 +193,83 @@
               <el-switch v-model="notificationSettings.resumeExportEnabled" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveNotificationSettings">保存设置</el-button>
+              <el-button
+                type="primary"
+                @click="saveNotificationSettings"
+              >
+                保存设置
+              </el-button>
             </el-form-item>
           </el-form>
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="存储设置" name="storage">
+      <el-tab-pane
+        label="存储设置"
+        name="storage"
+      >
         <div class="settings-content">
-          <el-form :model="storageSettings" label-width="150px">
+          <el-form
+            :model="storageSettings"
+            label-width="150px"
+          >
             <el-form-item label="存储类型">
               <el-radio-group v-model="storageSettings.storageType">
-                <el-radio label="local">本地存储</el-radio>
-                <el-radio label="minio">MinIO</el-radio>
-                <el-radio label="oss">阿里云OSS</el-radio>
+                <el-radio label="local">
+                  本地存储
+                </el-radio>
+                <el-radio label="minio">
+                  MinIO
+                </el-radio>
+                <el-radio label="oss">
+                  阿里云OSS
+                </el-radio>
               </el-radio-group>
             </el-form-item>
-            <el-form-item label="MinIO地址" v-if="storageSettings.storageType === 'minio'">
-              <el-input v-model="storageSettings.minioEndpoint" style="width: 400px" />
+            <el-form-item
+              v-if="storageSettings.storageType === 'minio'"
+              label="MinIO地址"
+            >
+              <el-input
+                v-model="storageSettings.minioEndpoint"
+                style="width: 400px"
+              />
             </el-form-item>
-            <el-form-item label="Access Key" v-if="storageSettings.storageType === 'minio'">
-              <el-input v-model="storageSettings.accessKey" style="width: 400px" type="password" />
+            <el-form-item
+              v-if="storageSettings.storageType === 'minio'"
+              label="Access Key"
+            >
+              <el-input
+                v-model="storageSettings.accessKey"
+                style="width: 400px"
+                type="password"
+              />
             </el-form-item>
-            <el-form-item label="Secret Key" v-if="storageSettings.storageType === 'minio'">
-              <el-input v-model="storageSettings.secretKey" style="width: 400px" type="password" />
+            <el-form-item
+              v-if="storageSettings.storageType === 'minio'"
+              label="Secret Key"
+            >
+              <el-input
+                v-model="storageSettings.secretKey"
+                style="width: 400px"
+                type="password"
+              />
             </el-form-item>
-            <el-form-item label="Bucket名称" v-if="storageSettings.storageType === 'minio'">
-              <el-input v-model="storageSettings.bucketName" style="width: 400px" />
+            <el-form-item
+              v-if="storageSettings.storageType === 'minio'"
+              label="Bucket名称"
+            >
+              <el-input
+                v-model="storageSettings.bucketName"
+                style="width: 400px"
+              />
             </el-form-item>
             <el-form-item label="最大文件大小">
-              <el-input-number v-model="storageSettings.maxFileSize" :min="1" :max="100" />
+              <el-input-number
+                v-model="storageSettings.maxFileSize"
+                :min="1"
+                :max="100"
+              />
               <span style="margin-left: 10px">MB</span>
             </el-form-item>
             <el-form-item label="允许的文件类型">
@@ -166,7 +282,12 @@
               />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveStorageSettings">保存设置</el-button>
+              <el-button
+                type="primary"
+                @click="saveStorageSettings"
+              >
+                保存设置
+              </el-button>
             </el-form-item>
           </el-form>
         </div>

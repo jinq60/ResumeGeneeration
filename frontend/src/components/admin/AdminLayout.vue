@@ -1,7 +1,10 @@
 <template>
   <div class="admin-layout">
     <el-container>
-      <el-aside width="240px" class="sidebar">
+      <el-aside
+        width="240px"
+        class="sidebar"
+      >
         <div class="logo">
           <h2>管理后台</h2>
         </div>
@@ -35,18 +38,26 @@
       <el-container>
         <el-header class="header">
           <div class="header-left">
-            <el-button text @click="toggleSidebar">
+            <el-button
+              text
+              @click="toggleSidebar"
+            >
               <el-icon><Fold /></el-icon>
             </el-button>
             <el-breadcrumb separator="/">
-              <el-breadcrumb-item :to="{ path: '/admin' }">首页</el-breadcrumb-item>
+              <el-breadcrumb-item :to="{ path: '/admin' }">
+                首页
+              </el-breadcrumb-item>
               <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
             </el-breadcrumb>
           </div>
           <div class="header-right">
             <el-dropdown @command="handleCommand">
               <span class="user-dropdown">
-                <el-avatar :size="32" :src="userInfo.avatar">
+                <el-avatar
+                  :size="32"
+                  :src="userInfo.avatar"
+                >
                   <el-icon><User /></el-icon>
                 </el-avatar>
                 <span class="username">{{ userInfo.nickname }}</span>
@@ -54,8 +65,15 @@
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="profile">个人资料</el-dropdown-item>
-                  <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+                  <el-dropdown-item command="profile">
+                    个人资料
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    command="logout"
+                    divided
+                  >
+                    退出登录
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>

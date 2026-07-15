@@ -1,12 +1,28 @@
 <template>
   <div class="login-view">
-    <el-card class="login-card" shadow="hover">
-      <h1 class="title">智能简历生成工具</h1>
-      <p class="subtitle">登录后开始创建专业简历</p>
+    <el-card
+      class="login-card"
+      shadow="hover"
+    >
+      <h1 class="title">
+        智能简历生成工具
+      </h1>
+      <p class="subtitle">
+        登录后开始创建专业简历
+      </p>
 
-      <el-tabs v-model="activeTab" class="login-tabs">
-        <el-tab-pane label="登录" name="login">
-          <el-form :model="loginForm" @submit.prevent="handleLogin">
+      <el-tabs
+        v-model="activeTab"
+        class="login-tabs"
+      >
+        <el-tab-pane
+          label="登录"
+          name="login"
+        >
+          <el-form
+            :model="loginForm"
+            @submit.prevent="handleLogin"
+          >
             <el-form-item>
               <el-input
                 v-model="loginForm.account"
@@ -22,24 +38,53 @@
                 show-password
               />
             </el-form-item>
-            <el-button type="primary" class="submit-btn" @click="handleLogin" :loading="loading">
+            <el-button
+              type="primary"
+              class="submit-btn"
+              :loading="loading"
+              @click="handleLogin"
+            >
               登录
             </el-button>
           </el-form>
         </el-tab-pane>
 
-        <el-tab-pane label="注册" name="register">
-          <el-form :model="registerForm" @submit.prevent="handleRegister">
+        <el-tab-pane
+          label="注册"
+          name="register"
+        >
+          <el-form
+            :model="registerForm"
+            @submit.prevent="handleRegister"
+          >
             <el-form-item>
-              <el-input v-model="registerForm.phone" placeholder="手机号" clearable />
+              <el-input
+                v-model="registerForm.phone"
+                placeholder="手机号"
+                clearable
+              />
             </el-form-item>
             <el-form-item>
-              <el-input v-model="registerForm.verifyCode" placeholder="验证码（任意 6 位数字）" maxlength="6" />
+              <el-input
+                v-model="registerForm.verifyCode"
+                placeholder="验证码（任意 6 位数字）"
+                maxlength="6"
+              />
             </el-form-item>
             <el-form-item>
-              <el-input v-model="registerForm.password" type="password" placeholder="密码（6-32 位）" show-password />
+              <el-input
+                v-model="registerForm.password"
+                type="password"
+                placeholder="密码（6-32 位）"
+                show-password
+              />
             </el-form-item>
-            <el-button type="primary" class="submit-btn" @click="handleRegister" :loading="loading">
+            <el-button
+              type="primary"
+              class="submit-btn"
+              :loading="loading"
+              @click="handleRegister"
+            >
               注册
             </el-button>
           </el-form>
@@ -48,11 +93,21 @@
 
       <el-divider>或</el-divider>
 
-      <el-button class="guest-btn" plain @click="handleGuest" :loading="loading">
+      <el-button
+        class="guest-btn"
+        plain
+        :loading="loading"
+        @click="handleGuest"
+      >
         游客模式，直接体验
       </el-button>
 
-      <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
+      <p
+        v-if="errorMsg"
+        class="error-msg"
+      >
+        {{ errorMsg }}
+      </p>
     </el-card>
   </div>
 </template>

@@ -2,12 +2,26 @@
   <div class="editor-view">
     <div class="editor-header">
       <div class="header-left">
-        <el-button @click="handleBack" :icon="ArrowLeft">返回</el-button>
+        <el-button
+          :icon="ArrowLeft"
+          @click="handleBack"
+        >
+          返回
+        </el-button>
         <h2>{{ resume?.title || '新建简历' }}</h2>
       </div>
       <div class="header-right">
-        <el-button @click="handlePreview" :icon="View">预览</el-button>
-        <el-button type="primary" @click="handleSave" :loading="saving">
+        <el-button
+          :icon="View"
+          @click="handlePreview"
+        >
+          预览
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="saving"
+          @click="handleSave"
+        >
           <el-icon><Check /></el-icon>
           保存
         </el-button>
@@ -16,40 +30,95 @@
 
     <div class="editor-content">
       <div class="editor-left">
-        <el-tabs v-model="activeTab" class="editor-tabs">
-          <el-tab-pane label="基本信息" name="basic">
-            <BasicInfoForm v-if="resume" :resume="resume" @update="handleBasicInfoUpdate" />
+        <el-tabs
+          v-model="activeTab"
+          class="editor-tabs"
+        >
+          <el-tab-pane
+            label="基本信息"
+            name="basic"
+          >
+            <BasicInfoForm
+              v-if="resume"
+              :resume="resume"
+              @update="handleBasicInfoUpdate"
+            />
           </el-tab-pane>
-          <el-tab-pane label="教育经历" name="education">
-            <EducationForm v-if="resume" :sections="resume.sections" @update="handleSectionsUpdate" />
+          <el-tab-pane
+            label="教育经历"
+            name="education"
+          >
+            <EducationForm
+              v-if="resume"
+              :sections="resume.sections"
+              @update="handleSectionsUpdate"
+            />
           </el-tab-pane>
-          <el-tab-pane label="项目经历" name="project">
-            <ProjectForm v-if="resume" :sections="resume.sections" @update="handleSectionsUpdate" />
+          <el-tab-pane
+            label="项目经历"
+            name="project"
+          >
+            <ProjectForm
+              v-if="resume"
+              :sections="resume.sections"
+              @update="handleSectionsUpdate"
+            />
           </el-tab-pane>
-          <el-tab-pane label="工作经历" name="work">
-            <WorkForm v-if="resume" :sections="resume.sections" @update="handleSectionsUpdate" />
+          <el-tab-pane
+            label="工作经历"
+            name="work"
+          >
+            <WorkForm
+              v-if="resume"
+              :sections="resume.sections"
+              @update="handleSectionsUpdate"
+            />
           </el-tab-pane>
-          <el-tab-pane label="技能" name="skill">
-            <SkillForm v-if="resume" :sections="resume.sections" @update="handleSectionsUpdate" />
+          <el-tab-pane
+            label="技能"
+            name="skill"
+          >
+            <SkillForm
+              v-if="resume"
+              :sections="resume.sections"
+              @update="handleSectionsUpdate"
+            />
           </el-tab-pane>
-          <el-tab-pane label="自我介绍" name="introduction">
-            <IntroductionForm v-if="resume" :sections="resume.sections" @update="handleSectionsUpdate" />
+          <el-tab-pane
+            label="自我介绍"
+            name="introduction"
+          >
+            <IntroductionForm
+              v-if="resume"
+              :sections="resume.sections"
+              @update="handleSectionsUpdate"
+            />
           </el-tab-pane>
-          <el-tab-pane label="自定义模块" name="custom">
-            <CustomForm v-if="resume" :sections="resume.sections" @update="handleSectionsUpdate" />
+          <el-tab-pane
+            label="自定义模块"
+            name="custom"
+          >
+            <CustomForm
+              v-if="resume"
+              :sections="resume.sections"
+              @update="handleSectionsUpdate"
+            />
           </el-tab-pane>
         </el-tabs>
       </div>
 
       <div class="editor-right">
-        <ResumePreview v-if="resume" :resume="resume" />
+        <ResumePreview
+          v-if="resume"
+          :resume="resume"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { defineComponent, ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, View, Check } from '@element-plus/icons-vue'

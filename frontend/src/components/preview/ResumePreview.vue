@@ -1,14 +1,36 @@
 <template>
   <div class="resume-preview-container">
-    <div v-if="loading" class="loading-state">
-      <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+    <div
+      v-if="loading"
+      class="loading-state"
+    >
+      <el-icon
+        class="is-loading"
+        :size="32"
+      >
+        <Loading />
+      </el-icon>
       <p>正在加载预览...</p>
     </div>
 
-    <div v-else-if="error" class="error-state">
-      <el-icon :size="32" color="#f56c6c"><Warning /></el-icon>
+    <div
+      v-else-if="error"
+      class="error-state"
+    >
+      <el-icon
+        :size="32"
+        color="#f56c6c"
+      >
+        <Warning />
+      </el-icon>
       <p>{{ error }}</p>
-      <el-button @click="loadPreview" type="primary" size="small">重试</el-button>
+      <el-button
+        type="primary"
+        size="small"
+        @click="loadPreview"
+      >
+        重试
+      </el-button>
     </div>
 
     <iframe
@@ -19,7 +41,7 @@
       frameborder="0"
       sandbox="allow-same-origin"
       @load="handleIframeLoad"
-    ></iframe>
+    />
   </div>
 </template>
 
