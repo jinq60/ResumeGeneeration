@@ -15,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,13 +52,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String key = resolveKey(request);
+        long now = System.currentTimeMillis();
 
-        // 清理过期计数器，防止内存无限增长
-        cleanupExpiredCounters();
+        WindowCounter counter = counters.compute(key, (k, existing) -> {
+            if (existing == null || now - existing.windowStart > windowMs) {
+                return new WindowCounter(now);
+            }
+            return existing;
+        });
 
-        WindowCounter counter = counters.computeIfAbsent(key, k -> new WindowCounter());
+        cleanupExpiredCounters(now);
 
-        if (counter.tryAcquire(maxRequests, windowMs)) {
+        if (counter.tryAcquire(maxRequests)) {
             chain.doFilter(request, response);
         } else {
             log.warn("Rate limit exceeded: key={}", key);
@@ -75,25 +81,33 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return "rate:" + request.getRemoteAddr();
     }
 
-    private void cleanupExpiredCounters() {
-        long now = System.currentTimeMillis();
-        counters.entrySet().removeIf(entry -> now - entry.getValue().windowStart > windowMs);
+    /**
+     * 清理过期计数器，防止内存无限增长。
+     * <p>
+     * 使用 {@link ConcurrentHashMap#compute(Object, java.util.function.BiFunction)} 按 key
+     * 原子地删除或保留，避免与窗口重置发生竞态。
+     * </p>
+     */
+    private void cleanupExpiredCounters(long now) {
+        for (String key : new ArrayList<>(counters.keySet())) {
+            counters.compute(key, (k, counter) -> {
+                if (counter == null) {
+                    return null;
+                }
+                return now - counter.windowStart > windowMs ? null : counter;
+            });
+        }
     }
 
     private static class WindowCounter {
-        private volatile long windowStart = System.currentTimeMillis();
+        private final long windowStart;
         private final AtomicInteger count = new AtomicInteger(0);
 
-        boolean tryAcquire(int maxRequests, long windowMs) {
-            long now = System.currentTimeMillis();
-            if (now - windowStart > windowMs) {
-                synchronized (this) {
-                    if (now - windowStart > windowMs) {
-                        windowStart = now;
-                        count.set(0);
-                    }
-                }
-            }
+        WindowCounter(long windowStart) {
+            this.windowStart = windowStart;
+        }
+
+        boolean tryAcquire(int maxRequests) {
             return count.incrementAndGet() <= maxRequests;
         }
     }

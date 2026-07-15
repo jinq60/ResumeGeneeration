@@ -159,7 +159,7 @@ class UserServiceTest {
         RefreshRequest request = new RefreshRequest();
         request.setRefreshToken("invalid_token");
 
-        when(jwtTokenProvider.validateToken("invalid_token")).thenReturn(false);
+        when(jwtTokenProvider.validateRefreshToken("invalid_token")).thenReturn(false);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> userService.refresh(request));
         assertEquals(ResultCode.AUTH_REFRESH_TOKEN_INVALID, ex.getErrorCode());
