@@ -29,9 +29,9 @@ app:
     access-key: ${APP_MINIO_ACCESS_KEY}
     secret-key: ${APP_MINIO_SECRET_KEY}
     buckets:
-      avatars: ${APP_MINIO_BUCKET_AVATARS:resume-avatars}
-      pdfs: ${APP_MINIO_BUCKET_PDFS:resume-pdfs}
-      templates: ${APP_MINIO_BUCKET_TEMPLATES:resume-templates}
+      avatars: ${APP_MINIO_BUCKET_AVATARS}
+      pdfs: ${APP_MINIO_BUCKET_PDFS}
+      templates: ${APP_MINIO_BUCKET_TEMPLATES}
     presigned-url-expiration: 3600
   jwt:
     secret: ${APP_JWT_SECRET:}

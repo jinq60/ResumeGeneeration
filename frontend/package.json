@@ -22,13 +22,16 @@
     "@element-plus/icons-vue": "^2.3.1",
     "vue-cropper": "^1.1.1"
   },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.4",
+    "@vitejs/plugin-vue": "^5.2.4",
     "@vue/test-utils": "^2.4.5",
     "typescript": "^5.4.5",
-    "vite": "^5.2.8",
+    "vite": "^6.4.3",
     "vue-tsc": "^2.0.11",
-    "vitest": "^1.4.0",
+    "vitest": "^3.2.7",
     "jsdom": "^24.0.0",
     "@playwright/test": "^1.43.0",
     "eslint": "^8.57.0",
