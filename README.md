@@ -5,7 +5,7 @@
 ## 项目状态
 
 - **设计文档**：v1.1 已对齐，见 [设计文档](#设计文档)。
-- **后端完成度**：认证、简历、模板、PDF 导出等 P0 核心模块已实现，`mvn test` 74 个用例通过；AI 点评/优化、后台管理为占位或部分实现。
+- **后端完成度**：认证、简历、模板、PDF 导出等 P0 核心模块已实现，`mvn test` 75 个用例通过；AI 点评/优化、后台管理为占位或部分实现。
 - **前端完成度**：P0 约 25%，核心页面待实现；lint / build / unit tests 已通过。
 - **CI/CD**：GitHub Actions 已启用，覆盖 `production`、`develop`、`stable`。
 - **分支模型**：`production`（默认）/ `develop` / `stable`，详见 `docs/development-workflow.md`。

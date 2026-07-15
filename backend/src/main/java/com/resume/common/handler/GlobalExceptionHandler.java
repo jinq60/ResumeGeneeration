@@ -81,6 +81,7 @@ public class GlobalExceptionHandler {
                  ResultCode.TEMPLATE_CODE_IMMUTABLE,
                  ResultCode.TEMPLATE_BUILTIN_PROTECTED -> 409;
             case ResultCode.RATE_LIMITED -> 429;
+            case ResultCode.PDF_EXPORT_FAILED -> 500;
             case ResultCode.INTERNAL_ERROR -> 500;
             default -> {
                 if (errorCode >= 1000 && errorCode < 2000) {

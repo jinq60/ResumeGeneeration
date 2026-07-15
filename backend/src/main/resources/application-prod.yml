@@ -34,7 +34,7 @@ app:
       templates: ${APP_MINIO_BUCKET_TEMPLATES:resume-templates}
     presigned-url-expiration: 3600
   jwt:
-    secret: ${APP_JWT_SECRET}
+    secret: ${APP_JWT_SECRET:}
     access-token-expiration: 3600000
     refresh-token-expiration: 604800000
   cors:
