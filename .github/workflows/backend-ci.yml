@@ -1,0 +1,32 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - production
+      - develop
+      - stable
+  pull_request:
+    branches:
+      - production
+      - develop
+
+jobs:
+  test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Run backend tests
+        working-directory: backend
+        run: mvn -B clean test

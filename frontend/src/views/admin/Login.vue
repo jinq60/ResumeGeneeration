@@ -5,7 +5,12 @@
         <h1>管理员登录</h1>
         <p>智能简历生成系统 - 管理后台</p>
       </div>
-      <el-form :model="loginForm" :rules="rules" ref="loginFormRef" class="login-form">
+      <el-form
+        ref="loginFormRef"
+        :model="loginForm"
+        :rules="rules"
+        class="login-form"
+      >
         <el-form-item prop="username">
           <el-input
             v-model="loginForm.username"

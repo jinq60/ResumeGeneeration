@@ -2,23 +2,43 @@
   <div class="resume-list-view">
     <div class="header">
       <h2>我的简历</h2>
-      <el-button type="primary" @click="handleCreate">
+      <el-button
+        type="primary"
+        @click="handleCreate"
+      >
         <el-icon><Plus /></el-icon>
         创建简历
       </el-button>
     </div>
 
-    <div v-if="loading" class="loading">
-      <el-skeleton :rows="3" animated />
+    <div
+      v-if="loading"
+      class="loading"
+    >
+      <el-skeleton
+        :rows="3"
+        animated
+      />
     </div>
 
-    <div v-else-if="resumes.length === 0" class="empty">
+    <div
+      v-else-if="resumes.length === 0"
+      class="empty"
+    >
       <el-empty description="暂无简历，点击上方按钮创建">
-        <el-button type="primary" @click="handleCreate">创建简历</el-button>
+        <el-button
+          type="primary"
+          @click="handleCreate"
+        >
+          创建简历
+        </el-button>
       </el-empty>
     </div>
 
-    <div v-else class="resume-list">
+    <div
+      v-else
+      class="resume-list"
+    >
       <el-card
         v-for="resume in resumes"
         :key="resume.id"
@@ -27,15 +47,32 @@
         @click="handleEdit(resume.id)"
       >
         <div class="resume-card-header">
-          <h3 class="resume-title">{{ resume.title }}</h3>
-          <div class="resume-actions" @click.stop>
-            <el-dropdown @command="(cmd) => handleAction(cmd, resume)">
-              <el-button circle :icon="MoreFilled" />
+          <h3 class="resume-title">
+            {{ resume.title }}
+          </h3>
+          <div
+            class="resume-actions"
+            @click.stop
+          >
+            <el-dropdown @command="(cmd: string) => handleAction(cmd, resume)">
+              <el-button
+                circle
+                :icon="MoreFilled"
+              />
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="rename">重命名</el-dropdown-item>
-                  <el-dropdown-item command="duplicate">复制</el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                  <el-dropdown-item command="rename">
+                    重命名
+                  </el-dropdown-item>
+                  <el-dropdown-item command="duplicate">
+                    复制
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    command="delete"
+                    divided
+                  >
+                    删除
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -43,8 +80,13 @@
         </div>
 
         <div class="resume-info">
-          <p class="resume-scene">{{ getSceneText(resume.scene) }}</p>
-          <p class="resume-position" v-if="resume.targetPosition">
+          <p class="resume-scene">
+            {{ getSceneText(resume.scene) }}
+          </p>
+          <p
+            v-if="resume.targetPosition"
+            class="resume-position"
+          >
             目标岗位：{{ resume.targetPosition }}
           </p>
           <p class="resume-time">
@@ -53,10 +95,17 @@
         </div>
 
         <div class="resume-footer">
-          <el-button type="primary" size="small" @click.stop="handleEdit(resume.id)">
+          <el-button
+            type="primary"
+            size="small"
+            @click.stop="handleEdit(resume.id)"
+          >
             编辑
           </el-button>
-          <el-button size="small" @click.stop="handlePreview(resume.id)">
+          <el-button
+            size="small"
+            @click.stop="handlePreview(resume.id)"
+          >
             预览
           </el-button>
         </div>
@@ -64,11 +113,25 @@
     </div>
 
     <!-- 重命名对话框 -->
-    <el-dialog v-model="renameDialogVisible" title="重命名简历" width="400px">
-      <el-input v-model="newTitle" placeholder="请输入新标题" />
+    <el-dialog
+      v-model="renameDialogVisible"
+      title="重命名简历"
+      width="400px"
+    >
+      <el-input
+        v-model="newTitle"
+        placeholder="请输入新标题"
+      />
       <template #footer>
-        <el-button @click="renameDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleRenameConfirm">确定</el-button>
+        <el-button @click="renameDialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          @click="handleRenameConfirm"
+        >
+          确定
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -171,7 +234,7 @@ async function handleRenameConfirm() {
 
 async function handleDuplicate(id: string) {
   try {
-    const result = await resumeApi.duplicate(id)
+    await resumeApi.duplicate(id)
     ElMessage.success('复制成功')
     await loadResumes()
   } catch (e: any) {
