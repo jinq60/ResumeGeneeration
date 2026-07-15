@@ -2,6 +2,8 @@ package com.resume.template.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
@@ -28,6 +30,7 @@ import java.util.List;
 public class TemplateService {
 
     private final TemplateMapper templateMapper;
+    private final ObjectMapper objectMapper;
 
     /**
      * 前台模板列表。
@@ -111,6 +114,7 @@ public class TemplateService {
         if (exist != null) {
             throw new BusinessException(ResultCode.TEMPLATE_CODE_EXISTS, "模板编码已存在。");
         }
+        validateConfig(request.getConfig());
 
         Template template = new Template();
         template.setCode(request.getCode());
@@ -148,6 +152,7 @@ public class TemplateService {
         if (!template.getCode().equals(request.getCode())) {
             throw new BusinessException(ResultCode.TEMPLATE_CODE_IMMUTABLE, "模板编码不可修改。");
         }
+        validateConfig(request.getConfig());
 
         template.setName(request.getName());
         template.setCategory(request.getCategory());
@@ -197,6 +202,17 @@ public class TemplateService {
         template.setDeleted(BizConstant.DELETED);
         template.setUpdatedAt(LocalDateTime.now());
         templateMapper.updateById(template);
+    }
+
+    private void validateConfig(Object config) {
+        if (config == null) {
+            throw new BusinessException(ResultCode.TEMPLATE_CONFIG_INVALID, "模板配置为必填项。");
+        }
+        try {
+            objectMapper.writeValueAsString(config);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ResultCode.TEMPLATE_CONFIG_INVALID, "模板配置格式不正确。", e);
+        }
     }
 
     private Template findByCode(String code) {

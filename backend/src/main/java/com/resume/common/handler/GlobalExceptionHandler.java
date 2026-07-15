@@ -22,7 +22,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<R<Void>> handleBusinessException(BusinessException e) {
-        log.warn("Business exception: code={}, message={}", e.getErrorCode(), e.getMessage());
+        if (e.getCause() != null) {
+            log.warn("Business exception: code={}, message={}", e.getErrorCode(), e.getMessage(), e);
+        } else {
+            log.warn("Business exception: code={}, message={}", e.getErrorCode(), e.getMessage());
+        }
         int httpStatus = resolveHttpStatus(e.getErrorCode());
         return ResponseEntity.status(httpStatus).body(R.error(e.getErrorCode(), e.getMessage()));
     }

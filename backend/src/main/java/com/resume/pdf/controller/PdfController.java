@@ -9,6 +9,7 @@ import com.resume.pdf.service.PdfService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +22,7 @@ import java.util.Map;
 /**
  * PDF 导出相关接口。
  */
+@Slf4j
 @RestController
 @RequestMapping("/pdf")
 @RequiredArgsConstructor
@@ -56,7 +58,8 @@ public class PdfController {
             out.write(content);
             out.flush();
         } catch (Exception e) {
-            throw new BusinessException(ResultCode.PDF_EXPORT_FAILED, "PDF 下载失败。");
+            log.error("PDF download failed, taskId={}", taskId, e);
+            throw new BusinessException(ResultCode.PDF_EXPORT_FAILED, "PDF 下载失败。", e);
         }
     }
 }
