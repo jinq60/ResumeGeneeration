@@ -309,11 +309,25 @@ public class ResumeRenderService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> parseConfig(String json) {
+    private Map<String, Object> parseConfig(Object config) {
+        if (config == null) {
+            return Map.of();
+        }
+        if (config instanceof Map) {
+            return (Map<String, Object>) config;
+        }
+        if (config instanceof String json) {
+            try {
+                return objectMapper.readValue(json, Map.class);
+            } catch (Exception e) {
+                log.warn("Parse template config failed", e);
+                return Map.of();
+            }
+        }
         try {
-            return objectMapper.readValue(json, Map.class);
+            return objectMapper.convertValue(config, Map.class);
         } catch (Exception e) {
-            log.warn("Parse template config failed", e);
+            log.warn("Convert template config failed", e);
             return Map.of();
         }
     }

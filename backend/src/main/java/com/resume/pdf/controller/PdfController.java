@@ -1,6 +1,8 @@
 package com.resume.pdf.controller;
 
+import com.resume.common.constant.ResultCode;
 import com.resume.common.entity.R;
+import com.resume.common.exception.BusinessException;
 import com.resume.pdf.dto.ExportPdfRequest;
 import com.resume.pdf.dto.PdfTaskResponse;
 import com.resume.pdf.service.PdfService;
@@ -54,7 +56,7 @@ public class PdfController {
             out.write(content);
             out.flush();
         } catch (Exception e) {
-            throw new RuntimeException("PDF 下载失败", e);
+            throw new BusinessException(ResultCode.PDF_EXPORT_FAILED, "PDF 下载失败。");
         }
     }
 }

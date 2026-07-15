@@ -1,28 +1,28 @@
 package com.resume.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.resume.common.entity.R;
+import com.resume.common.mapper.IdempotencyRecordMapper;
+import com.resume.common.security.WithMockJwt;
 import com.resume.user.dto.AuthResponse;
+import com.resume.user.security.JwtTokenProvider;
 import com.resume.user.dto.LoginRequest;
 import com.resume.user.dto.RegisterRequest;
 import com.resume.user.service.UserService;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@Disabled("需要修复Spring Security配置问题")
 @WebMvcTest(AuthController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
     @Autowired
@@ -34,12 +34,18 @@ class AuthControllerTest {
     @MockBean
     private UserService userService;
 
+    @MockBean
+    private IdempotencyRecordMapper idempotencyRecordMapper;
+
+    @MockBean
+    private JwtTokenProvider jwtTokenProvider;
+
     @Test
     void testRegister_Success() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setPhone("13800138000");
         request.setVerifyCode("123456");
-        request.setPassword("password123");
+        request.setPassword("Password123");
 
         AuthResponse response = new AuthResponse();
         response.setUserId("user123");
@@ -49,7 +55,6 @@ class AuthControllerTest {
         when(userService.register(any(RegisterRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/auth/register")
-                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -63,10 +68,9 @@ class AuthControllerTest {
         RegisterRequest request = new RegisterRequest();
         request.setPhone("invalid");
         request.setVerifyCode("123456");
-        request.setPassword("password123");
+        request.setPassword("Password123");
 
         mockMvc.perform(post("/auth/register")
-                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -76,7 +80,7 @@ class AuthControllerTest {
     void testLogin_Success() throws Exception {
         LoginRequest request = new LoginRequest();
         request.setAccount("13800138000");
-        request.setPassword("password123");
+        request.setPassword("Password123");
         request.setLoginType("phone");
 
         AuthResponse response = new AuthResponse();
@@ -87,7 +91,6 @@ class AuthControllerTest {
         when(userService.login(any(LoginRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/auth/login")
-                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -105,8 +108,7 @@ class AuthControllerTest {
 
         when(userService.createGuest()).thenReturn(response);
 
-        mockMvc.perform(post("/auth/guest")
-                .with(csrf()))
+        mockMvc.perform(post("/auth/guest"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.userId").value("guest123"))

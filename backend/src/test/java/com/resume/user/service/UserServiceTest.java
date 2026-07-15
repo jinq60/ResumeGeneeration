@@ -52,10 +52,10 @@ class UserServiceTest {
         RegisterRequest request = new RegisterRequest();
         request.setPhone("13800000000");
         request.setVerifyCode("123456");
-        request.setPassword("123456");
+        request.setPassword("Password123");
 
         when(userMapper.selectOne(any())).thenReturn(null);
-        when(passwordEncoder.encode("123456")).thenReturn("hashed");
+        when(passwordEncoder.encode("Password123")).thenReturn("hashed");
         when(userMapper.insert(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             u.setId("user_1");
@@ -87,7 +87,7 @@ class UserServiceTest {
         RegisterRequest request = new RegisterRequest();
         request.setPhone("13800000000");
         request.setVerifyCode("123456");
-        request.setPassword("123456");
+        request.setPassword("Password123");
 
         User exist = new User();
         exist.setId("user_old");

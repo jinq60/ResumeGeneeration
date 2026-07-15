@@ -1,7 +1,6 @@
 package com.resume.template.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
@@ -31,13 +30,11 @@ class TemplateServiceTest {
     @Mock
     private TemplateMapper templateMapper;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
     private TemplateService templateService;
 
     @BeforeEach
     void setUp() {
-        templateService = new TemplateService(templateMapper, objectMapper);
+        templateService = new TemplateService(templateMapper);
     }
 
     @Test
