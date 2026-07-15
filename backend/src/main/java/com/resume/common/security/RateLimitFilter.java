@@ -19,14 +19,14 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 简易内存限流过滤器。
  * <p>
  * 基于固定时间窗口的请求计数，达到上限后返回 429。
- * 默认使用 TCP 连接对端地址 {@link HttpServletRequest#getRemoteAddr()}，不直接信任客户端传入的
- * {@code X-Forwarded-For}，避免通过伪造请求头绕过限流。
- * 过期计数器会在每次请求时清理，防止内存持续增长。
+ * 每个 key 的窗口创建/重置与计数增加通过 {@link ConcurrentHashMap#compute} 原子完成；
+ * 窗口创建时使用 {@link System#currentTimeMillis()}，避免 cleanup 误删刚重置的计数器。
  * </p>
  */
 @Slf4j
@@ -38,6 +38,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
 
     private final Map<String, WindowCounter> counters = new ConcurrentHashMap<>();
+    private final AtomicLong lastCleanupTime = new AtomicLong(0);
 
     public RateLimitFilter(
             @Value("${app.rate-limit.max-requests:60}") int maxRequests,
@@ -52,18 +53,19 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String key = resolveKey(request);
-        long now = System.currentTimeMillis();
 
-        WindowCounter counter = counters.compute(key, (k, existing) -> {
-            if (existing == null || now - existing.windowStart > windowMs) {
-                return new WindowCounter(now);
-            }
-            return existing;
+        // 使用 compute 原子地完成窗口创建/重置与计数增加，避免 cleanup 与窗口更新之间出现竞态。
+        boolean[] allowed = new boolean[1];
+        counters.compute(key, (k, existing) -> {
+            long now = System.currentTimeMillis();
+            WindowCounter counter = (existing == null || now - existing.getWindowStart() > windowMs)
+                    ? new WindowCounter(now)
+                    : existing;
+            allowed[0] = counter.tryAcquire(maxRequests);
+            return counter;
         });
 
-        cleanupExpiredCounters(now);
-
-        if (counter.tryAcquire(maxRequests)) {
+        if (allowed[0]) {
             chain.doFilter(request, response);
         } else {
             log.warn("Rate limit exceeded: key={}", key);
@@ -73,6 +75,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.getWriter().write(objectMapper.writeValueAsString(
                     R.error(ResultCode.RATE_LIMITED, "请求过于频繁，请稍后再试。")));
         }
+
+        // 窗口级别的清理不会过于频繁地执行，避免每次请求都全量扫描。
+        tryCleanup();
     }
 
     private String resolveKey(HttpServletRequest request) {
@@ -82,7 +87,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * 清理过期计数器，防止内存无限增长。
+     * 按窗口周期触发过期计数器清理，防止内存无限增长。
+     */
+    private void tryCleanup() {
+        long now = System.currentTimeMillis();
+        long last = lastCleanupTime.get();
+        if (now - last > windowMs && lastCleanupTime.compareAndSet(last, now)) {
+            cleanupExpiredCounters(now);
+        }
+    }
+
+    /**
+     * 清理过期计数器。
      * <p>
      * 使用 {@link ConcurrentHashMap#compute(Object, java.util.function.BiFunction)} 按 key
      * 原子地删除或保留，避免与窗口重置发生竞态。
@@ -94,7 +110,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 if (counter == null) {
                     return null;
                 }
-                return now - counter.windowStart > windowMs ? null : counter;
+                return now - counter.getWindowStart() > windowMs ? null : counter;
             });
         }
     }
@@ -105,6 +121,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         WindowCounter(long windowStart) {
             this.windowStart = windowStart;
+        }
+
+        long getWindowStart() {
+            return windowStart;
         }
 
         boolean tryAcquire(int maxRequests) {

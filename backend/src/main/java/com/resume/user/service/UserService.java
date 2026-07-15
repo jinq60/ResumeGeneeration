@@ -127,13 +127,7 @@ public class UserService {
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.insert(user);
 
-        AuthResponse response = new AuthResponse();
-        response.setUserId(user.getId());
-        response.setAccessToken(jwtTokenProvider.generateAccessToken(user.getId(), true));
-        response.setRefreshToken(jwtTokenProvider.generateRefreshToken(user.getId()));
-        response.setExpiresIn(jwtTokenProvider.getAccessTokenExpiration() / 1000);
-        response.setIsGuest(true);
-        return response;
+        return buildAuthResponse(user);
     }
 
     /**

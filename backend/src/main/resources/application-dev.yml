@@ -15,6 +15,9 @@ logging:
     org.springframework.security: debug
 
 app:
+  jwt:
+    # dev-only 默认密钥，仅用于本地开发；长度 40 字节，已 Base64 编码。
+    secret: cmVzdW1lLWdlbmVyYXRpb24tZGV2LW9ubHktc2VjcmV0LWtleS0xMjM=
   minio:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
     access-key: ${MINIO_ACCESS_KEY:minioadmin}

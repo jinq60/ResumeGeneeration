@@ -14,6 +14,7 @@
 
 ### 调整
 
+- `GET /resumes/{resumeId}/preview` 由匿名访问改为需 JWT 认证并校验简历所有者，防止个人简历信息泄露。
 - PDF 导出无姓名时文件名统一为 `我的简历_yyyyMMdd.pdf`（例如 `我的简历_20260707.pdf`）。
 - `UpdateResumeRequest.sections` 由必填改为可选。
 - 头像优化任务明确为 P0 占位实现，P1 接入真实 AI。
