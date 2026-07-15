@@ -71,6 +71,7 @@ public class UserService {
         user.setEmail(request.getEmail());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setIsGuest(BizConstant.IS_NOT_GUEST);
+        user.setRole(BizConstant.USER_ROLE_USER);
         user.setStatus(BizConstant.USER_STATUS_ACTIVE);
         user.setDeleted(BizConstant.NOT_DELETED);
         user.setCreatedAt(LocalDateTime.now());
@@ -116,6 +117,7 @@ public class UserService {
     public AuthResponse createGuest() {
         User user = new User();
         user.setIsGuest(BizConstant.IS_GUEST);
+        user.setRole(BizConstant.USER_ROLE_USER);
         user.setStatus(BizConstant.USER_STATUS_ACTIVE);
         user.setDeleted(BizConstant.NOT_DELETED);
         user.setCreatedAt(LocalDateTime.now());
@@ -135,8 +137,8 @@ public class UserService {
      * 刷新 Token。
      */
     public AuthResponse refresh(RefreshRequest request) {
-        if (!jwtTokenProvider.validateToken(request.getRefreshToken())) {
-            throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌无效或已过期。");
+        if (!jwtTokenProvider.validateRefreshToken(request.getRefreshToken())) {
+            throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌无效、已过期或类型不正确。");
         }
         String userId = jwtTokenProvider.getUserId(request.getRefreshToken());
         User user = userMapper.selectById(userId);
@@ -167,8 +169,9 @@ public class UserService {
     private AuthResponse buildAuthResponse(User user) {
         AuthResponse response = new AuthResponse();
         response.setUserId(user.getId());
+        String role = user.getRole() == null ? BizConstant.USER_ROLE_USER : user.getRole();
         response.setAccessToken(jwtTokenProvider.generateAccessToken(user.getId(),
-                BizConstant.IS_GUEST.equals(user.getIsGuest())));
+                BizConstant.IS_GUEST.equals(user.getIsGuest()), role));
         response.setRefreshToken(jwtTokenProvider.generateRefreshToken(user.getId()));
         response.setExpiresIn(jwtTokenProvider.getAccessTokenExpiration() / 1000);
         response.setIsGuest(BizConstant.IS_GUEST.equals(user.getIsGuest()));

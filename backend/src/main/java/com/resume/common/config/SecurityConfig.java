@@ -21,7 +21,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
- * 安全基础配置：无会话、JWT 认证、CORS。
+ * 安全基础配置：无会话、JWT 认证、CORS、RBAC。
  */
 @Configuration
 @EnableWebSecurity
@@ -48,7 +48,7 @@ public class SecurityConfig {
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/**", "/templates", "/templates/**").permitAll()
-                .requestMatchers("/resumes/*/preview").permitAll()
+                .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .anyRequest().authenticated()

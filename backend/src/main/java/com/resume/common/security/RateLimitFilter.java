@@ -23,6 +23,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 简易内存限流过滤器。
  * <p>
  * 基于固定时间窗口的请求计数，达到上限后返回 429。
+ * 默认使用 TCP 连接对端地址 {@link HttpServletRequest#getRemoteAddr()}，不直接信任客户端传入的
+ * {@code X-Forwarded-For}，避免通过伪造请求头绕过限流。
+ * 过期计数器会在每次请求时清理，防止内存持续增长。
  * </p>
  */
 @Slf4j
@@ -48,6 +51,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String key = resolveKey(request);
+
+        // 清理过期计数器，防止内存无限增长
+        cleanupExpiredCounters();
+
         WindowCounter counter = counters.computeIfAbsent(key, k -> new WindowCounter());
 
         if (counter.tryAcquire(maxRequests, windowMs)) {
@@ -63,12 +70,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveKey(HttpServletRequest request) {
-        String ip = request.getRemoteAddr();
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            ip = forwarded.split(",")[0].trim();
-        }
-        return "rate:" + ip;
+        // 不直接信任 X-Forwarded-For，防止客户端伪造 IP 绕过限流。
+        // 如需获取真实客户端 IP，应在可信反向代理后统一部署，由网关统一注入并校验。
+        return "rate:" + request.getRemoteAddr();
+    }
+
+    private void cleanupExpiredCounters() {
+        long now = System.currentTimeMillis();
+        counters.entrySet().removeIf(entry -> now - entry.getValue().windowStart > windowMs);
     }
 
     private static class WindowCounter {

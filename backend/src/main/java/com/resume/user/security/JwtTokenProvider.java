@@ -1,5 +1,6 @@
 package com.resume.user.security;
 
+import com.resume.common.constant.BizConstant;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -14,10 +15,20 @@ import java.util.Date;
 
 /**
  * JWT Token 生成与校验工具。
+ * <p>
+ * 访问令牌（access）与刷新令牌（refresh）通过 claim {@code type} 区分，防止刷新令牌被用于业务接口。
+ * </p>
  */
 @Slf4j
 @Component
 public class JwtTokenProvider {
+
+    public static final String CLAIM_TYPE = "type";
+    public static final String CLAIM_GUEST = "guest";
+    public static final String CLAIM_ROLE = "role";
+
+    public static final String TOKEN_TYPE_ACCESS = "access";
+    public static final String TOKEN_TYPE_REFRESH = "refresh";
 
     @Value("${app.jwt.secret}")
     private String jwtSecret;
@@ -37,11 +48,20 @@ public class JwtTokenProvider {
      * 生成访问令牌。
      */
     public String generateAccessToken(String userId, boolean guest) {
+        return generateAccessToken(userId, guest, BizConstant.USER_ROLE_USER);
+    }
+
+    /**
+     * 生成访问令牌（携带角色）。
+     */
+    public String generateAccessToken(String userId, boolean guest, String role) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenExpiration);
         return Jwts.builder()
                 .subject(userId)
-                .claim("guest", guest)
+                .claim(CLAIM_TYPE, TOKEN_TYPE_ACCESS)
+                .claim(CLAIM_GUEST, guest)
+                .claim(CLAIM_ROLE, role == null ? BizConstant.USER_ROLE_USER : role)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(getSigningKey())
@@ -56,6 +76,7 @@ public class JwtTokenProvider {
         Date expiry = new Date(now.getTime() + refreshTokenExpiration);
         return Jwts.builder()
                 .subject(userId)
+                .claim(CLAIM_TYPE, TOKEN_TYPE_REFRESH)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(getSigningKey())
@@ -84,6 +105,34 @@ public class JwtTokenProvider {
     }
 
     /**
+     * 从 Token 中解析用户角色。
+     */
+    public String getRole(String token) {
+        return parseClaims(token).get(CLAIM_ROLE, String.class);
+    }
+
+    /**
+     * 从 Token 中解析类型。
+     */
+    public String getTokenType(String token) {
+        return parseClaims(token).get(CLAIM_TYPE, String.class);
+    }
+
+    /**
+     * 是否为访问令牌。
+     */
+    public boolean isAccessToken(String token) {
+        return TOKEN_TYPE_ACCESS.equals(getTokenType(token));
+    }
+
+    /**
+     * 是否为刷新令牌。
+     */
+    public boolean isRefreshToken(String token) {
+        return TOKEN_TYPE_REFRESH.equals(getTokenType(token));
+    }
+
+    /**
      * 校验 Token 是否有效。
      */
     public boolean validateToken(String token) {
@@ -94,6 +143,20 @@ public class JwtTokenProvider {
             log.warn("Invalid JWT token: {}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 校验访问令牌是否有效。
+     */
+    public boolean validateAccessToken(String token) {
+        return validateToken(token) && isAccessToken(token);
+    }
+
+    /**
+     * 校验刷新令牌是否有效。
+     */
+    public boolean validateRefreshToken(String token) {
+        return validateToken(token) && isRefreshToken(token);
     }
 
     private Claims parseClaims(String token) {
