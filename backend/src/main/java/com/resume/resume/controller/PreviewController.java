@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +24,7 @@ import java.nio.charset.StandardCharsets;
  *
  * <p>
  * 通过服务端统一渲染 HTML，前端以 iframe 加载，确保预览与 PDF 导出视觉一致。
+ * 预览接口需要认证，并校验当前用户是否为简历所有者，防止通过简历 ID 越权访问他人简历。
  * </p>
  */
 @RestController
@@ -37,7 +39,7 @@ public class PreviewController {
     /**
      * 预览简历 HTML。
      *
-     * @param userId     当前用户 ID（匿名访问时可为 null）
+     * @param userId     当前用户 ID
      * @param resumeId   简历 ID
      * @param templateId 可选，覆盖本次预览使用的模板（不修改简历）
      * @param response   HTTP 响应
@@ -45,8 +47,9 @@ public class PreviewController {
     @GetMapping("/{resumeId}/preview")
     public void preview(@PathVariable String resumeId,
                         @RequestParam(required = false) String templateId,
+                        @AuthenticationPrincipal String userId,
                         HttpServletResponse response) throws IOException {
-        Resume resume = resumeService.getResumeForPreview(resumeId);
+        Resume resume = resumeService.getResumeEntity(userId, resumeId);
 
         String previewTemplateId = StringUtils.isNotBlank(templateId) ? templateId : resume.getTemplateId();
         Template template = templateService.getTemplateEntity(previewTemplateId);

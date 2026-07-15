@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,6 +42,7 @@ class UserServiceTest {
     void setUp() {
         userService = new UserService(userMapper, jwtTokenProvider, passwordEncoder);
         lenient().when(jwtTokenProvider.generateAccessToken(anyString(), anyBoolean())).thenReturn("access_token");
+        lenient().when(jwtTokenProvider.generateAccessToken(anyString(), anyBoolean(), anyString())).thenReturn("access_token");
         lenient().when(jwtTokenProvider.generateRefreshToken(anyString())).thenReturn("refresh_token");
         lenient().when(jwtTokenProvider.getAccessTokenExpiration()).thenReturn(3600000L);
     }
@@ -157,7 +159,7 @@ class UserServiceTest {
         RefreshRequest request = new RefreshRequest();
         request.setRefreshToken("invalid_token");
 
-        when(jwtTokenProvider.validateToken("invalid_token")).thenReturn(false);
+        when(jwtTokenProvider.validateRefreshToken("invalid_token")).thenReturn(false);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> userService.refresh(request));
         assertEquals(ResultCode.AUTH_REFRESH_TOKEN_INVALID, ex.getErrorCode());

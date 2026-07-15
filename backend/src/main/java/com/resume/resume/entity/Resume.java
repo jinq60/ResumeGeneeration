@@ -16,7 +16,7 @@ import java.util.List;
  * 简历实体。
  */
 @Data
-@TableName("resume")
+@TableName(value = "resume", autoResultMap = true)
 public class Resume {
 
     @TableId(type = IdType.ASSIGN_ID)

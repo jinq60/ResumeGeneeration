@@ -253,4 +253,10 @@ public final class BizConstant {
      */
     public static final Integer BUILTIN_YES = 1;
     public static final Integer BUILTIN_NO = 0;
+
+    /**
+     * 用户角色。
+     */
+    public static final String USER_ROLE_USER = "USER";
+    public static final String USER_ROLE_ADMIN = "ADMIN";
 }

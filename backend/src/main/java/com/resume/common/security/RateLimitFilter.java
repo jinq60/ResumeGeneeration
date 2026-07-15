@@ -15,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,6 +24,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 简易内存限流过滤器。
  * <p>
  * 基于固定时间窗口的请求计数，达到上限后返回 429。
+ * 默认使用 TCP 连接对端地址 {@link HttpServletRequest#getRemoteAddr()}，不直接信任客户端传入的
+ * {@code X-Forwarded-For}，避免通过伪造请求头绕过限流。
+ * 过期计数器会在每次请求时清理，防止内存持续增长。
  * </p>
  */
 @Slf4j
@@ -48,9 +52,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String key = resolveKey(request);
-        WindowCounter counter = counters.computeIfAbsent(key, k -> new WindowCounter());
+        long now = System.currentTimeMillis();
 
-        if (counter.tryAcquire(maxRequests, windowMs)) {
+        WindowCounter counter = counters.compute(key, (k, existing) -> {
+            if (existing == null || now - existing.windowStart > windowMs) {
+                return new WindowCounter(now);
+            }
+            return existing;
+        });
+
+        cleanupExpiredCounters(now);
+
+        if (counter.tryAcquire(maxRequests)) {
             chain.doFilter(request, response);
         } else {
             log.warn("Rate limit exceeded: key={}", key);
@@ -63,28 +76,38 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveKey(HttpServletRequest request) {
-        String ip = request.getRemoteAddr();
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            ip = forwarded.split(",")[0].trim();
+        // 不直接信任 X-Forwarded-For，防止客户端伪造 IP 绕过限流。
+        // 如需获取真实客户端 IP，应在可信反向代理后统一部署，由网关统一注入并校验。
+        return "rate:" + request.getRemoteAddr();
+    }
+
+    /**
+     * 清理过期计数器，防止内存无限增长。
+     * <p>
+     * 使用 {@link ConcurrentHashMap#compute(Object, java.util.function.BiFunction)} 按 key
+     * 原子地删除或保留，避免与窗口重置发生竞态。
+     * </p>
+     */
+    private void cleanupExpiredCounters(long now) {
+        for (String key : new ArrayList<>(counters.keySet())) {
+            counters.compute(key, (k, counter) -> {
+                if (counter == null) {
+                    return null;
+                }
+                return now - counter.windowStart > windowMs ? null : counter;
+            });
         }
-        return "rate:" + ip;
     }
 
     private static class WindowCounter {
-        private volatile long windowStart = System.currentTimeMillis();
+        private final long windowStart;
         private final AtomicInteger count = new AtomicInteger(0);
 
-        boolean tryAcquire(int maxRequests, long windowMs) {
-            long now = System.currentTimeMillis();
-            if (now - windowStart > windowMs) {
-                synchronized (this) {
-                    if (now - windowStart > windowMs) {
-                        windowStart = now;
-                        count.set(0);
-                    }
-                }
-            }
+        WindowCounter(long windowStart) {
+            this.windowStart = windowStart;
+        }
+
+        boolean tryAcquire(int maxRequests) {
             return count.incrementAndGet() <= maxRequests;
         }
     }

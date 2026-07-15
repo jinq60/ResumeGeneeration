@@ -30,13 +30,11 @@ logging:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:cmVzdW1lLWdlbmVyYXRpb24tZGVmYXVsdC1zZWNyZXQta2V5LW11c3QtYmUtaXMtMzItYnl0ZXM=}
+    secret: ${JWT_SECRET}
     access-token-expiration: 3600000
     refresh-token-expiration: 604800000
   playwright:
     chromium-args: --no-sandbox,--disable-setuid-sandbox
-
-app:
   ai:
     providers:
       resume-review:
