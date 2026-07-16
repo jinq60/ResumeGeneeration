@@ -1,6 +1,8 @@
 package com.resume.common.service;
 
 import com.resume.common.config.MinioConfig;
+import com.resume.common.constant.ResultCode;
+import com.resume.common.exception.BusinessException;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -37,7 +39,7 @@ public class MinioStorageService {
                             .build());
         } catch (Exception e) {
             log.error("Upload file to MinIO failed: bucket={}, object={}", bucket, objectName, e);
-            throw new RuntimeException("文件上传失败", e);
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件上传失败，请稍后重试。", e);
         }
     }
 
@@ -65,7 +67,7 @@ public class MinioStorageService {
             return inputStream.readAllBytes();
         } catch (Exception e) {
             log.error("Download file from MinIO failed: bucket={}, object={}", bucket, objectName, e);
-            throw new RuntimeException("文件下载失败", e);
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件下载失败，请稍后重试。", e);
         }
     }
 

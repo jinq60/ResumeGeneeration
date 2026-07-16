@@ -114,6 +114,7 @@ public class TemplateService {
         if (exist != null) {
             throw new BusinessException(ResultCode.TEMPLATE_CODE_EXISTS, "模板编码已存在。");
         }
+        validateConfig(request.getConfig());
 
         Template template = new Template();
         template.setCode(request.getCode());
@@ -121,7 +122,7 @@ public class TemplateService {
         template.setCategory(request.getCategory());
         template.setThumbnailUrl(request.getThumbnailUrl());
         template.setDescription(request.getDescription());
-        template.setConfig(toJson(request.getConfig()));
+        template.setConfig(request.getConfig());
         template.setHtmlTemplate(request.getHtmlTemplate());
         template.setRenderEngine(StringUtils.defaultString(request.getRenderEngine(), BizConstant.RENDER_ENGINE_SERVER));
         template.setIsBuiltin(BizConstant.BUILTIN_NO);
@@ -151,12 +152,13 @@ public class TemplateService {
         if (!template.getCode().equals(request.getCode())) {
             throw new BusinessException(ResultCode.TEMPLATE_CODE_IMMUTABLE, "模板编码不可修改。");
         }
+        validateConfig(request.getConfig());
 
         template.setName(request.getName());
         template.setCategory(request.getCategory());
         template.setThumbnailUrl(request.getThumbnailUrl());
         template.setDescription(request.getDescription());
-        template.setConfig(toJson(request.getConfig()));
+        template.setConfig(request.getConfig());
         template.setHtmlTemplate(request.getHtmlTemplate());
         template.setRenderEngine(StringUtils.defaultString(request.getRenderEngine(), template.getRenderEngine()));
         template.setIsRecommended(request.getIsRecommended() != null && request.getIsRecommended()
@@ -202,6 +204,17 @@ public class TemplateService {
         templateMapper.updateById(template);
     }
 
+    private void validateConfig(Object config) {
+        if (config == null) {
+            throw new BusinessException(ResultCode.TEMPLATE_CONFIG_INVALID, "模板配置为必填项。");
+        }
+        try {
+            objectMapper.writeValueAsString(config);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ResultCode.TEMPLATE_CONFIG_INVALID, "模板配置格式不正确。", e);
+        }
+    }
+
     private Template findByCode(String code) {
         LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Template::getCode, code)
@@ -214,22 +227,6 @@ public class TemplateService {
                 || BizConstant.TEMPLATE_STATUS_INACTIVE.equals(status);
     }
 
-    private String toJson(Object obj) {
-        try {
-            return objectMapper.writeValueAsString(obj);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException(ResultCode.TEMPLATE_CONFIG_INVALID, "模板配置格式不正确。");
-        }
-    }
-
-    private Object toObject(String json) {
-        try {
-            return objectMapper.readValue(json, Object.class);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException(ResultCode.INTERNAL_ERROR, "模板配置解析失败。");
-        }
-    }
-
     private TemplateDTO toTemplateDTO(Template template) {
         TemplateDTO dto = new TemplateDTO();
         dto.setId(template.getId());
@@ -238,7 +235,7 @@ public class TemplateService {
         dto.setCategory(template.getCategory());
         dto.setThumbnailUrl(template.getThumbnailUrl());
         dto.setDescription(template.getDescription());
-        dto.setConfig(toObject(template.getConfig()));
+        dto.setConfig(template.getConfig());
         dto.setRenderEngine(template.getRenderEngine());
         dto.setSortOrder(template.getSortOrder());
         dto.setIsRecommended(BizConstant.BUILTIN_YES.equals(template.getIsRecommended()));

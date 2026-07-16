@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 简历模板实体。
  */
 @Data
-@TableName("template")
+@TableName(value = "template", autoResultMap = true)
 public class Template {
 
     @TableId(type = IdType.ASSIGN_ID)
@@ -26,7 +26,7 @@ public class Template {
     private String description;
 
     @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
-    private String config;
+    private Object config;
 
     private String htmlTemplate;
     private String renderEngine;

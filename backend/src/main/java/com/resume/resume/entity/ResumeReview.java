@@ -15,7 +15,7 @@ import java.util.Map;
  * AI 简历点评结果实体。
  */
 @Data
-@TableName("resume_review")
+@TableName(value = "resume_review", autoResultMap = true)
 public class ResumeReview {
 
     @TableId(type = IdType.ASSIGN_ID)
@@ -32,19 +32,19 @@ public class ResumeReview {
     /**
      * 分项评分，JSON 对象，例如：{"completeness":85,"structure":80,...}。
      */
-    @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+    @TableField(typeHandler = com.resume.common.handler.StringIntegerMapTypeHandler.class)
     private Map<String, Integer> dimensionScores;
 
     /**
      * 修改建议，JSON 数组。
      */
-    @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+    @TableField(typeHandler = com.resume.resume.handler.ResumeReviewSuggestionListTypeHandler.class)
     private List<ResumeReviewSuggestion> suggestions;
 
     /**
      * 亮点，JSON 数组。
      */
-    @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+    @TableField(typeHandler = com.resume.common.handler.StringListTypeHandler.class)
     private List<String> highlights;
 
     /**
