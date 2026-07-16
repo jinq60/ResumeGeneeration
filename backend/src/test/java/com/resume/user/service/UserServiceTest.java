@@ -1,5 +1,6 @@
 package com.resume.user.service;
 
+import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.user.dto.*;
@@ -14,6 +15,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,10 +56,10 @@ class UserServiceTest {
         RegisterRequest request = new RegisterRequest();
         request.setPhone("13800000000");
         request.setVerifyCode("123456");
-        request.setPassword("123456");
+        request.setPassword("Password123");
 
         when(userMapper.selectOne(any())).thenReturn(null);
-        when(passwordEncoder.encode("123456")).thenReturn("hashed");
+        when(passwordEncoder.encode("Password123")).thenReturn("hashed");
         when(userMapper.insert(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             u.setId("user_1");
@@ -87,7 +91,7 @@ class UserServiceTest {
         RegisterRequest request = new RegisterRequest();
         request.setPhone("13800000000");
         request.setVerifyCode("123456");
-        request.setPassword("123456");
+        request.setPassword("Password123");
 
         User exist = new User();
         exist.setId("user_old");
@@ -155,13 +159,26 @@ class UserServiceTest {
     }
 
     @Test
-    void refresh_shouldRejectInvalidToken() {
+    void refresh_shouldRejectAccessToken() {
+        // 使用真实的 JwtTokenProvider，确保 UserService.refresh 真正校验 refresh token 的类型/有效性，
+        // 而不是通过 mock validateRefreshToken 来绕过校验逻辑。
+        JwtTokenProvider realProvider = new JwtTokenProvider();
+        ReflectionTestUtils.setField(realProvider, "jwtSecret",
+                Base64.getEncoder().encodeToString("resume-generation-test-secret-key-must-be-is-32-bytes".getBytes()));
+        ReflectionTestUtils.setField(realProvider, "accessTokenExpiration", 3600000L);
+        ReflectionTestUtils.setField(realProvider, "refreshTokenExpiration", 604800000L);
+
+        UserService service = new UserService(userMapper, realProvider, passwordEncoder);
+        User user = new User();
+        user.setId("user_1");
+        user.setStatus(BizConstant.USER_STATUS_ACTIVE);
+        when(userMapper.selectById("user_1")).thenReturn(user);
+
+        String accessToken = realProvider.generateAccessToken("user_1", false);
         RefreshRequest request = new RefreshRequest();
-        request.setRefreshToken("invalid_token");
+        request.setRefreshToken(accessToken);
 
-        when(jwtTokenProvider.validateRefreshToken("invalid_token")).thenReturn(false);
-
-        BusinessException ex = assertThrows(BusinessException.class, () -> userService.refresh(request));
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.refresh(request));
         assertEquals(ResultCode.AUTH_REFRESH_TOKEN_INVALID, ex.getErrorCode());
     }
 }

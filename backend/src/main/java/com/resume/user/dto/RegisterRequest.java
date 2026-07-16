@@ -23,6 +23,7 @@ public class RegisterRequest {
     private String verifyCode;
 
     @NotBlank(message = "密码为必填项。")
-    @Size(min = 6, max = 32, message = "密码长度应为 6–32 位。")
+    @Size(min = 8, max = 32, message = "密码长度应为 8–32 位。")
+    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).+$", message = "密码需同时包含字母和数字。")
     private String password;
 }
