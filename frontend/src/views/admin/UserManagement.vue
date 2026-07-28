@@ -1,211 +1,351 @@
 <template>
-  <div class="user-management">
-    <div class="page-header">
-      <h1>用户管理</h1>
+  <div class="admin-user-management">
+    <!-- Header -->
+    <div class="mb-8">
+      <h2 class="text-headline-md font-bold">
+        用户管理
+      </h2>
+      <p class="text-body-md text-on-surface-variant mt-2">
+        管理平台注册用户，查看用户信息、会员状态与使用情况
+      </p>
     </div>
 
-    <div class="search-bar">
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索用户名、邮箱或手机号"
-        clearable
-        style="width: 300px"
-        @clear="handleSearch"
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-8">
+      <div
+        v-for="stat in stats"
+        :key="stat.label"
+        class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant flex items-center gap-4 hover:shadow-md transition-shadow"
       >
-        <template #prefix>
-          <el-icon><Search /></el-icon>
-        </template>
-      </el-input>
-      <el-select
-        v-model="statusFilter"
-        placeholder="状态筛选"
-        clearable
-        style="width: 150px; margin-left: 10px"
-      >
-        <el-option
-          label="全部"
-          value=""
-        />
-        <el-option
-          label="正常"
-          value="active"
-        />
-        <el-option
-          label="禁用"
-          value="inactive"
-        />
-      </el-select>
-      <el-select
-        v-model="typeFilter"
-        placeholder="用户类型"
-        clearable
-        style="width: 150px; margin-left: 10px"
-      >
-        <el-option
-          label="全部"
-          value=""
-        />
-        <el-option
-          label="注册用户"
-          value="registered"
-        />
-        <el-option
-          label="游客"
-          value="guest"
-        />
-      </el-select>
-      <el-button
-        type="primary"
-        @click="handleSearch"
-      >
-        搜索
-      </el-button>
+        <div
+          class="w-12 h-12 rounded-xl flex items-center justify-center text-[28px]"
+          :class="stat.iconBg"
+        >
+          <el-icon
+            :class="stat.iconColor"
+            size="28"
+          >
+            <component :is="stat.icon" />
+          </el-icon>
+        </div>
+        <div>
+          <p class="text-label-md text-on-surface-variant">
+            {{ stat.label }}
+          </p>
+          <div class="flex items-baseline gap-2 mt-1">
+            <span class="text-headline-md font-bold">{{ stat.value }}</span>
+            <span class="text-[12px] text-secondary flex items-center font-bold">
+              <el-icon size="14"><ArrowUp /></el-icon>{{ stat.growth }}
+            </span>
+          </div>
+          <p class="text-[11px] text-outline mt-1">
+            {{ stat.compare }}
+          </p>
+        </div>
+      </div>
     </div>
 
-    <div class="user-list">
+    <!-- Filters -->
+    <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+        <div class="space-y-2">
+          <label class="text-label-md font-bold text-on-surface-variant">关键词搜索</label>
+          <el-input
+            v-model="filters.keyword"
+            placeholder="搜索用户昵称、手机号、邮箱"
+            clearable
+          >
+            <template #prefix>
+              <el-icon size="18">
+                <Search />
+              </el-icon>
+            </template>
+          </el-input>
+        </div>
+        <div class="space-y-2">
+          <label class="text-label-md font-bold text-on-surface-variant">账户状态</label>
+          <el-select
+            v-model="filters.status"
+            placeholder="全部状态"
+            clearable
+          >
+            <el-option
+              label="全部状态"
+              value=""
+            />
+            <el-option
+              label="正常"
+              value="active"
+            />
+            <el-option
+              label="已禁用"
+              value="disabled"
+            />
+          </el-select>
+        </div>
+        <div class="space-y-2 flex flex-col justify-end">
+          <div class="flex gap-2">
+            <el-button
+              type="primary"
+              class="flex-1"
+              @click="loadUserList"
+            >
+              <el-icon size="16">
+                <Search />
+              </el-icon>查询
+            </el-button>
+            <el-button
+              class="px-3"
+              @click="resetFilters"
+            >
+              重置
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <el-button type="primary">
+          <el-icon size="18">
+            <Plus />
+          </el-icon>新增用户
+        </el-button>
+        <el-divider direction="vertical" />
+        <el-dropdown>
+          <el-button>
+            批量操作<el-icon
+              class="ml-1"
+              size="16"
+            >
+              <ArrowDown />
+            </el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item>批量启用</el-dropdown-item>
+              <el-dropdown-item>批量禁用</el-dropdown-item>
+              <el-dropdown-item divided>
+                批量删除
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span class="text-label-md text-outline ml-2">已选择 {{ selectedIds.length }} 项</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <el-button>
+          <el-icon size="16">
+            <Download />
+          </el-icon>导出
+        </el-button>
+        <el-button @click="loadUserList">
+          <el-icon size="16">
+            <Refresh />
+          </el-icon>
+        </el-button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden shadow-sm">
       <el-table
         v-loading="loading"
         :data="userList"
+        @selection-change="handleSelectionChange"
       >
         <el-table-column
-          label="头像"
-          width="80"
+          type="selection"
+          width="48"
+        />
+        <el-table-column
+          label="用户ID"
+          prop="userId"
+          width="120"
         >
           <template #default="{ row }">
-            <el-avatar
-              :size="40"
-              :src="row.avatarUrl"
-            >
-              <el-icon><User /></el-icon>
-            </el-avatar>
+            <span class="text-body-md text-outline font-mono">{{ row.userId }}</span>
           </template>
         </el-table-column>
         <el-table-column
-          prop="nickname"
-          label="昵称"
-          width="150"
-        />
-        <el-table-column
-          prop="email"
-          label="邮箱"
-          width="200"
-        />
-        <el-table-column
-          prop="phone"
-          label="手机号"
-          width="130"
-        />
-        <el-table-column
-          label="用户类型"
-          width="100"
+          label="用户昵称"
+          min-width="160"
         >
           <template #default="{ row }">
-            <el-tag
-              :type="row.isGuest ? 'info' : 'primary'"
-              size="small"
-            >
-              {{ row.isGuest ? '游客' : '注册用户' }}
-            </el-tag>
+            <div class="flex items-center gap-3">
+              <el-avatar
+                :size="32"
+                :src="row.avatarUrl || ''"
+              >
+                <el-icon size="16">
+                  <UserIcon />
+                </el-icon>
+              </el-avatar>
+              <span class="text-body-md font-bold">{{ row.nickname || '未设置昵称' }}</span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column
-          label="状态"
-          width="80"
+          label="手机号 / 邮箱"
+          min-width="180"
         >
           <template #default="{ row }">
-            <el-tag
-              :type="row.status === 'active' ? 'success' : 'danger'"
-              size="small"
-            >
-              {{ row.status === 'active' ? '正常' : '禁用' }}
-            </el-tag>
+            {{ formatContact(row) }}
           </template>
         </el-table-column>
         <el-table-column
-          prop="resumeCount"
-          label="简历数"
-          width="80"
-        />
+          label="角色"
+          width="110"
+          align="center"
+        >
+          <template #default="{ row }">
+            <span
+              class="px-2 py-0.5 rounded text-[10px] font-bold"
+              :class="roleClass(row.role)"
+            >
+              {{ row.role === 'ADMIN' ? '管理员' : '普通用户' }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column
-          prop="createdAt"
+          label="类型"
+          prop="isGuest"
+          width="90"
+          align="center"
+        >
+          <template #default="{ row }">
+            {{ row.isGuest ? '游客' : '注册用户' }}
+          </template>
+        </el-table-column>
+        <el-table-column
           label="注册时间"
-          width="180"
-        />
+          prop="createdAt"
+          width="170"
+        >
+          <template #default="{ row }">
+            {{ formatDate(row.createdAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="账户状态"
+          width="110"
+        >
+          <template #default="{ row }">
+            <span
+              class="flex items-center gap-1.5 text-[12px] font-bold"
+              :class="statusClass(row.status)"
+            >
+              <span
+                class="w-1.5 h-1.5 rounded-full"
+                :class="statusDotClass(row.status)"
+              />
+              {{ statusLabel(row.status) }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column
           label="操作"
+          width="140"
+          align="right"
           fixed="right"
-          width="200"
         >
           <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              @click="handleViewDetail(row)"
-            >
-              详情
-            </el-button>
-            <el-button
-              link
-              :type="row.status === 'active' ? 'warning' : 'success'"
-              @click="handleToggleStatus(row)"
-            >
-              {{ row.status === 'active' ? '禁用' : '启用' }}
-            </el-button>
+            <div class="flex items-center justify-end gap-3">
+              <el-button
+                link
+                type="primary"
+                @click="handleViewDetail(row)"
+              >
+                查看
+              </el-button>
+              <el-dropdown>
+                <el-icon
+                  class="text-on-surface-variant hover:text-primary cursor-pointer"
+                  size="18"
+                >
+                  <More />
+                </el-icon>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item @click="handleViewDetail(row)">
+                      详情
+                    </el-dropdown-item>
+                    <el-dropdown-item @click="handleToggleStatus(row)">
+                      {{ row.status === 'active' ? '禁用' : '启用' }}
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- Pagination -->
+      <div class="px-6 py-4 flex items-center justify-between bg-surface-container-low border-t border-outline-variant">
+        <span class="text-label-md text-on-surface-variant">共 {{ total }} 条</span>
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="sizes, prev, pager, next, jumper"
+          background
+        />
+      </div>
     </div>
 
-    <!-- 用户详情对话框 -->
+    <!-- Detail Dialog -->
     <el-dialog
-      v-model="detailDialogVisible"
+      v-model="detailVisible"
       title="用户详情"
       width="600px"
     >
       <div
         v-if="currentUser"
-        class="user-detail"
+        class="space-y-6"
       >
-        <div class="detail-header">
+        <div class="flex items-center gap-4 pb-6 border-b border-outline-variant">
           <el-avatar
-            :size="80"
-            :src="currentUser.avatarUrl"
+            :size="64"
+            :src="currentUser.avatarUrl || ''"
           >
-            <el-icon><User /></el-icon>
+            <el-icon size="24">
+              <User />
+            </el-icon>
           </el-avatar>
-          <div class="user-info">
-            <h3>{{ currentUser.nickname }}</h3>
-            <el-tag :type="currentUser.isGuest ? 'info' : 'primary'">
-              {{ currentUser.isGuest ? '游客' : '注册用户' }}
-            </el-tag>
+          <div>
+            <h3 class="text-title-md font-bold">
+              {{ currentUser.nickname || '未设置昵称' }}
+            </h3>
+            <span class="text-label-md text-on-surface-variant">{{ currentUser.userId }}</span>
           </div>
         </div>
         <el-descriptions
           :column="2"
           border
         >
-          <el-descriptions-item label="用户ID">
-            {{ currentUser.id }}
+          <el-descriptions-item label="手机号 / 邮箱">
+            {{ formatContact(currentUser) }}
           </el-descriptions-item>
-          <el-descriptions-item label="邮箱">
-            {{ currentUser.email }}
+          <el-descriptions-item label="角色">
+            {{ currentUser.role === 'ADMIN' ? '管理员' : '普通用户' }}
           </el-descriptions-item>
-          <el-descriptions-item label="手机号">
-            {{ currentUser.phone }}
+          <el-descriptions-item label="账户类型">
+            {{ currentUser.isGuest ? '游客' : '注册用户' }}
           </el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <el-tag :type="currentUser.status === 'active' ? 'success' : 'danger'">
-              {{ currentUser.status === 'active' ? '正常' : '禁用' }}
+          <el-descriptions-item label="账户状态">
+            <el-tag :type="currentUser.status === 'active' ? 'success' : 'info'">
+              {{ statusLabel(currentUser.status) }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="简历数量">
-            {{ currentUser.resumeCount }}
-          </el-descriptions-item>
           <el-descriptions-item label="注册时间">
-            {{ currentUser.createdAt }}
+            {{ formatDate(currentUser.createdAt) }}
           </el-descriptions-item>
-          <el-descriptions-item label="最后登录">
-            {{ currentUser.lastLoginAt }}
+          <el-descriptions-item label="最近更新">
+            {{ formatDate(currentUser.updatedAt) }}
           </el-descriptions-item>
         </el-descriptions>
       </div>
@@ -214,153 +354,152 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, User } from '@element-plus/icons-vue'
-
-interface UserItem {
-  id: string
-  nickname: string
-  email: string
-  phone: string
-  avatarUrl: string
-  isGuest: boolean
-  status: string
-  resumeCount: number
-  createdAt: string
-  lastLoginAt: string
-}
+import { userApi, type User, type UserStats } from '@/api/admin/users'
+import {
+  User as UserIcon,
+  Search,
+  Plus,
+  ArrowDown,
+  Download,
+  Refresh,
+  More,
+  ArrowUp,
+  UserFilled,
+  StarFilled,
+  WarningFilled
+} from '@element-plus/icons-vue'
 
 const loading = ref(false)
-const searchKeyword = ref('')
-const statusFilter = ref('')
-const typeFilter = ref('')
-const userList = ref<UserItem[]>([])
+const selectedIds = ref<string[]>([])
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 
-const detailDialogVisible = ref(false)
-const currentUser = ref<any>(null)
-
-onMounted(() => {
-  loadUserList()
+const filters = reactive({
+  keyword: '',
+  status: ''
 })
 
-const loadUserList = () => {
-  loading.value = true
-  // TODO: 调用API获取用户列表
-  setTimeout(() => {
-    userList.value = [
-      {
-        id: 'user_001',
-        nickname: '张三',
-        email: 'zhangsan@example.com',
-        phone: '138****8000',
-        avatarUrl: '',
-        isGuest: false,
-        status: 'active',
-        resumeCount: 5,
-        createdAt: '2024-01-10 09:30:00',
-        lastLoginAt: '2024-01-15 08:20:00'
-      },
-      {
-        id: 'user_002',
-        nickname: '李四',
-        email: 'lisi@example.com',
-        phone: '139****9000',
-        avatarUrl: '',
-        isGuest: false,
-        status: 'active',
-        resumeCount: 3,
-        createdAt: '2024-01-12 14:20:00',
-        lastLoginAt: '2024-01-14 16:45:00'
-      },
-      {
-        id: 'guest_001',
-        nickname: '游客001',
-        email: '',
-        phone: '',
-        avatarUrl: '',
-        isGuest: true,
-        status: 'active',
-        resumeCount: 1,
-        createdAt: '2024-01-15 10:00:00',
-        lastLoginAt: '2024-01-15 10:00:00'
-      }
-    ]
-    loading.value = false
-  }, 500)
+const userList = ref<User[]>([])
+const detailVisible = ref(false)
+const currentUser = ref<User | null>(null)
+
+const stats = reactive([
+  { label: '用户总数', value: '-', growth: '', compare: '', icon: UserIcon, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
+  { label: '今日新增', value: '-', growth: '', compare: '', icon: UserFilled, iconBg: 'bg-secondary/10', iconColor: 'text-secondary' },
+  { label: '正式用户', value: '-', growth: '', compare: '', icon: StarFilled, iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' },
+  { label: '禁用账号', value: '-', growth: '', compare: '', icon: WarningFilled, iconBg: 'bg-error/10', iconColor: 'text-error' }
+])
+
+function statusClass(status: string) {
+  switch (status) {
+    case 'active': return 'text-secondary'
+    case 'disabled': return 'text-outline'
+    default: return 'text-on-surface-variant'
+  }
+}
+function statusDotClass(status: string) {
+  switch (status) {
+    case 'active': return 'bg-secondary'
+    case 'disabled': return 'bg-outline'
+    default: return 'bg-outline'
+  }
+}
+function statusLabel(status: string) {
+  switch (status) {
+    case 'active': return '正常'
+    case 'disabled': return '已禁用'
+    default: return status
+  }
+}
+function roleClass(role: string) {
+  if (role === 'ADMIN') return 'bg-tertiary/10 text-tertiary'
+  return 'bg-surface-container text-on-surface-variant'
+}
+function formatContact(row: User) {
+  return row.phone || row.email || '-'
+}
+function formatDate(date: string | null) {
+  return date ? date.replace('T', ' ').substring(0, 19) : '-'
 }
 
-const handleSearch = () => {
+function handleSelectionChange(rows: User[]) {
+  selectedIds.value = rows.map(r => r.userId)
+}
+
+async function handleViewDetail(row: User) {
+  try {
+    currentUser.value = await userApi.getUser(row.userId)
+    detailVisible.value = true
+  } catch (e: any) {
+    ElMessage.error(e.message || '获取用户详情失败')
+  }
+}
+
+async function handleToggleStatus(row: User) {
+  const nextStatus = row.status === 'active' ? 'disabled' : 'active'
+  const action = nextStatus === 'active' ? '启用' : '禁用'
+  try {
+    await ElMessageBox.confirm(`确定要${action}该用户吗？`, '提示', { type: 'warning' })
+    await userApi.updateUserStatus(row.userId, nextStatus)
+    ElMessage.success(`${action}成功`)
+    loadUserList()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || `${action}失败`)
+    }
+  }
+}
+
+function resetFilters() {
+  filters.keyword = ''
+  filters.status = ''
+  page.value = 1
   loadUserList()
 }
 
-const handleViewDetail = (row: any) => {
-  currentUser.value = row
-  detailDialogVisible.value = true
+async function loadUserList() {
+  loading.value = true
+  try {
+    const res = await userApi.getUsers({
+      page: page.value,
+      size: pageSize.value,
+      keyword: filters.keyword || undefined,
+      status: filters.status || undefined
+    })
+    userList.value = res.records
+    total.value = res.total
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载用户列表失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const handleToggleStatus = (row: any) => {
-  const action = row.status === 'active' ? '禁用' : '启用'
-  ElMessageBox.confirm(`确定要${action}该用户吗？`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    // TODO: 调用API更新用户状态
-    ElMessage.success(`${action}成功`)
-    loadUserList()
-  })
+async function loadStats() {
+  try {
+    const s: UserStats = await userApi.getUserStats()
+    stats[0].value = String(s.totalUsers)
+    stats[1].value = String(s.todayNewUsers)
+    stats[2].value = String(s.registeredUsers)
+    stats[3].value = String(s.disabledUsers)
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载统计数据失败')
+  }
 }
+
+watch([page, pageSize], loadUserList)
+
+onMounted(() => {
+  loadStats()
+  loadUserList()
+})
 </script>
 
-<style scoped>
-.user-management {
-  padding: 20px;
-}
-
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-header h1 {
-  font-size: 24px;
-  color: #333;
-  margin: 0;
-}
-
-.search-bar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.user-list {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.user-detail {
-  padding: 10px 0;
-}
-
-.detail-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #eee;
-}
-
-.user-info {
-  margin-left: 20px;
-  flex: 1;
-}
-
-.user-info h3 {
-  font-size: 18px;
-  color: #333;
-  margin: 0 0 10px 0;
+<style scoped lang="scss">
+.admin-user-management {
+  padding-bottom: var(--st-margin-page);
 }
 </style>

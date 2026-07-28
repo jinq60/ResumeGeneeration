@@ -1,157 +1,254 @@
 <template>
-  <div class="template-management">
-    <div class="page-header">
-      <h1>模板管理</h1>
+  <div class="admin-template-management">
+    <div class="mb-8">
+      <h2 class="text-headline-md font-bold">
+        模板管理
+      </h2>
+      <p class="text-body-md text-on-surface-variant mt-2">
+        管理平台简历模板，控制上架状态与排序
+      </p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-8">
+      <div
+        v-for="stat in stats"
+        :key="stat.label"
+        class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant flex items-center gap-4 hover:shadow-md transition-shadow"
+      >
+        <div
+          class="w-12 h-12 rounded-xl flex items-center justify-center"
+          :class="stat.iconBg"
+        >
+          <el-icon
+            :class="stat.iconColor"
+            size="28"
+          >
+            <component :is="stat.icon" />
+          </el-icon>
+        </div>
+        <div>
+          <p class="text-label-md text-on-surface-variant">
+            {{ stat.label }}
+          </p>
+          <p class="text-headline-md font-bold mt-1">
+            {{ stat.value }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-gutter">
+        <div class="space-y-2">
+          <label class="text-label-md font-bold text-on-surface-variant">关键词搜索</label>
+          <el-input
+            v-model="filters.keyword"
+            placeholder="搜索模板名称或编码"
+            clearable
+          >
+            <template #prefix>
+              <el-icon size="18">
+                <Search />
+              </el-icon>
+            </template>
+          </el-input>
+        </div>
+        <div class="space-y-2">
+          <label class="text-label-md font-bold text-on-surface-variant">模板分类</label>
+          <el-select
+            v-model="filters.category"
+            placeholder="全部分类"
+            clearable
+          >
+            <el-option
+              label="全部"
+              value=""
+            />
+            <el-option
+              label="经典"
+              value="classic"
+            />
+            <el-option
+              label="技术"
+              value="tech"
+            />
+            <el-option
+              label="应届生"
+              value="fresh"
+            />
+            <el-option
+              label="商务"
+              value="business"
+            />
+            <el-option
+              label="学术"
+              value="postgraduate"
+            />
+          </el-select>
+        </div>
+        <div class="space-y-2">
+          <label class="text-label-md font-bold text-on-surface-variant">状态</label>
+          <el-select
+            v-model="filters.status"
+            placeholder="全部状态"
+            clearable
+          >
+            <el-option
+              label="全部"
+              value=""
+            />
+            <el-option
+              label="已上架"
+              value="active"
+            />
+            <el-option
+              label="已下架"
+              value="inactive"
+            />
+          </el-select>
+        </div>
+        <div class="space-y-2 flex flex-col justify-end">
+          <div class="flex gap-2">
+            <el-button
+              type="primary"
+              class="flex-1"
+              @click="loadTemplates"
+            >
+              <el-icon size="16">
+                <Search />
+              </el-icon>查询
+            </el-button>
+            <el-button @click="resetFilters">
+              重置
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center justify-between mb-4">
       <el-button
         type="primary"
         @click="handleAdd"
       >
-        <el-icon><Plus /></el-icon>
-        新增模板
+        <el-icon size="18">
+          <Plus />
+        </el-icon>新增模板
       </el-button>
+      <div class="flex gap-2">
+        <el-button>
+          <el-icon size="16">
+            <Download />
+          </el-icon>导出
+        </el-button>
+        <el-button @click="loadTemplates">
+          <el-icon size="16">
+            <Refresh />
+          </el-icon>
+        </el-button>
+      </div>
     </div>
 
-    <div class="search-bar">
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索模板名称或编码"
-        clearable
-        style="width: 300px"
-        @clear="handleSearch"
+    <!-- Template Grid -->
+    <div
+      v-loading="loading"
+      class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-gutter mb-8"
+    >
+      <div
+        v-for="tpl in templateList"
+        :key="tpl.id"
+        class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden hover:shadow-md transition-all group"
       >
-        <template #prefix>
-          <el-icon><Search /></el-icon>
-        </template>
-      </el-input>
-      <el-select
-        v-model="statusFilter"
-        placeholder="状态筛选"
-        clearable
-        style="width: 150px; margin-left: 10px"
-      >
-        <el-option
-          label="全部"
-          value=""
-        />
-        <el-option
-          label="已上架"
-          value="active"
-        />
-        <el-option
-          label="已下架"
-          value="inactive"
-        />
-      </el-select>
-      <el-button
-        type="primary"
-        @click="handleSearch"
-      >
-        搜索
-      </el-button>
-    </div>
-
-    <div class="template-list">
-      <el-table
-        v-loading="loading"
-        :data="templateList"
-      >
-        <el-table-column
-          label="缩略图"
-          width="120"
-        >
-          <template #default="{ row }">
-            <div class="thumbnail">
-              <img
-                v-if="row.thumbnailUrl"
-                :src="row.thumbnailUrl"
-                alt="缩略图"
-              >
-              <div
-                v-else
-                class="no-thumbnail"
-              >
-                暂无图片
-              </div>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="code"
-          label="模板编码"
-          width="150"
-        />
-        <el-table-column
-          prop="name"
-          label="模板名称"
-          width="200"
-        />
-        <el-table-column
-          prop="category"
-          label="分类"
-          width="120"
-        />
-        <el-table-column
-          prop="sortOrder"
-          label="排序"
-          width="80"
-        />
-        <el-table-column
-          label="状态"
-          width="100"
-        >
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'active' ? 'success' : 'info'">
-              {{ row.status === 'active' ? '已上架' : '已下架' }}
+        <div class="aspect-[3/4] bg-surface-container relative flex items-center justify-center overflow-hidden">
+          <img
+            v-if="tpl.thumbnailUrl"
+            :src="tpl.thumbnailUrl"
+            class="w-full h-full object-cover"
+          >
+          <div
+            v-else
+            class="flex flex-col items-center gap-3 text-outline"
+          >
+            <el-icon size="48">
+              <Document />
+            </el-icon>
+            <span class="text-label-md">暂无预览</span>
+          </div>
+          <div class="absolute top-3 right-3 flex flex-col gap-1 items-end">
+            <el-tag
+              :type="tpl.status === 'active' ? 'success' : 'info'"
+              size="small"
+            >
+              {{ tpl.status === 'active' ? '已上架' : '已下架' }}
             </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="createdAt"
-          label="创建时间"
-          width="180"
-        />
-        <el-table-column
-          label="操作"
-          fixed="right"
-          width="200"
-        >
-          <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              @click="handleEdit(row)"
+            <el-tag
+              v-if="tpl.isBuiltin"
+              type="warning"
+              size="small"
             >
-              编辑
-            </el-button>
-            <el-button
-              link
-              :type="row.status === 'active' ? 'warning' : 'success'"
-              @click="handleToggleStatus(row)"
-            >
-              {{ row.status === 'active' ? '下架' : '上架' }}
-            </el-button>
-            <el-button
-              link
-              type="danger"
-              @click="handleDelete"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+              内置
+            </el-tag>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <h3 class="text-title-md font-bold">
+                {{ tpl.name }}
+              </h3>
+              <p class="text-label-md text-outline font-mono mt-1">
+                {{ tpl.code }}
+              </p>
+            </div>
+            <el-dropdown>
+              <el-icon
+                class="text-on-surface-variant hover:text-primary cursor-pointer"
+                size="18"
+              >
+                <More />
+              </el-icon>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="handleEdit(tpl)">
+                    编辑
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="handleToggleStatus(tpl)">
+                    {{ tpl.status === 'active' ? '下架' : '上架' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    divided
+                    @click="handleDelete(tpl)"
+                  >
+                    删除
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+          <p class="text-body-md text-on-surface-variant mb-4 line-clamp-2">
+            {{ tpl.description || '暂无描述' }}
+          </p>
+          <div class="flex items-center justify-between text-label-md text-outline">
+            <span>排序: {{ tpl.sortOrder }}</span>
+            <span>{{ formatDate(tpl.updatedAt) }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- 新增/编辑对话框 -->
+    <!-- Add/Edit Dialog -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
       width="600px"
-      @close="handleDialogClose"
+      @close="resetForm"
     >
       <el-form
-        ref="templateFormRef"
-        :model="templateForm"
+        ref="formRef"
+        :model="form"
         :rules="formRules"
         label-width="100px"
       >
@@ -159,86 +256,76 @@
           label="模板编码"
           prop="code"
         >
-          <el-input
-            v-model="templateForm.code"
-            placeholder="请输入模板编码"
-          />
+          <el-input v-model="form.code" />
         </el-form-item>
         <el-form-item
           label="模板名称"
           prop="name"
         >
-          <el-input
-            v-model="templateForm.name"
-            placeholder="请输入模板名称"
-          />
+          <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item
-          label="模板分类"
+          label="分类"
           prop="category"
         >
           <el-select
-            v-model="templateForm.category"
-            placeholder="请选择分类"
+            v-model="form.category"
+            placeholder="请选择"
           >
             <el-option
-              label="简约风格"
-              value="simple"
+              label="经典"
+              value="classic"
             />
             <el-option
-              label="商务风格"
+              label="技术"
+              value="tech"
+            />
+            <el-option
+              label="应届生"
+              value="fresh"
+            />
+            <el-option
+              label="商务"
               value="business"
             />
             <el-option
-              label="创意风格"
-              value="creative"
-            />
-            <el-option
-              label="学术风格"
-              value="academic"
+              label="学术"
+              value="postgraduate"
             />
           </el-select>
         </el-form-item>
-        <el-form-item
-          label="缩略图"
-          prop="thumbnailUrl"
-        >
+        <el-form-item label="缩略图">
           <el-upload
             class="thumbnail-uploader"
             :show-file-list="false"
+            :http-request="handleUpload"
             :on-success="handleUploadSuccess"
-            :before-upload="beforeUpload"
           >
             <img
-              v-if="templateForm.thumbnailUrl"
-              :src="templateForm.thumbnailUrl"
-              class="thumbnail"
+              v-if="form.thumbnailUrl"
+              :src="form.thumbnailUrl"
+              class="w-full h-full object-cover"
             >
-            <el-icon
+            <div
               v-else
-              class="uploader-icon"
+              class="flex flex-col items-center justify-center text-outline"
             >
-              <Plus />
-            </el-icon>
+              <el-icon size="28">
+                <Plus />
+              </el-icon><span class="text-label-md mt-2">上传缩略图</span>
+            </div>
           </el-upload>
         </el-form-item>
-        <el-form-item
-          label="模板描述"
-          prop="description"
-        >
+        <el-form-item label="描述">
           <el-input
-            v-model="templateForm.description"
+            v-model="form.description"
             type="textarea"
             :rows="3"
-            placeholder="请输入模板描述"
           />
         </el-form-item>
-        <el-form-item
-          label="排序"
-          prop="sortOrder"
-        >
+        <el-form-item label="排序">
           <el-input-number
-            v-model="templateForm.sortOrder"
+            v-model="form.sortOrder"
             :min="0"
           />
         </el-form-item>
@@ -262,244 +349,238 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
-import type { FormInstance, FormRules, UploadProps } from 'element-plus'
+import { Document, Search, Plus, Download, Refresh, More } from '@element-plus/icons-vue'
+import type { FormInstance, FormRules, UploadProps, UploadRequestOptions } from 'element-plus'
+import { templateApi, type Template, type TemplateRequest, type TemplateStats } from '@/api/admin/templates'
 
-interface TemplateItem {
-  id: string
-  code: string
-  name: string
-  category: string
-  thumbnailUrl: string
-  status: string
-  sortOrder: number
-  createdAt: string
+interface TemplateForm extends TemplateRequest {
+  id?: string
 }
 
 const loading = ref(false)
-const searchKeyword = ref('')
-const statusFilter = ref('')
-const templateList = ref<TemplateItem[]>([])
-
+const filters = reactive({ keyword: '', category: '', status: '' })
+const templateList = ref<Template[]>([])
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增模板')
 const submitLoading = ref(false)
-const templateFormRef = ref<FormInstance>()
-
-const templateForm = reactive({
+const formRef = ref<FormInstance>()
+const form = reactive<TemplateForm>({
   id: '',
   code: '',
   name: '',
   category: '',
   thumbnailUrl: '',
   description: '',
-  sortOrder: 0
+  htmlTemplate: '',
+  renderEngine: 'server',
+  config: {},
+  sortOrder: 0,
+  isRecommended: false
 })
-
 const formRules: FormRules = {
   code: [{ required: true, message: '请输入模板编码', trigger: 'blur' }],
   name: [{ required: true, message: '请输入模板名称', trigger: 'blur' }],
-  category: [{ required: true, message: '请选择模板分类', trigger: 'change' }]
+  category: [{ required: true, message: '请选择分类', trigger: 'change' }]
 }
+
+const stats = reactive([
+  { label: '模板总数', value: '-', icon: Document, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
+  { label: '已上架', value: '-', icon: Document, iconBg: 'bg-secondary/10', iconColor: 'text-secondary' },
+  { label: '已下架', value: '-', icon: Plus, iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' },
+  { label: '系统内置', value: '-', icon: Document, iconBg: 'bg-on-tertiary-fixed-variant/10', iconColor: 'text-on-tertiary-fixed-variant' }
+])
 
 onMounted(() => {
-  loadTemplateList()
+  loadStats()
+  loadTemplates()
 })
 
-const loadTemplateList = () => {
+async function loadStats() {
+  try {
+    const s: TemplateStats = await templateApi.getTemplateStats()
+    stats[0].value = String(s.totalTemplates)
+    stats[1].value = String(s.activeTemplates)
+    stats[2].value = String(s.inactiveTemplates)
+    stats[3].value = String(s.builtinTemplates)
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载统计数据失败')
+  }
+}
+
+async function loadTemplates() {
   loading.value = true
-  // TODO: 调用API获取模板列表
-  setTimeout(() => {
-    templateList.value = [
-      {
-        id: '1',
-        code: 'simple_blue',
-        name: '简约蓝',
-        category: '简约风格',
-        thumbnailUrl: '',
-        status: 'active',
-        sortOrder: 1,
-        createdAt: '2024-01-15 10:30:00'
-      },
-      {
-        id: '2',
-        code: 'business_gray',
-        name: '商务灰',
-        category: '商务风格',
-        thumbnailUrl: '',
-        status: 'active',
-        sortOrder: 2,
-        createdAt: '2024-01-16 14:20:00'
-      }
-    ]
+  try {
+    const res = await templateApi.getTemplates({
+      page: 1,
+      size: 100,
+      keyword: filters.keyword || undefined,
+      status: filters.status || undefined,
+      category: filters.category || undefined
+    })
+    templateList.value = res.records
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载模板列表失败')
+  } finally {
     loading.value = false
-  }, 500)
+  }
 }
 
-const handleSearch = () => {
-  loadTemplateList()
+function resetFilters() {
+  filters.keyword = ''
+  filters.category = ''
+  filters.status = ''
+  loadTemplates()
 }
 
-const handleAdd = () => {
+function handleAdd() {
   dialogTitle.value = '新增模板'
-  dialogVisible.value = true
   resetForm()
+  dialogVisible.value = true
 }
 
-const handleEdit = (row: any) => {
+async function handleEdit(row: Template) {
   dialogTitle.value = '编辑模板'
-  dialogVisible.value = true
-  Object.assign(templateForm, row)
-}
-
-const handleToggleStatus = (row: any) => {
-  const action = row.status === 'active' ? '下架' : '上架'
-  ElMessageBox.confirm(`确定要${action}该模板吗？`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    // TODO: 调用API更新状态
-    ElMessage.success(`${action}成功`)
-    loadTemplateList()
-  })
-}
-
-const handleDelete = () => {
-  ElMessageBox.confirm('确定要删除该模板吗？此操作不可恢复。', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    // TODO: 调用API删除模板
-    ElMessage.success('删除成功')
-    loadTemplateList()
-  })
-}
-
-const handleSubmit = async () => {
-  if (!templateFormRef.value) return
-  
-  await templateFormRef.value.validate((valid) => {
-    if (valid) {
-      submitLoading.value = true
-      // TODO: 调用API保存模板
-      setTimeout(() => {
-        submitLoading.value = false
-        dialogVisible.value = false
-        ElMessage.success('保存成功')
-        loadTemplateList()
-      }, 500)
-    }
-  })
-}
-
-const handleDialogClose = () => {
   resetForm()
+  try {
+    const detail = await templateApi.getTemplate(row.id)
+    Object.assign(form, detail, {
+      config: detail.config || {},
+      htmlTemplate: detail.thumbnailUrl || row.code,
+      renderEngine: 'server',
+      isRecommended: detail.isRecommended
+    })
+  } catch {
+    Object.assign(form, row, {
+      config: {},
+      htmlTemplate: row.code,
+      renderEngine: 'server',
+      isRecommended: row.isRecommended
+    })
+  }
+  dialogVisible.value = true
 }
 
-const resetForm = () => {
-  templateFormRef.value?.resetFields()
-  Object.assign(templateForm, {
+async function handleToggleStatus(row: Template) {
+  const nextStatus = row.status === 'active' ? 'inactive' : 'active'
+  const action = nextStatus === 'active' ? '上架' : '下架'
+  try {
+    await ElMessageBox.confirm(`确定要${action}该模板吗？`, '提示', { type: 'warning' })
+    await templateApi.updateTemplateStatus(row.id, nextStatus)
+    ElMessage.success(`${action}成功`)
+    loadTemplates()
+    loadStats()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || `${action}失败`)
+    }
+  }
+}
+
+async function handleDelete(row: Template) {
+  if (row.isBuiltin) {
+    ElMessage.warning('系统内置模板不可删除')
+    return
+  }
+  try {
+    await ElMessageBox.confirm('确定要删除该模板吗？', '提示', { type: 'warning' })
+    await templateApi.deleteTemplate(row.id)
+    ElMessage.success('删除成功')
+    loadTemplates()
+    loadStats()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '删除失败')
+    }
+  }
+}
+
+function resetForm() {
+  formRef.value?.resetFields()
+  Object.assign(form, {
     id: '',
     code: '',
     name: '',
     category: '',
     thumbnailUrl: '',
     description: '',
-    sortOrder: 0
+    htmlTemplate: '',
+    renderEngine: 'server',
+    config: {},
+    sortOrder: 0,
+    isRecommended: false
   })
 }
 
-const beforeUpload: UploadProps['beforeUpload'] = () => {
-  // TODO: 文件上传前的验证
-  return true
+async function handleSubmit() {
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return
+    submitLoading.value = true
+    try {
+      const payload: TemplateRequest = {
+        code: form.code,
+        name: form.name,
+        category: form.category,
+        thumbnailUrl: form.thumbnailUrl,
+        description: form.description,
+        htmlTemplate: form.htmlTemplate || form.code,
+        renderEngine: form.renderEngine || 'server',
+        config: form.config || {},
+        sortOrder: form.sortOrder ?? 0,
+        isRecommended: form.isRecommended ?? false
+      }
+      if (form.id) {
+        await templateApi.updateTemplate(form.id, payload)
+      } else {
+        await templateApi.createTemplate(payload)
+      }
+      ElMessage.success('保存成功')
+      dialogVisible.value = false
+      resetForm()
+      loadTemplates()
+      loadStats()
+    } catch (e: any) {
+      ElMessage.error(e.message || '保存失败')
+    } finally {
+      submitLoading.value = false
+    }
+  })
 }
 
-const handleUploadSuccess: UploadProps['onSuccess'] = (response) => {
-  // TODO: 处理上传成功
-  templateForm.thumbnailUrl = response.url
+async function handleUpload(options: UploadRequestOptions) {
+  const res = await templateApi.uploadThumbnail(options.file)
+  return res
+}
+
+const handleUploadSuccess: UploadProps['onSuccess'] = (response: any) => {
+  form.thumbnailUrl = response.url
+}
+
+function formatDate(date: string | null) {
+  return date ? date.replace('T', ' ').substring(0, 19) : '-'
 }
 </script>
 
-<style scoped>
-.template-management {
-  padding: 20px;
+<style scoped lang="scss">
+.admin-template-management {
+  padding-bottom: var(--st-margin-page);
 }
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.page-header h1 {
-  font-size: 24px;
-  color: #333;
-  margin: 0;
-}
-
-.search-bar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.template-list {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.thumbnail {
-  width: 80px;
-  height: 60px;
-  object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid #eee;
-}
-
-.no-thumbnail {
-  width: 80px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f5f5f5;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #999;
-}
-
 .thumbnail-uploader {
-  border: 1px dashed #d9d9d9;
-  border-radius: 6px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  width: 100px;
-  height: 100px;
-}
-
-.thumbnail-uploader:hover {
-  border-color: #409eff;
-}
-
-.thumbnail-uploader .thumbnail {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.uploader-icon {
-  font-size: 28px;
-  color: #8c939d;
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 160px;
+  border: 1px dashed var(--st-outline-variant);
+  border-radius: var(--st-radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  &:hover { border-color: var(--st-primary); }
+}
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

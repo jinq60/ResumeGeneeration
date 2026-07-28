@@ -1,67 +1,26 @@
-import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
-import AdminLayout from '@/components/admin/AdminLayout.vue'
-import Login from '@/views/admin/Login.vue'
-import Dashboard from '@/views/admin/Dashboard.vue'
-import TemplateManagement from '@/views/admin/TemplateManagement.vue'
-import UserManagement from '@/views/admin/UserManagement.vue'
-import SystemSettings from '@/views/admin/SystemSettings.vue'
+import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
   {
     path: '/admin/login',
     name: 'AdminLogin',
-    component: Login,
+    component: () => import('@/views/admin/Login.vue'),
     meta: { title: '管理员登录' }
   },
   {
     path: '/admin',
-    component: AdminLayout,
+    component: () => import('@/components/admin/AdminLayout.vue'),
     redirect: '/admin/dashboard',
     children: [
-      {
-        path: 'dashboard',
-        name: 'AdminDashboard',
-        component: Dashboard,
-        meta: { title: '仪表板', requiresAuth: true }
-      },
-      {
-        path: 'templates',
-        name: 'AdminTemplateManagement',
-        component: TemplateManagement,
-        meta: { title: '模板管理', requiresAuth: true }
-      },
-      {
-        path: 'users',
-        name: 'AdminUserManagement',
-        component: UserManagement,
-        meta: { title: '用户管理', requiresAuth: true }
-      },
-      {
-        path: 'settings',
-        name: 'AdminSystemSettings',
-        component: SystemSettings,
-        meta: { title: '系统设置', requiresAuth: true }
-      }
+      { path: 'dashboard', name: 'AdminDashboard', component: () => import('@/views/admin/Dashboard.vue'), meta: { title: '统计总览', requiresAuth: true } },
+      { path: 'users', name: 'AdminUserManagement', component: () => import('@/views/admin/UserManagement.vue'), meta: { title: '用户管理', requiresAuth: true } },
+      { path: 'resumes', name: 'AdminResumeManagement', component: () => import('@/views/admin/ResumeManagement.vue'), meta: { title: '简历管理', requiresAuth: true } },
+      { path: 'templates', name: 'AdminTemplateManagement', component: () => import('@/views/admin/TemplateManagement.vue'), meta: { title: '模板管理', requiresAuth: true } },
+      { path: 'ai-rules', name: 'AdminAIRules', component: () => import('@/views/admin/SystemSettings.vue'), meta: { title: 'AI 规则', requiresAuth: true } },
+      { path: 'audit', name: 'AdminContentAudit', component: () => import('@/views/admin/ContentAudit.vue'), meta: { title: '内容审核', requiresAuth: true } },
+      { path: 'delivery', name: 'AdminDeliveryData', component: () => import('@/views/admin/DeliveryData.vue'), meta: { title: '投递数据', requiresAuth: true } }
     ]
   }
 ]
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes
-})
-
-// 路由守卫
-router.beforeEach((to, _from, next) => {
-  const token = localStorage.getItem('admin_token')
-  
-  if (to.meta.requiresAuth && !token) {
-    next('/admin/login')
-  } else if (to.path === '/admin/login' && token) {
-    next('/admin/dashboard')
-  } else {
-    next()
-  }
-})
-
-export default router
+export default routes

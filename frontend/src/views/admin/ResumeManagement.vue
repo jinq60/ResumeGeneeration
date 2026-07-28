@@ -1,0 +1,259 @@
+<template>
+  <div class="admin-resume-management">
+    <div class="mb-8">
+      <h2 class="text-headline-md font-bold">
+        简历管理
+      </h2>
+      <p class="text-body-md text-on-surface-variant mt-2">
+        查看平台用户创建的简历内容、状态与导出情况
+      </p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-8">
+      <div
+        v-for="stat in stats"
+        :key="stat.label"
+        class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant flex items-center gap-4 hover:shadow-md transition-shadow"
+      >
+        <div
+          class="w-12 h-12 rounded-xl flex items-center justify-center"
+          :class="stat.iconBg"
+        >
+          <el-icon
+            :class="stat.iconColor"
+            size="28"
+          >
+            <component :is="stat.icon" />
+          </el-icon>
+        </div>
+        <div>
+          <p class="text-label-md text-on-surface-variant">
+            {{ stat.label }}
+          </p>
+          <p class="text-headline-md font-bold mt-1">
+            {{ stat.value }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+        <div class="space-y-2">
+          <label class="text-label-md font-bold text-on-surface-variant">关键词搜索</label>
+          <el-input
+            v-model="filters.keyword"
+            placeholder="搜索简历标题、目标岗位"
+            clearable
+          >
+            <template #prefix>
+              <el-icon size="18">
+                <Search />
+              </el-icon>
+            </template>
+          </el-input>
+        </div>
+        <div class="space-y-2 flex flex-col justify-end">
+          <div class="flex gap-2">
+            <el-button
+              type="primary"
+              class="flex-1"
+              @click="loadResumes"
+            >
+              <el-icon size="16">
+                <Search />
+              </el-icon>查询
+            </el-button>
+            <el-button @click="resetFilters">
+              重置
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden shadow-sm">
+      <el-table
+        v-loading="loading"
+        :data="resumeList"
+      >
+        <el-table-column
+          label="简历ID"
+          prop="id"
+          width="120"
+        />
+        <el-table-column
+          label="简历标题"
+          prop="title"
+          min-width="160"
+        />
+        <el-table-column
+          label="用户ID"
+          prop="userId"
+          min-width="120"
+        />
+        <el-table-column
+          label="目标岗位"
+          prop="targetPosition"
+          min-width="140"
+        />
+        <el-table-column
+          label="场景"
+          prop="scene"
+          width="120"
+        >
+          <template #default="{ row }">
+            {{ sceneLabel(row.scene) }}
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="模板"
+          prop="templateName"
+          width="140"
+        />
+        <el-table-column
+          label="导出次数"
+          prop="exportCount"
+          width="100"
+          align="center"
+        />
+        <el-table-column
+          label="更新时间"
+          prop="updatedAt"
+          width="170"
+        >
+          <template #default="{ row }">
+            {{ formatDate(row.updatedAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="操作"
+          width="140"
+          align="right"
+          fixed="right"
+        >
+          <template #default="{ row }">
+            <el-button
+              link
+              type="primary"
+              @click="previewResume(row)"
+            >
+              预览
+            </el-button>
+            <el-button
+              link
+              @click="downloadResume(row)"
+            >
+              下载
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="px-6 py-4 flex items-center justify-between bg-surface-container-low border-t border-outline-variant">
+        <span class="text-label-md text-on-surface-variant">共 {{ total }} 条</span>
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-sizes="[10,20,50,100]"
+          layout="sizes, prev, pager, next, jumper"
+          background
+        />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, onMounted, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Document, Search, Download, View } from '@element-plus/icons-vue'
+import { resumeApi, type Resume, type ResumeStats } from '@/api/admin/resumes'
+
+const loading = ref(false)
+const filters = reactive({ keyword: '' })
+const resumeList = ref<Resume[]>([])
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+
+const stats = reactive([
+  { label: '简历总数', value: '-', icon: Document, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
+  { label: '今日新增', value: '-', icon: Document, iconBg: 'bg-secondary/10', iconColor: 'text-secondary' },
+  { label: '活跃简历', value: '-', icon: Download, iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' },
+  { label: '已删除', value: '-', icon: View, iconBg: 'bg-on-tertiary-fixed-variant/10', iconColor: 'text-on-tertiary-fixed-variant' }
+])
+
+onMounted(() => {
+  loadStats()
+  loadResumes()
+})
+
+async function loadStats() {
+  try {
+    const s: ResumeStats = await resumeApi.getResumeStats()
+    stats[0].value = String(s.totalResumes)
+    stats[1].value = String(s.todayNewResumes)
+    stats[2].value = String(s.activeResumes)
+    stats[3].value = String(s.deletedResumes)
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载统计数据失败')
+  }
+}
+
+async function loadResumes() {
+  loading.value = true
+  try {
+    const res = await resumeApi.getResumes({
+      page: page.value,
+      size: pageSize.value,
+      keyword: filters.keyword || undefined
+    })
+    resumeList.value = res.records
+    total.value = res.total
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载简历列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+function resetFilters() {
+  filters.keyword = ''
+  page.value = 1
+  loadResumes()
+}
+
+function sceneLabel(scene: string) {
+  const map: Record<string, string> = {
+    campus: '校园招聘',
+    social: '社会招聘',
+    intern: '实习',
+    postgraduate: '考研复试'
+  }
+  return map[scene] || scene
+}
+
+function formatDate(date: string | null) {
+  return date ? date.replace('T', ' ').substring(0, 19) : '-'
+}
+
+function previewResume(row: Resume) {
+  ElMessage.info(`预览简历 ${row.title}`)
+}
+
+function downloadResume(row: Resume) {
+  ElMessage.info(`下载简历 ${row.title}`)
+}
+
+watch([page, pageSize], loadResumes)
+</script>
+
+<style scoped lang="scss">
+.admin-resume-management {
+  padding-bottom: var(--st-margin-page);
+}
+</style>
