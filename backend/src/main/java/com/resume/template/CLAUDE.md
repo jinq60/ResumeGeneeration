@@ -72,7 +72,7 @@ Base URL：`http://localhost:8080/api`
 | `category` | String | 分类：classic/tech/fresh/business/postgraduate |
 | `thumbnailUrl` | String | 缩略图 URL |
 | `description` | String | 描述 |
-| `config` | String（JSON） | 模板配置：页面、字体、颜色、布局等 |
+| `config` | Object（JSON） | 模板配置：页面、字体、颜色、布局等；数据库以 JSON 对象存储，实体通过 JacksonTypeHandler 直接映射为 Object |
 | `htmlTemplate` | String | HTML 模板文件名或路径 |
 | `renderEngine` | String | `server` / `client` / `hybrid`，默认 `server` |
 | `isBuiltin` | Integer | `1` 系统内置，不可删除 |
@@ -175,7 +175,7 @@ Base URL：`http://localhost:8080/api`
 
 ## 10. 开发约束
 
-- `config` 在实体中为 `String`，DTO 中为 `Object`；Service 层使用 `ObjectMapper` 转换。
+- `config` 在实体中为 `Object`（通过 `JacksonTypeHandler` 映射为 MySQL JSON 对象），DTO 中为 `Object`；Service 层在写入前使用 `ObjectMapper` 校验其可序列化。
 - 模板更新必须自动递增 `version`，用于缓存控制。
 - 内置模板受保护，不可删除。
 - 前台接口允许匿名访问。
