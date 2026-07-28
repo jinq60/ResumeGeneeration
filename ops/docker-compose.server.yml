@@ -1,13 +1,19 @@
+# 服务器生产/测试环境编排
+# 运行前请确保：
+# 1. /opt/resume-generation/.env 已配置数据库、MinIO、JWT 等密钥；
+# 2. 前端 dist/ 已生成（npm run build）；
+# 3. 后端 Dockerfile 会在容器内自行执行 mvn package，无需在宿主机预先生成 jar。
+
 services:
   mysql:
     image: mysql:8.0
     container_name: resume-mysql
     restart: unless-stopped
+    env_file:
+      - /opt/resume-generation/.env
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-resume_generation}
       MYSQL_USER: ${MYSQL_USER:-resume}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
@@ -19,7 +25,7 @@ services:
     networks:
       - resume-net
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-ResumeRoot123}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,9 +35,8 @@ services:
     container_name: resume-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    env_file:
+      - /opt/resume-generation/.env
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
@@ -44,6 +49,48 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: resume-backend
+    restart: unless-stopped
+    env_file:
+      - /opt/resume-generation/.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/resume_generation?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+      APP_MINIO_ENDPOINT: http://minio:9000
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - resume-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: resume-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - resume-net
 
 volumes:
   resume-mysql-data:
