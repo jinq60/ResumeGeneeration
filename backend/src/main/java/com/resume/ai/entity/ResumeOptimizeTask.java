@@ -16,7 +16,7 @@ import java.util.Map;
  * JD 匹配优化任务实体。
  */
 @Data
-@TableName("resume_optimize_task")
+@TableName(value = "resume_optimize_task", autoResultMap = true)
 public class ResumeOptimizeTask {
 
     @TableId(type = IdType.ASSIGN_ID)
@@ -30,19 +30,19 @@ public class ResumeOptimizeTask {
     private Integer matchScore;
 
     /** 分项评分 JSON */
-    @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+    @TableField(typeHandler = com.resume.common.handler.StringIntegerMapTypeHandler.class)
     private Map<String, Integer> dimensionScores;
 
     /** 逐模块优化建议 JSON */
-    @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+    @TableField(typeHandler = com.resume.ai.handler.SectionOptimizationListTypeHandler.class)
     private List<SectionOptimization> optimizations;
 
     /** 缺失技能 JSON */
-    @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+    @TableField(typeHandler = com.resume.common.handler.StringListTypeHandler.class)
     private List<String> missingSkills;
 
     /** 整体建议 JSON */
-    @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+    @TableField(typeHandler = com.resume.common.handler.StringListTypeHandler.class)
     private List<String> recommendations;
 
     private String modelName;

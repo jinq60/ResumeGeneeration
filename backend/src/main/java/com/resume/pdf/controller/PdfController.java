@@ -1,6 +1,8 @@
 package com.resume.pdf.controller;
 
+import com.resume.common.constant.ResultCode;
 import com.resume.common.entity.R;
+import com.resume.common.exception.BusinessException;
 import com.resume.pdf.dto.ExportPdfRequest;
 import com.resume.pdf.dto.PdfTaskResponse;
 import com.resume.pdf.service.PdfService;

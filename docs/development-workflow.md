@@ -89,6 +89,7 @@ git push -u origin feature/resume-export-pdf
 |---|---|
 | `.github/workflows/backend-ci.yml` | JDK 17 环境；运行 `mvn -B clean test` |
 | `.github/workflows/frontend-ci.yml` | Node 20 环境；运行 `npm ci`、lint、unit tests、production build |
+| `.github/workflows/deploy.yml` | `production`/`develop` 推送时构建 dist，SCP 源码/产物到服务器后由后端 Dockerfile 构建 jar，再用 Docker Compose 部署 |
 
 ### 3.3 本地验证
 

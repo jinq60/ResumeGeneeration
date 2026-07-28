@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * 头像优化任务实体。
  */
 @Data
-@TableName("avatar_task")
+@TableName(value = "avatar_task", autoResultMap = true)
 public class AvatarTask {
 
     @TableId(type = IdType.ASSIGN_ID)

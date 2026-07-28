@@ -184,7 +184,7 @@ public class PdfService {
             Files.writeString(htmlPath, html);
 
             try (Playwright playwright = Playwright.create();
-                 Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setArgs(getChromiumArgs()));
+                 Browser browser = playwright.chromium().launch(buildLaunchOptions());
                  BrowserContext context = browser.newContext();
                  Page page = context.newPage()) {
                 page.navigate(htmlPath.toUri().toString());
@@ -207,7 +207,8 @@ public class PdfService {
         } catch (Exception e) {
             log.error("Generate PDF failed: taskId={}", task.getId(), e);
             task.setStatus(BizConstant.TASK_STATUS_FAILED);
-            task.setErrorMsg("PDF 生成失败：" + e.getMessage());
+            String msg = e.getMessage() == null ? "" : e.getMessage();
+            task.setErrorMsg(StringUtils.abbreviate("PDF 生成失败：" + msg, 500));
         } finally {
             if (tempDir != null) {
                 try {
@@ -251,6 +252,16 @@ public class PdfService {
             return name + "_简历.pdf";
         }
         return "我的简历_" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
+    }
+
+    private BrowserType.LaunchOptions buildLaunchOptions() {
+        BrowserType.LaunchOptions options = new BrowserType.LaunchOptions().setArgs(getChromiumArgs());
+        String executablePath = System.getenv("PLAYWRIGHT_CHROMIUM_EXECUTABLE");
+        if (StringUtils.isNotBlank(executablePath)) {
+            log.info("Using custom Chromium executable for Playwright: {}", executablePath);
+            options.setExecutablePath(Path.of(executablePath.trim()));
+        }
+        return options;
     }
 
     private List<String> getChromiumArgs() {

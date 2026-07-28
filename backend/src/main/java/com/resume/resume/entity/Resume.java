@@ -29,7 +29,7 @@ public class Resume {
     private String targetIndustry;
     private String templateId;
 
-    @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+    @TableField(typeHandler = com.resume.resume.handler.SectionListTypeHandler.class)
     private List<SectionDTO> sections;
 
     private String status;

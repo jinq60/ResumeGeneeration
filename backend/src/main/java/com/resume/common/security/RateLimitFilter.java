@@ -21,6 +21,8 @@ import java.nio.charset.StandardCharsets;
  * 简易限流过滤器。
  * <p>
  * 委托给 {@link RateLimiter} 接口实现（默认内存实现，可替换为 Redis）。
+ * 底层计数器使用 {@link java.util.concurrent.ConcurrentHashMap#compute} 原子地完成窗口创建与计数，
+ * 避免 cleanup 与窗口更新之间出现竞态。
  * </p>
  */
 @Slf4j
@@ -61,6 +63,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveKey(HttpServletRequest request) {
+        // 不直接信任 X-Forwarded-For，防止客户端伪造 IP 绕过限流。
+        // 如需获取真实客户端 IP，应在可信反向代理后统一部署，由网关统一注入并校验。
         return "rate:" + request.getRemoteAddr();
     }
 }

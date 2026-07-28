@@ -4,9 +4,11 @@
 
 ## 项目状态
 
-- **后端 P0**：✅ 完成，79 个测试通过（含集成测试）
-- **前端 P0**：约 40%，核心页面使用 Geminia 风格重写中；Tailwind CSS 已接入
-- **CI/CD**：GitHub Actions 已启用
+- **设计文档**：v1.1 已对齐，见 [设计文档](#设计文档)。
+- **后端 P0**：✅ 完成，79 个测试通过（含集成测试）；认证、简历、模板、PDF 导出、AI 点评/优化、后台管理接口均已实现。
+- **前端 P0**：约 40%，用户端与后台管理核心页面已接入真实后端；使用 Geminia 风格重写中，Tailwind CSS 已接入。
+- **CI/CD**：GitHub Actions 已启用，覆盖 `production`、`develop`、`stable`。
+- **分支模型**：`production`（默认）/ `develop` / `stable`，详见 `docs/development-workflow.md`。
 - **测试环境**：`docker compose -f ops/docker-compose.test.yml -p resume-test up -d`
 
 ## 项目结构

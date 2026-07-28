@@ -1,9 +1,6 @@
 package com.resume.template.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -12,7 +9,7 @@ import java.time.LocalDateTime;
  * 简历模板实体。
  */
 @Data
-@TableName("template")
+@TableName(value = "template", autoResultMap = true)
 public class Template {
 
     @TableId(type = IdType.ASSIGN_ID)
@@ -24,7 +21,8 @@ public class Template {
     private String thumbnailUrl;
     private String description;
 
-    private String config;
+    @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+    private Object config;
 
     private String htmlTemplate;
     private String renderEngine;

@@ -22,7 +22,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<R<Void>> handleBusinessException(BusinessException e) {
-        log.warn("Business exception: code={}, message={}", e.getErrorCode(), e.getMessage());
+        if (e.getCause() != null) {
+            log.warn("Business exception: code={}, message={}", e.getErrorCode(), e.getMessage(), e);
+        } else {
+            log.warn("Business exception: code={}, message={}", e.getErrorCode(), e.getMessage());
+        }
         int httpStatus = resolveHttpStatus(e.getErrorCode());
         return ResponseEntity.status(httpStatus).body(R.error(e.getErrorCode(), e.getMessage()));
     }
@@ -77,6 +81,7 @@ public class GlobalExceptionHandler {
                  ResultCode.TEMPLATE_CODE_IMMUTABLE,
                  ResultCode.TEMPLATE_BUILTIN_PROTECTED -> 409;
             case ResultCode.RATE_LIMITED -> 429;
+            case ResultCode.PDF_EXPORT_FAILED -> 500;
             case ResultCode.INTERNAL_ERROR -> 500;
             default -> {
                 if (errorCode >= 1000 && errorCode < 2000) {

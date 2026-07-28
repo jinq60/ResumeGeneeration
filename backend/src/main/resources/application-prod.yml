@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: never
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  shutdown: graceful
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+logging:
+  level:
+    root: info
+    com.resume: info
+    org.springframework.security: info
+
+app:
+  minio:
+    endpoint: ${APP_MINIO_ENDPOINT}
+    access-key: ${APP_MINIO_ACCESS_KEY}
+    secret-key: ${APP_MINIO_SECRET_KEY}
+    buckets:
+      avatars: ${APP_MINIO_BUCKET_AVATARS}
+      pdfs: ${APP_MINIO_BUCKET_PDFS}
+      templates: ${APP_MINIO_BUCKET_TEMPLATES}
+    presigned-url-expiration: 3600
+  jwt:
+    secret: ${APP_JWT_SECRET:}
+    access-token-expiration: 3600000
+    refresh-token-expiration: 604800000
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}

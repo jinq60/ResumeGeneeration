@@ -6,11 +6,18 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
+import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Date;
 
 /**
@@ -30,14 +37,45 @@ public class JwtTokenProvider {
     public static final String TOKEN_TYPE_ACCESS = "access";
     public static final String TOKEN_TYPE_REFRESH = "refresh";
 
-    @Value("${app.jwt.secret}")
+    @Value("${app.jwt.secret:}")
     private String jwtSecret;
+
+    @Autowired(required = false)
+    private Environment environment;
 
     @Value("${app.jwt.access-token-expiration:3600000}")
     private long accessTokenExpiration;
 
     @Value("${app.jwt.refresh-token-expiration:604800000}")
     private long refreshTokenExpiration;
+
+    @PostConstruct
+    public void initSecret() {
+        if (!StringUtils.hasText(jwtSecret)) {
+            if (isDevOrTestProfile()) {
+                jwtSecret = generateRandomSecret();
+                log.warn("JWT secret not configured for dev/test profile; generated a temporary secret.");
+            } else {
+                throw new IllegalStateException("app.jwt.secret must be configured for non-dev/test profiles.");
+            }
+        }
+        // Validate the secret early (Base64-decodable and sufficient length).
+        getSigningKey();
+    }
+
+    private boolean isDevOrTestProfile() {
+        if (environment == null) {
+            return false;
+        }
+        return Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> "dev".equals(profile) || "test".equals(profile));
+    }
+
+    private String generateRandomSecret() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getEncoder().encodeToString(bytes);
+    }
 
     private SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);

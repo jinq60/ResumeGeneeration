@@ -35,8 +35,10 @@ public class UserService {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
 
-    private static final int MIN_PASSWORD_LENGTH = 6;
+    private static final int MIN_PASSWORD_LENGTH = 8;
     private static final int MAX_PASSWORD_LENGTH = 32;
+    private static final java.util.regex.Pattern PASSWORD_COMPLEXITY =
+            java.util.regex.Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).+$");
 
     /**
      * 注册账号。
@@ -50,15 +52,15 @@ public class UserService {
         }
         if (StringUtils.isBlank(request.getPassword())
                 || request.getPassword().length() < MIN_PASSWORD_LENGTH
-                || request.getPassword().length() > MAX_PASSWORD_LENGTH) {
+                || request.getPassword().length() > MAX_PASSWORD_LENGTH
+                || !PASSWORD_COMPLEXITY.matcher(request.getPassword()).matches()) {
             throw new BusinessException(ResultCode.AUTH_PASSWORD_TOO_WEAK,
-                    "密码长度应为 " + MIN_PASSWORD_LENGTH + "–" + MAX_PASSWORD_LENGTH + " 位。");
+                    "密码长度应为 " + MIN_PASSWORD_LENGTH + "–" + MAX_PASSWORD_LENGTH + " 位，且需同时包含字母和数字。");
         }
 
         // P0：验证码占位校验，任意 6 位数字均通过。
-        // 防御性校验：即使 DTO 校验被绕过，也不应在此抛 NPE。
-        String verifyCode = request.getVerifyCode();
-        if (verifyCode == null || !verifyCode.matches("^\\d{6}$")) {
+        // 防御性校验：即使 DTO 校验被绕过，也不应在此抛 NPE（StringUtils.isBlank 已兼容 null）。
+        if (StringUtils.isBlank(request.getVerifyCode()) || !request.getVerifyCode().matches("^\\d{6}$")) {
             throw new BusinessException(ResultCode.AUTH_VERIFY_CODE_INVALID, "验证码不正确或已过期。");
         }
 
@@ -137,17 +139,7 @@ public class UserService {
         userMapper.insert(user);
 
         log.info("guest session created: userId={}", user.getId());
-
-        AuthResponse response = new AuthResponse();
-        response.setUserId(user.getId());
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), true);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
-        response.setAccessToken(accessToken);
-        response.setRefreshToken(refreshToken);
-        response.setExpiresIn(jwtTokenProvider.getAccessTokenExpiration() / 1000);
-        response.setIsGuest(true);
-        storeRefreshToken(user.getId(), refreshToken);
-        return response;
+        return buildAuthResponse(user);
     }
 
     /**
@@ -185,6 +177,9 @@ public class UserService {
         User user = userMapper.selectById(userId);
         if (user == null || BizConstant.DELETED.equals(user.getDeleted())) {
             throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌无效或已过期。");
+        }
+        if (BizConstant.USER_STATUS_DISABLED.equals(user.getStatus())) {
+            throw new BusinessException(ResultCode.AUTH_ACCOUNT_LOCKED, "账号已被锁定，无法刷新令牌。");
         }
         return buildAuthResponse(user);
     }
@@ -278,8 +273,10 @@ public class UserService {
         }
         String[] parts = email.split("@");
         String local = parts[0];
-        String mask = local.length() <= 2 ? "*" : local.charAt(0) + "***";
-        return mask + "@" + parts[1];
+        if (local.length() <= 2) {
+            return "*@" + parts[1];
+        }
+        return local.charAt(0) + "***" + local.charAt(local.length() - 1) + "@" + parts[1];
     }
 
     /**

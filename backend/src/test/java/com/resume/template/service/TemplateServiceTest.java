@@ -31,13 +31,11 @@ class TemplateServiceTest {
     @Mock
     private TemplateMapper templateMapper;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
     private TemplateService templateService;
 
     @BeforeEach
     void setUp() {
-        templateService = new TemplateService(templateMapper, objectMapper);
+        templateService = new TemplateService(templateMapper, new ObjectMapper());
     }
 
     @Test
@@ -68,6 +66,17 @@ class TemplateServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> templateService.createTemplate(request, "admin_1"));
         assertEquals(ResultCode.TEMPLATE_CODE_EXISTS, ex.getErrorCode());
+    }
+
+    @Test
+    void createTemplate_shouldRejectInvalidConfig() {
+        AdminTemplateRequest request = buildRequest("classic-invalid-config");
+        request.setConfig(new NonSerializableConfig());
+        when(templateMapper.selectOne(any())).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> templateService.createTemplate(request, "admin_1"));
+        assertEquals(ResultCode.TEMPLATE_CONFIG_INVALID, ex.getErrorCode());
     }
 
     @Test
@@ -191,7 +200,7 @@ class TemplateServiceTest {
         template.setCode(code);
         template.setName("Template");
         template.setCategory("classic");
-        template.setConfig("{}");
+        template.setConfig(Map.of());
         template.setHtmlTemplate("classic.html");
         template.setRenderEngine(BizConstant.RENDER_ENGINE_SERVER);
         template.setIsBuiltin(BizConstant.BUILTIN_NO);
@@ -199,5 +208,13 @@ class TemplateServiceTest {
         template.setVersion(1);
         template.setDeleted(BizConstant.NOT_DELETED);
         return template;
+    }
+
+    /**
+     * 用于测试不可 JSON 序列化的配置对象。
+     */
+    private static class NonSerializableConfig {
+        @SuppressWarnings("unused")
+        private final NonSerializableConfig self = this;
     }
 }

@@ -1,6 +1,7 @@
 package com.resume.common.config;
 
 import io.minio.MinioClient;
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -29,9 +30,23 @@ public class MinioConfig {
 
     @Data
     public static class Buckets {
-        private String avatars = "resume-avatars";
-        private String pdfs = "resume-pdfs";
-        private String templates = "resume-templates";
+        private String avatars;
+        private String pdfs;
+        private String templates;
+    }
+
+    @PostConstruct
+    public void validateBuckets() {
+        if (buckets == null
+                || isBlank(buckets.getAvatars())
+                || isBlank(buckets.getPdfs())
+                || isBlank(buckets.getTemplates())) {
+            throw new IllegalStateException("MinIO bucket names must be configured via app.minio.buckets.*");
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     @Bean

@@ -38,7 +38,7 @@ public class MinioStorageService {
                             .build());
         } catch (Exception e) {
             log.error("Upload file to MinIO failed: bucket={}, object={}", bucket, objectName, e);
-            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件上传失败");
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件上传失败，请稍后重试。", e);
         }
     }
 
@@ -66,7 +66,7 @@ public class MinioStorageService {
             return inputStream.readAllBytes();
         } catch (Exception e) {
             log.error("Download file from MinIO failed: bucket={}, object={}", bucket, objectName, e);
-            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件下载失败");
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件下载失败，请稍后重试。", e);
         }
     }
 
@@ -82,7 +82,7 @@ public class MinioStorageService {
                     GetObjectArgs.builder().bucket(bucket).object(objectName).build());
         } catch (Exception e) {
             log.error("Stream file from MinIO failed: bucket={}, object={}", bucket, objectName, e);
-            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件下载失败");
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件下载失败，请稍后重试。", e);
         }
     }
 
