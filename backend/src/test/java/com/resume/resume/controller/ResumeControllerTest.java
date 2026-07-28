@@ -3,6 +3,7 @@ package com.resume.resume.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.common.mapper.IdempotencyRecordMapper;
 import com.resume.common.security.WithMockJwt;
+import com.resume.common.service.RateLimiter;
 import com.resume.user.security.JwtTokenProvider;
 import com.resume.resume.dto.CreateResumeRequest;
 import com.resume.resume.dto.ResumeDetailResponse;
@@ -51,6 +52,9 @@ class ResumeControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private RateLimiter rateLimiter;
 
     @Test
     @WithMockJwt(userId = "user123")

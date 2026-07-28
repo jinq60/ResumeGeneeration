@@ -178,7 +178,7 @@ class UserServiceTest {
         ReflectionTestUtils.setField(realProvider, "accessTokenExpiration", 3600000L);
         ReflectionTestUtils.setField(realProvider, "refreshTokenExpiration", 604800000L);
 
-        UserService service = new UserService(userMapper, realProvider, passwordEncoder);
+        UserService service = new UserService(userMapper, refreshTokenMapper, realProvider, passwordEncoder);
         User user = new User();
         user.setId("user_1");
         user.setStatus(BizConstant.USER_STATUS_ACTIVE);

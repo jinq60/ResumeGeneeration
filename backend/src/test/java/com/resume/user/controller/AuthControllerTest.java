@@ -2,6 +2,7 @@ package com.resume.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.common.mapper.IdempotencyRecordMapper;
+import com.resume.common.service.RateLimiter;
 import com.resume.user.dto.AuthResponse;
 import com.resume.user.security.JwtTokenProvider;
 import com.resume.user.dto.LoginRequest;
@@ -38,6 +39,9 @@ class AuthControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private RateLimiter rateLimiter;
 
     @Test
     void testRegister_Success() throws Exception {
