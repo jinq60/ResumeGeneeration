@@ -113,6 +113,33 @@ class ResumeSectionValidatorTest {
         assertEquals(ResultCode.RESUME_SECTION_INVALID, ex.getErrorCode());
     }
 
+    @Test
+    void draft_shouldRejectTooManySections() {
+        java.util.List<SectionDTO> sections = new java.util.ArrayList<>();
+        for (int i = 0; i < 51; i++) {
+            sections.add(createSection("custom", "模块" + i, i, new HashMap<String, Object>()));
+        }
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> validator.validateDraft(sections));
+        assertEquals(ResultCode.RESUME_CONTENT_TOO_LONG, ex.getErrorCode());
+    }
+
+    @Test
+    void draft_shouldRejectContentTooLong() {
+        Map<String, Object> data = new HashMap<>();
+        // 单 Section 内字符数即可触发上限
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 210_000; i++) {
+            sb.append('a');
+        }
+        data.put("content", sb.toString());
+        SectionDTO section = createSection("custom", "大模块", 0, data);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> validator.validateDraft(List.of(section)));
+        assertEquals(ResultCode.RESUME_CONTENT_TOO_LONG, ex.getErrorCode());
+    }
+
     private SectionDTO createSection(String type, String title, int order, Object data) {
         SectionDTO section = new SectionDTO();
         section.setId("sec_" + type + "_" + order);

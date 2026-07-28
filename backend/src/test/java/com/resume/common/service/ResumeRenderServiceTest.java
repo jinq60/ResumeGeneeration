@@ -48,6 +48,8 @@ class ResumeRenderServiceTest {
 
         Template template = new Template();
         template.setId("template_1");
+        // htmlTemplate 留空 -> 触发回退到内置单栏渲染器
+        template.setHtmlTemplate(null);
         template.setConfig("{}");
 
         String html = renderService.render(resume, template);
@@ -64,5 +66,38 @@ class ResumeRenderServiceTest {
             () -> assertTrue(html.contains("28岁")),
             () -> assertTrue(html.contains("20k-30k"))
         );
+    }
+
+    @Test
+    void render_shouldLoadSkeletonFromHtmlTemplateFile() {
+        Resume resume = new Resume();
+        resume.setId("resume_1");
+        resume.setTitle("我的简历");
+
+        Map<String, Object> profileData = new HashMap<>();
+        profileData.put("name", "李四");
+        SectionDTO section = new SectionDTO();
+        section.setId("sec_profile");
+        section.setType("profile");
+        section.setTitle("个人信息");
+        section.setOrder(0);
+        section.setVisible(true);
+        section.setData(profileData);
+        resume.setSections(List.of(section));
+
+        Template template = new Template();
+        template.setId("template_classic_single");
+        // 指向 classpath:templates/resume/classic-single.html
+        template.setHtmlTemplate("classic-single");
+        template.setConfig("{\"color\":{\"primary\":\"#333333\",\"accent\":\"#1a5276\"}}");
+
+        String html = renderService.render(resume, template);
+
+        // 来自 skeleton 文件的 title 占位被替换
+        assertTrue(html.contains("<title>我的简历</title>"));
+        // 来自 skeleton 文件，body 占位会被替换为 section 内容
+        assertTrue(html.contains("李四"));
+        // CSS 占位被替换为模板配置生成的 CSS
+        assertTrue(html.contains("#1a5276"));
     }
 }

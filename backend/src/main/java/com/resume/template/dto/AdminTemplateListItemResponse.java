@@ -14,6 +14,8 @@ public class AdminTemplateListItemResponse {
     private String code;
     private String name;
     private String category;
+    private String thumbnailUrl;
+    private String description;
     private String status;
     private Boolean isBuiltin;
     private Boolean isRecommended;

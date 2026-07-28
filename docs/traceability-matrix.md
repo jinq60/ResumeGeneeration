@@ -1,7 +1,7 @@
 # 需求追溯矩阵
 
-> 版本：v1.0  
-> 日期：2026-07-07  
+> 版本：v1.1  
+> 日期：2026-07-26  
 > 作用：将 PRD 需求追溯到设计文档、数据模型、API 规范、校验规则、测试计划与代码，便于审计与迭代。
 
 ---
@@ -33,7 +33,7 @@
 
 | PRD 需求 | 范围对齐 | 数据模型 | API 规范 | 校验规则 | TDD 计划 | 代码位置 |
 |---|---|---|---|---|---|---|
-| 左侧表单 + 右侧实时预览 | `scope-alignment.md` §2.1 | `resume.sections` | `api-spec.md` §7 | `validation-rules.md` §3–§8 | `tdd-test-plan.md` §3 | `frontend/src/views/EditorView.vue`（待完善） |
+| 左侧表单 + 右侧实时预览 | `scope-alignment.md` §2.1 | `resume.sections` | `api-spec.md` §7 | `validation-rules.md` §3–§8 | `tdd-test-plan.md` §3 | `frontend/src/views/EditorView.vue` |
 | 模块增删改 | `scope-alignment.md` §2.1 | `resume.sections` | `api-spec.md` §7.4 | `validation-rules.md` §12 | `tdd-test-plan.md` §3 | `ResumeService` |
 | 模块排序（按钮） | `scope-alignment.md` §2.1、§2.2 | `resume.sections.order` | `api-spec.md` §7.4 | — | `tdd-test-plan.md` §2.1 `SectionSorterTest` | 待实现 |
 | 自动保存 | `scope-alignment.md` §2.1 | `resume.sections` | `api-spec.md` §7.4 | `validation-rules.md` §1.3 | `tdd-test-plan.md` §3 | `frontend/src/composables/useAutoSave.ts`（待连接） |
@@ -96,7 +96,40 @@
 
 ---
 
-## 10. 说明
+## 10. 前端页面实现
+
+| 页面/能力 | 设计来源 | 代码位置 |
+|---|---|---|
+| 用户工作台（Dashboard） | Google Stitch 项目 `workbench-overview` | `frontend/src/views/DashboardView.vue` |
+| 简历列表 | Google Stitch 项目 `my-resumes` | `frontend/src/views/ResumeListView.vue` |
+| 简历编辑器 | Google Stitch 项目 `resume-editor` | `frontend/src/views/EditorView.vue` |
+| 官网首页 | Google Stitch 项目 `landing-page` | `frontend/src/views/LandingView.vue` |
+| 投递管理（用户侧） | Google Stitch 项目 `delivery-management` | `frontend/src/views/DeliveryManagementView.vue` |
+| 后台总览 | Google Stitch 项目 `admin-overview` | `frontend/src/views/admin/Dashboard.vue` |
+| 用户管理 | Google Stitch 项目 `user-management` | `frontend/src/views/admin/UserManagement.vue` |
+| 模板管理 | Google Stitch 项目 `template-management` | `frontend/src/views/admin/TemplateManagement.vue` |
+| 简历管理 | Google Stitch 项目 `resume-management` | `frontend/src/views/admin/ResumeManagement.vue` |
+| AI 规则管理 | Google Stitch 项目 `ai-rules` | `frontend/src/views/admin/SystemSettings.vue` |
+| 内容审核 | Google Stitch 项目 `content-audit` | `frontend/src/views/admin/ContentAudit.vue` |
+| 投递数据 | Google Stitch 项目 `delivery-data` | `frontend/src/views/admin/DeliveryData.vue` |
+| 用户端布局与导航 | Google Stitch 设计系统 | `frontend/src/components/layout/MainLayout.vue`, `TopNavbar.vue` |
+| 管理端布局 | Google Stitch 设计系统 | `frontend/src/components/admin/AdminLayout.vue` |
+| 设计系统/主题 | Google Stitch 设计令牌 | `frontend/src/assets/styles/design-system.scss`, `tailwind.css` |
+| 管理员登录 | 设计系统 | `frontend/src/views/admin/Login.vue` |
+| 用户账号设置 | 设计系统 | `frontend/src/views/SettingsView.vue` |
+| 模板中心 | 设计系统 | `frontend/src/views/TemplateCenterView.vue` |
+| AI 点评入口 | 设计系统 | `frontend/src/views/AIReviewCenterView.vue` |
+| 404 页面 | 设计系统 | `frontend/src/views/NotFoundView.vue` |
+| 模板详情页 | 设计系统 | `frontend/src/views/TemplateDetailView.vue` |
+| 下载中心 | 设计系统 | `frontend/src/views/DownloadCenterView.vue` |
+| 通知中心 | 设计系统 | `frontend/src/views/NotificationCenterView.vue` |
+| 简历详情/预览页 | 设计系统 | `frontend/src/views/ResumeDetailView.vue` |
+| 路由与鉴权守卫 | `security-guide.md` | `frontend/src/router/index.ts` |
+| 导出/头像任务本地存储 | 设计系统 | `frontend/src/utils/download.ts` |
+
+---
+
+## 11. 说明
 
 - “代码位置”列标记为“待实现”或“（待完善）”的项，是下一阶段开发重点。
 - 本矩阵随需求变更和功能实现同步更新。

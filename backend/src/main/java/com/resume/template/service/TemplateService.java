@@ -10,6 +10,7 @@ import com.resume.common.exception.BusinessException;
 import com.resume.template.dto.AdminTemplateListItemResponse;
 import com.resume.template.dto.AdminTemplateRequest;
 import com.resume.template.dto.TemplateDTO;
+import com.resume.template.dto.TemplateStatsResponse;
 import com.resume.template.entity.Template;
 import com.resume.template.mapper.TemplateMapper;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +93,34 @@ public class TemplateService {
         responsePage.setSize(result.getSize());
         responsePage.setPages(result.getPages());
         return responsePage;
+    }
+
+    /**
+     * 后台模板统计。
+     */
+    public TemplateStatsResponse stats() {
+        TemplateStatsResponse response = new TemplateStatsResponse();
+
+        LambdaQueryWrapper<Template> notDeleted = new LambdaQueryWrapper<>();
+        notDeleted.eq(Template::getDeleted, BizConstant.NOT_DELETED);
+        response.setTotalTemplates(templateMapper.selectCount(notDeleted));
+
+        LambdaQueryWrapper<Template> active = new LambdaQueryWrapper<>();
+        active.eq(Template::getDeleted, BizConstant.NOT_DELETED)
+                .eq(Template::getStatus, BizConstant.TEMPLATE_STATUS_ACTIVE);
+        response.setActiveTemplates(templateMapper.selectCount(active));
+
+        LambdaQueryWrapper<Template> inactive = new LambdaQueryWrapper<>();
+        inactive.eq(Template::getDeleted, BizConstant.NOT_DELETED)
+                .eq(Template::getStatus, BizConstant.TEMPLATE_STATUS_INACTIVE);
+        response.setInactiveTemplates(templateMapper.selectCount(inactive));
+
+        LambdaQueryWrapper<Template> builtin = new LambdaQueryWrapper<>();
+        builtin.eq(Template::getDeleted, BizConstant.NOT_DELETED)
+                .eq(Template::getIsBuiltin, BizConstant.BUILTIN_YES);
+        response.setBuiltinTemplates(templateMapper.selectCount(builtin));
+
+        return response;
     }
 
     /**
@@ -260,6 +289,8 @@ public class TemplateService {
         response.setCode(template.getCode());
         response.setName(template.getName());
         response.setCategory(template.getCategory());
+        response.setThumbnailUrl(template.getThumbnailUrl());
+        response.setDescription(template.getDescription());
         response.setStatus(template.getStatus());
         response.setIsBuiltin(BizConstant.BUILTIN_YES.equals(template.getIsBuiltin()));
         response.setIsRecommended(BizConstant.BUILTIN_YES.equals(template.getIsRecommended()));

@@ -28,6 +28,15 @@ logging:
   level:
     com.resume: debug
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
@@ -37,6 +46,9 @@ app:
     refresh-token-expiration: 604800000
   playwright:
     chromium-args: --no-sandbox,--disable-setuid-sandbox
+  rate-limit:
+    max-requests: 60
+    window-seconds: 60
   ai:
     providers:
       resume-review:
@@ -137,12 +149,3 @@ app:
 
         目标背景色：{backgroundType}
         风格要求：{style}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health
-  endpoint:
-    health:
-      show-details: never

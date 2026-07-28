@@ -9,8 +9,13 @@ import com.resume.template.entity.Template;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,11 +24,26 @@ import java.util.Map;
  * <p>
  * 统一渲染简历为 HTML，供前端预览（iframe）与 PDF 导出共用，确保预览与导出视觉一致。
  * </p>
+ * <p>
+ * 渲染策略：
+ * <ol>
+ *   <li>若 {@code template.htmlTemplate} 指向 classpath:templates/resume/{htmlTemplate}.html 文件存在，
+ *       则加载该 HTML 文件并替换 {@code ${css}} / {@code ${body}} 占位符；</li>
+ *   <li>否则回退到内置单栏模板，保证旧有 5 套内置模板的渲染结果不破坏；</li>
+ *   <li>CSS 由 {@code template.config} 动态生成，颜色/字体/布局均来自模板配置。</li>
+ * </ol>
+ * </p>
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ResumeRenderService {
+
+    private static final String TEMPLATE_DIR = "templates/resume/";
+    private static final String TEMPLATE_SUFFIX = ".html";
+    private static final String PLACEHOLDER_CSS = "${css}";
+    private static final String PLACEHOLDER_BODY = "${body}";
+    private static final String PLACEHOLDER_RESUME_TITLE = "${resumeTitle}";
 
     private final ObjectMapper objectMapper;
 
@@ -37,29 +57,78 @@ public class ResumeRenderService {
     public String render(Resume resume, Template template) {
         List<SectionDTO> sections = resume.getSections() != null ? resume.getSections() : List.of();
         Map<String, Object> config = parseConfig(template.getConfig());
+        String css = buildCss(config);
+        String body = renderBody(sections);
 
+        // 优先加载 template.htmlTemplate 指定的 HTML 骨架文件，支持后台新增模板。
+        String skeleton = loadTemplateSkeleton(template.getHtmlTemplate());
+        if (skeleton != null) {
+            String resumeTitle = StringUtils.defaultString(resume.getTitle(), "");
+            return skeleton
+                    .replace(PLACEHOLDER_RESUME_TITLE, escapeHtml(resumeTitle))
+                    .replace(PLACEHOLDER_CSS, css)
+                    .replace(PLACEHOLDER_BODY, body);
+        }
+
+        // 回退：内置单栏默认模板，保证旧有内置模板仍可渲染。
         StringBuilder html = new StringBuilder();
         html.append("<!DOCTYPE html>\n")
             .append("<html lang=\"zh-CN\">\n")
             .append("<head>\n")
             .append("  <meta charset=\"UTF-8\">\n")
             .append("  <style>\n")
-            .append(buildCss(config))
+            .append(css)
             .append("  </style>\n")
             .append("</head>\n")
             .append("<body>\n")
-            .append("  <div class=\"resume-page\">\n");
-
-        for (SectionDTO section : sections) {
-            if (Boolean.TRUE.equals(section.getVisible())) {
-                html.append(renderSection(section));
-            }
-        }
-
-        html.append("  </div>\n")
+            .append("  <div class=\"resume-page\">\n")
+            .append(body)
+            .append("  </div>\n")
             .append("</body>\n")
             .append("</html>");
         return html.toString();
+    }
+
+    /**
+     * 渲染简历所有可见 Section，返回可嵌入骨架的 HTML 片段。
+     */
+    private String renderBody(List<SectionDTO> sections) {
+        StringBuilder body = new StringBuilder();
+        for (SectionDTO section : sections) {
+            if (Boolean.TRUE.equals(section.getVisible())) {
+                body.append(renderSection(section));
+            }
+        }
+        return body.toString();
+    }
+
+    /**
+     * 加载 classpath:templates/resume/{htmlTemplate}.html 骨架文件。
+     * <p>
+     * 找不到或读取失败时返回 null，触发回退到内置渲染逻辑。
+     * </p>
+     */
+    private String loadTemplateSkeleton(String htmlTemplate) {
+        if (StringUtils.isBlank(htmlTemplate)) {
+            return null;
+        }
+        // 防御：仅取文件名片段，避免路径穿越
+        String fileName = htmlTemplate.replaceAll("[^A-Za-z0-9._-]", "");
+        if (StringUtils.isBlank(fileName)) {
+            return null;
+        }
+        String path = TEMPLATE_DIR + fileName + TEMPLATE_SUFFIX;
+        ClassPathResource resource = new ClassPathResource(path);
+        if (!resource.exists()) {
+            log.debug("Template skeleton not found, fallback to builtin: {}", path);
+            return null;
+        }
+        try (InputStream in = resource.getInputStream()) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log.warn("Read template skeleton failed: {}", path, e);
+            return null;
+        }
     }
 
     private String buildCss(Map<String, Object> config) {

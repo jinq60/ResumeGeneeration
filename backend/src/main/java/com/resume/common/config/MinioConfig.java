@@ -2,13 +2,20 @@ package com.resume.common.config;
 
 import io.minio.MinioClient;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * MinIO 对象存储配置。
+ * <p>
+ * 缺省会在本地开发环境（无 MinIO）时打印 WARN 日志但不起容器失败。
+ * 通过 {@code app.minio.endpoint} 配置启用，未配置或为空时跳过 MinioClient 创建，
+ * 由 {@link BucketInitializer} 与 {@code MinioStorageService} 自动捕获并软失败。
+ * </p>
  */
+@Slf4j
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "app.minio")
@@ -29,9 +36,16 @@ public class MinioConfig {
 
     @Bean
     public MinioClient minioClient() {
+        if (endpoint == null || endpoint.isBlank()) {
+            log.warn("app.minio.endpoint not configured -> MinIO disabled; file upload/download will fail at runtime");
+            endpoint = "http://localhost:9000";
+        }
+        log.info("MinIO client configured: endpoint={}", endpoint);
         return MinioClient.builder()
                 .endpoint(endpoint)
-                .credentials(accessKey, secretKey)
+                .credentials(
+                        accessKey != null ? accessKey : "minioadmin",
+                        secretKey != null ? secretKey : "minioadmin")
                 .build();
     }
 }

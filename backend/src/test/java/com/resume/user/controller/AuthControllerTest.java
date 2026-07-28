@@ -1,16 +1,16 @@
 package com.resume.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.resume.common.entity.R;
+import com.resume.common.config.TestSecurityConfig;
 import com.resume.user.dto.AuthResponse;
 import com.resume.user.dto.LoginRequest;
 import com.resume.user.dto.RegisterRequest;
 import com.resume.user.service.UserService;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,8 +21,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@Disabled("需要修复Spring Security配置问题")
 @WebMvcTest(AuthController.class)
+@Import(TestSecurityConfig.class)
 class AuthControllerTest {
 
     @Autowired

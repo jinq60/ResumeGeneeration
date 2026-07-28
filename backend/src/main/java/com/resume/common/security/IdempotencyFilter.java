@@ -19,12 +19,13 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 /**
  * 幂等性过滤器。
  * <p>
- * 对携带 {@code Idempotency-Key} 请求头的 POST 请求，在首次成功（2xx）时将响应缓存 24 小时；
- * 重复请求直接返回缓存结果，避免重复创建资源。
+ * 对携带 {@code Idempotency-Key} 请求头的 POST/PUT/PATCH/DELETE 请求，在首次成功（2xx）时将响应缓存 24 小时；
+ * 重复请求直接返回缓存结果，避免重复执行副作用操作。
  * </p>
  */
 @Slf4j
@@ -35,13 +36,14 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
     private static final String HEADER_KEY = "Idempotency-Key";
     private static final int TTL_HOURS = 24;
+    private static final Set<String> IDEMPOTENT_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
     private final IdempotencyRecordMapper idempotencyRecordMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
-        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+        if (!IDEMPOTENT_METHODS.contains(request.getMethod().toUpperCase())) {
             chain.doFilter(request, response);
             return;
         }

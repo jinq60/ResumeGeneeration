@@ -1,10 +1,8 @@
 package com.resume.resume.service;
 
-import com.resume.avatar.entity.AvatarTask;
-import com.resume.avatar.mapper.AvatarTaskMapper;
-import com.resume.common.service.MinioStorageService;
-import com.resume.pdf.entity.PdfTask;
-import com.resume.pdf.mapper.PdfTaskMapper;
+import com.resume.avatar.service.AvatarService;
+import com.resume.pdf.service.PdfService;
+import com.resume.resume.dto.DuplicateResumeResponse;
 import com.resume.resume.dto.SectionDTO;
 import com.resume.resume.dto.UpdateResumeRequest;
 import com.resume.resume.entity.Resume;
@@ -20,7 +18,6 @@ import org.mockito.quality.Strictness;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,13 +34,10 @@ class ResumeServiceTest {
     private TemplateService templateService;
 
     @Mock
-    private PdfTaskMapper pdfTaskMapper;
+    private PdfService pdfService;
 
     @Mock
-    private AvatarTaskMapper avatarTaskMapper;
-
-    @Mock
-    private MinioStorageService minioStorageService;
+    private AvatarService avatarService;
 
     private ResumeSectionValidator resumeSectionValidator;
 
@@ -53,9 +47,7 @@ class ResumeServiceTest {
     void setUp() {
         resumeSectionValidator = new ResumeSectionValidator();
         resumeService = new ResumeService(resumeMapper, templateService,
-                pdfTaskMapper, avatarTaskMapper, minioStorageService, resumeSectionValidator);
-        when(minioStorageService.getBucketPdfs()).thenReturn("pdfs");
-        when(minioStorageService.getBucketAvatars()).thenReturn("avatars");
+                pdfService, avatarService, resumeSectionValidator);
     }
 
     @Test
@@ -107,9 +99,9 @@ class ResumeServiceTest {
             return 1;
         });
 
-        Map<String, Object> result = resumeService.duplicateResume(userId, resumeId);
+        DuplicateResumeResponse result = resumeService.duplicateResume(userId, resumeId);
 
-        String copiedTitle = (String) result.get("title");
+        String copiedTitle = result.getTitle();
         assertEquals(128, copiedTitle.length());
         assertTrue(copiedTitle.endsWith(" 副本"));
     }
@@ -129,22 +121,10 @@ class ResumeServiceTest {
 
         when(resumeMapper.selectById(resumeId)).thenReturn(existing);
 
-        PdfTask pdfTask = new PdfTask();
-        pdfTask.setId("pdf_1");
-        pdfTask.setFilePath("user_1/pdfs/pdf_1/简历.pdf");
-        when(pdfTaskMapper.selectList(any())).thenReturn(List.of(pdfTask));
-
-        AvatarTask avatarTask = new AvatarTask();
-        avatarTask.setId("avatar_1");
-        avatarTask.setSourceImageUrl("/uploads/avatars/user_1/avatars/avatar_1_source.png");
-        when(avatarTaskMapper.selectList(any())).thenReturn(List.of(avatarTask));
-
         resumeService.deleteResume(userId, resumeId);
 
-        verify(minioStorageService).remove("pdfs", "user_1/pdfs/pdf_1/简历.pdf");
-        verify(minioStorageService).remove("avatars", "user_1/avatars/avatar_1_source.png");
-        verify(pdfTaskMapper).update(any(PdfTask.class), any());
-        verify(avatarTaskMapper).update(any(AvatarTask.class), any());
-        assertEquals(1, existing.getDeleted());
+        verify(pdfService).cleanupTasksByResume(userId, resumeId);
+        verify(avatarService).cleanupTasksByResume(userId, resumeId);
+        verify(resumeMapper).deleteById(resumeId);
     }
 }

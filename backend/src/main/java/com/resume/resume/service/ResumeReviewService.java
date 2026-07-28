@@ -63,7 +63,9 @@ public class ResumeReviewService {
         review.setResumeId(resumeId);
         review.setUserId(userId);
         review.setJobDescription(request.getJobDescription());
-        review.setModelName("pending");
+        // model_name 留空，等异步任务真正调用 LLM 后由 AiResumeReviewService 填入；
+        // 避免使用 "pending" 字符串污染模型字段语义（status 已表达 pending 状态）。
+        review.setModelName(null);
         review.setStatus(BizConstant.TASK_STATUS_PENDING);
         review.setDeleted(BizConstant.NOT_DELETED);
         review.setCreatedAt(LocalDateTime.now());
@@ -115,30 +117,6 @@ public class ResumeReviewService {
             }
         }
         return total < 20;
-    }
-
-    private Map<String, Integer> buildDimensionScores() {
-        Map<String, Integer> scores = new LinkedHashMap<>();
-        scores.put("completeness", 85);
-        scores.put("structure", 80);
-        scores.put("content", 70);
-        scores.put("match", 75);
-        scores.put("expression", 82);
-        return scores;
-    }
-
-    private List<ResumeReviewSuggestion> buildSuggestions() {
-        ResumeReviewSuggestion suggestion = new ResumeReviewSuggestion();
-        suggestion.setSectionType("project");
-        suggestion.setTitle("项目经历描述不够量化");
-        suggestion.setProblem("缺少具体数据和成果，招聘方难以评估贡献度。");
-        suggestion.setAdvice("建议使用 STAR 法则，补充 QPS、用户数、性能提升百分比等指标。");
-        suggestion.setPriority("high");
-        return List.of(suggestion);
-    }
-
-    private List<String> buildHighlights() {
-        return List.of("教育背景与目标岗位匹配度高");
     }
 
     private ResumeReviewResponse toResponse(ResumeReview review) {

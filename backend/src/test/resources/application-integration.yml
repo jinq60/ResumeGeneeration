@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3307/resume_generation_test?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: resume_test
+    password: ResumeTest123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  sql:
+    init:
+      mode: never
+
+logging:
+  level:
+    com.resume: debug
+
+app:
+  jwt:
+    secret: cmVzdW1lLWdlbmVyYXRpb24tdGVzdC1zZWNyZXQta2V5LTEyMw==
+    access-token-expiration: 3600000
+    refresh-token-expiration: 604800000
+  minio:
+    endpoint: http://localhost:9002
+    access-key: minioadmin
+    secret-key: minioadmin
+    buckets:
+      avatars: resume-avatars
+      pdfs: resume-pdfs
+      templates: resume-templates
+  cors:
+    allowed-origins: http://localhost:5173
+  ai:
+    prompt-override: false

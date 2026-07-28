@@ -35,6 +35,11 @@ public class ResumeSectionValidator {
 
     private static final String PRESENT = "present";
 
+    /** Section 数量上限：超过则按内容过长拒绝。 */
+    private static final int MAX_SECTIONS = 50;
+    /** Section JSON 总字符数上限，避免大请求体撑爆 DB JSON 列。 */
+    private static final int MAX_TOTAL_CONTENT_LENGTH = 200_000;
+
     /**
      * 草稿级校验：字段存在时才校验格式，不强制完整。
      */
@@ -60,7 +65,12 @@ public class ResumeSectionValidator {
         if (sections == null) {
             throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "简历内容不能为空。");
         }
+        if (sections.size() > MAX_SECTIONS) {
+            throw new BusinessException(ResultCode.RESUME_CONTENT_TOO_LONG,
+                    "简历模块数量不能超过 " + MAX_SECTIONS + " 个。");
+        }
         Set<String> ids = new java.util.HashSet<>();
+        int totalContentLength = 0;
         for (SectionDTO section : sections) {
             if (StringUtils.isBlank(section.getId()) || StringUtils.isBlank(section.getType())
                     || StringUtils.isBlank(section.getTitle()) || section.getOrder() == null
@@ -72,6 +82,13 @@ public class ResumeSectionValidator {
             }
             if (!ids.add(section.getId())) {
                 throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "模块 ID 重复。");
+            }
+            if (section.getData() != null) {
+                totalContentLength += section.getData().toString().length();
+            }
+            if (totalContentLength > MAX_TOTAL_CONTENT_LENGTH) {
+                throw new BusinessException(ResultCode.RESUME_CONTENT_TOO_LONG,
+                        "简历内容过长，单份简历总字符数不能超过 " + MAX_TOTAL_CONTENT_LENGTH + "。");
             }
         }
     }

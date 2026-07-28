@@ -35,6 +35,20 @@ public class StaticResourceController {
                 .body(data);
     }
 
+    @GetMapping("/uploads/templates/**")
+    public ResponseEntity<byte[]> serveTemplate(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String objectName = uri.substring(uri.indexOf("/uploads/") + "/uploads/templates/".length());
+
+        byte[] data = minioStorageService.download(minioStorageService.getBucketTemplates(), objectName);
+
+        String contentType = guessContentType(objectName);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
+                .body(data);
+    }
+
     private String guessContentType(String filename) {
         String lower = filename.toLowerCase();
         if (lower.endsWith(".png")) return "image/png";

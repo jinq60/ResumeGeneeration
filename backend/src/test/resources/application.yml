@@ -25,7 +25,7 @@ logging:
 
 app:
   jwt:
-    secret: cmVzdW1lLWdlbmVyYXRpb24tdGVzdC1zZWNyZXQta2V5LTEyMw==
+    secret: MDEyMzQ1Njc4OUFCQ0RFRjAxMjM0NTY3ODlBQkNERUYwMTIzNDU2Nzg5QUJDREVGMDEyMzQ1Njc4OUFBQkNERUY=
     access-token-expiration: 3600000
     refresh-token-expiration: 604800000
   minio:

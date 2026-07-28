@@ -1,6 +1,8 @@
 package com.resume.common.service;
 
 import com.resume.common.config.MinioConfig;
+import com.resume.common.constant.ResultCode;
+import com.resume.common.exception.BusinessException;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -27,7 +29,6 @@ public class MinioStorageService {
      */
     public void upload(String bucket, String objectName, InputStream inputStream, long size, String contentType) {
         try {
-            ensureBucket(bucket);
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(bucket)
@@ -37,7 +38,7 @@ public class MinioStorageService {
                             .build());
         } catch (Exception e) {
             log.error("Upload file to MinIO failed: bucket={}, object={}", bucket, objectName, e);
-            throw new RuntimeException("文件上传失败", e);
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件上传失败");
         }
     }
 
@@ -65,7 +66,23 @@ public class MinioStorageService {
             return inputStream.readAllBytes();
         } catch (Exception e) {
             log.error("Download file from MinIO failed: bucket={}, object={}", bucket, objectName, e);
-            throw new RuntimeException("文件下载失败", e);
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件下载失败");
+        }
+    }
+
+    /**
+     * 以流方式获取对象，调用方负责关闭 InputStream。
+     * <p>
+     * 用于大文件（如 PDF）下载，避免一次性读入内存导致 OOM。
+     * </p>
+     */
+    public InputStream downloadStream(String bucket, String objectName) {
+        try {
+            return minioClient.getObject(
+                    GetObjectArgs.builder().bucket(bucket).object(objectName).build());
+        } catch (Exception e) {
+            log.error("Stream file from MinIO failed: bucket={}, object={}", bucket, objectName, e);
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件下载失败");
         }
     }
 
@@ -79,13 +96,5 @@ public class MinioStorageService {
 
     public String getBucketTemplates() {
         return minioConfig.getBuckets().getTemplates();
-    }
-
-    private void ensureBucket(String bucket) throws Exception {
-        boolean exists = minioClient.bucketExists(
-                io.minio.BucketExistsArgs.builder().bucket(bucket).build());
-        if (!exists) {
-            minioClient.makeBucket(io.minio.MakeBucketArgs.builder().bucket(bucket).build());
-        }
     }
 }

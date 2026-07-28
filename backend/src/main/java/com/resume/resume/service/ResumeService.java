@@ -2,22 +2,21 @@ package com.resume.resume.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.resume.avatar.entity.AvatarTask;
-import com.resume.avatar.mapper.AvatarTaskMapper;
+import com.resume.avatar.service.AvatarService;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
-import com.resume.common.service.MinioStorageService;
-import com.resume.pdf.entity.PdfTask;
-import com.resume.pdf.mapper.PdfTaskMapper;
 import com.resume.common.enums.SectionType;
+import com.resume.pdf.service.PdfService;
 import com.resume.resume.dto.*;
+import com.resume.resume.dto.AdminResumeListItemResponse;
+import com.resume.resume.dto.AdminResumeStatsResponse;
 import com.resume.resume.entity.Resume;
 import com.resume.resume.mapper.ResumeMapper;
 import com.resume.template.service.TemplateService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,15 +28,25 @@ import java.util.*;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ResumeService {
 
-    private final ResumeMapper resumeMapper;
+private final ResumeMapper resumeMapper;
     private final TemplateService templateService;
-    private final PdfTaskMapper pdfTaskMapper;
-    private final AvatarTaskMapper avatarTaskMapper;
-    private final MinioStorageService minioStorageService;
+    private final PdfService pdfService;
+    private final AvatarService avatarService;
     private final ResumeSectionValidator resumeSectionValidator;
+
+    public ResumeService(ResumeMapper resumeMapper,
+                          TemplateService templateService,
+                          @Lazy PdfService pdfService,
+                          @Lazy AvatarService avatarService,
+                          ResumeSectionValidator resumeSectionValidator) {
+        this.resumeMapper = resumeMapper;
+        this.templateService = templateService;
+        this.pdfService = pdfService;
+        this.avatarService = avatarService;
+        this.resumeSectionValidator = resumeSectionValidator;
+    }
 
     private static final int MAX_TITLE_LENGTH = 128;
 
@@ -46,6 +55,8 @@ public class ResumeService {
      */
     @Transactional(rollbackFor = Exception.class)
     public ResumeDetailResponse createResume(String userId, CreateResumeRequest request) {
+        log.info("createResume start: userId={}, scene={}, templateId={}",
+                userId, request.getScene(), request.getTemplateId());
         validateScene(request.getScene());
         templateService.getTemplateEntity(request.getTemplateId());
 
@@ -70,6 +81,7 @@ public class ResumeService {
         resume.setUpdatedAt(LocalDateTime.now());
         resumeMapper.insert(resume);
 
+        log.info("createResume success: userId={}, resumeId={}", userId, resume.getId());
         return toDetailResponse(resume);
     }
 
@@ -97,6 +109,62 @@ public class ResumeService {
     }
 
     /**
+     * 后台简历列表。
+     */
+    public Page<AdminResumeListItemResponse> listAdminResumes(int page, int size, String keyword) {
+        LambdaQueryWrapper<Resume> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Resume::getDeleted, BizConstant.NOT_DELETED);
+        if (StringUtils.isNotBlank(keyword)) {
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(Resume::getTitle, kw)
+                    .or().like(Resume::getTargetPosition, kw));
+        }
+        wrapper.orderByDesc(Resume::getLastEditedAt);
+
+        Page<Resume> pageParam = new Page<>(page, size);
+        Page<Resume> result = resumeMapper.selectPage(pageParam, wrapper);
+
+        List<AdminResumeListItemResponse> list = result.getRecords().stream()
+                .map(this::toAdminListItemResponse)
+                .toList();
+        Page<AdminResumeListItemResponse> responsePage = new Page<>();
+        responsePage.setRecords(list);
+        responsePage.setTotal(result.getTotal());
+        responsePage.setCurrent(result.getCurrent());
+        responsePage.setSize(result.getSize());
+        responsePage.setPages(result.getPages());
+        return responsePage;
+    }
+
+    /**
+     * 后台简历统计。
+     */
+    public AdminResumeStatsResponse adminStats() {
+        AdminResumeStatsResponse response = new AdminResumeStatsResponse();
+
+        LambdaQueryWrapper<Resume> notDeleted = new LambdaQueryWrapper<>();
+        notDeleted.eq(Resume::getDeleted, BizConstant.NOT_DELETED);
+        response.setTotalResumes(resumeMapper.selectCount(notDeleted));
+
+        LambdaQueryWrapper<Resume> active = new LambdaQueryWrapper<>();
+        active.eq(Resume::getDeleted, BizConstant.NOT_DELETED)
+                .eq(Resume::getStatus, BizConstant.RESUME_STATUS_ACTIVE);
+        response.setActiveResumes(resumeMapper.selectCount(active));
+
+        LambdaQueryWrapper<Resume> deleted = new LambdaQueryWrapper<>();
+        deleted.eq(Resume::getDeleted, BizConstant.DELETED);
+        response.setDeletedResumes(resumeMapper.selectCount(deleted));
+
+        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LambdaQueryWrapper<Resume> todayNew = new LambdaQueryWrapper<>();
+        todayNew.eq(Resume::getDeleted, BizConstant.NOT_DELETED)
+                .ge(Resume::getCreatedAt, todayStart);
+        response.setTodayNewResumes(resumeMapper.selectCount(todayNew));
+
+        return response;
+    }
+
+    /**
      * 获取简历详情。
      */
     public ResumeDetailResponse getResume(String userId, String resumeId) {
@@ -119,7 +187,7 @@ public class ResumeService {
      * 更新简历。
      */
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> updateResume(String userId, String resumeId, UpdateResumeRequest request) {
+    public UpdateResumeResponse updateResume(String userId, String resumeId, UpdateResumeRequest request) {
         Resume resume = getResumeEntity(userId, resumeId);
 
         if (StringUtils.isNotBlank(request.getTitle())) {
@@ -149,10 +217,10 @@ public class ResumeService {
         resume.setUpdatedAt(now);
         resumeMapper.updateById(resume);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("id", resume.getId());
-        result.put("updatedAt", resume.getUpdatedAt());
-        return result;
+        UpdateResumeResponse response = new UpdateResumeResponse();
+        response.setId(resume.getId());
+        response.setUpdatedAt(resume.getUpdatedAt());
+        return response;
     }
 
     /**
@@ -165,19 +233,17 @@ public class ResumeService {
     public void deleteResume(String userId, String resumeId) {
         Resume resume = getResumeEntity(userId, resumeId);
 
-        cleanupPdfTasks(userId, resumeId);
-        cleanupAvatarTasks(userId, resumeId);
+        pdfService.cleanupTasksByResume(userId, resumeId);
+        avatarService.cleanupTasksByResume(userId, resumeId);
 
-        resume.setDeleted(BizConstant.DELETED);
-        resume.setUpdatedAt(LocalDateTime.now());
-        resumeMapper.updateById(resume);
+        resumeMapper.deleteById(resumeId);
     }
 
     /**
      * 复制简历。
      */
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> duplicateResume(String userId, String resumeId) {
+    public DuplicateResumeResponse duplicateResume(String userId, String resumeId) {
         Resume source = getResumeEntity(userId, resumeId);
         Resume copy = new Resume();
         copy.setUserId(userId);
@@ -195,18 +261,18 @@ public class ResumeService {
         copy.setUpdatedAt(LocalDateTime.now());
         resumeMapper.insert(copy);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("id", copy.getId());
-        result.put("title", copy.getTitle());
-        result.put("createdAt", copy.getCreatedAt());
-        return result;
+        DuplicateResumeResponse response = new DuplicateResumeResponse();
+        response.setId(copy.getId());
+        response.setTitle(copy.getTitle());
+        response.setCreatedAt(copy.getCreatedAt());
+        return response;
     }
 
     /**
      * 重命名简历。
      */
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> renameResume(String userId, String resumeId, RenameResumeRequest request) {
+    public RenameResumeResponse renameResume(String userId, String resumeId, RenameResumeRequest request) {
         Resume resume = getResumeEntity(userId, resumeId);
         resume.setTitle(request.getTitle().trim());
         LocalDateTime now = LocalDateTime.now();
@@ -214,11 +280,11 @@ public class ResumeService {
         resume.setUpdatedAt(now);
         resumeMapper.updateById(resume);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("id", resume.getId());
-        result.put("title", resume.getTitle());
-        result.put("updatedAt", resume.getUpdatedAt());
-        return result;
+        RenameResumeResponse response = new RenameResumeResponse();
+        response.setId(resume.getId());
+        response.setTitle(resume.getTitle());
+        response.setUpdatedAt(resume.getUpdatedAt());
+        return response;
     }
 
     /**
@@ -244,48 +310,50 @@ public class ResumeService {
         return resume;
     }
 
-    private void cleanupPdfTasks(String userId, String resumeId) {
-        LambdaQueryWrapper<PdfTask> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(PdfTask::getUserId, userId)
-                .eq(PdfTask::getResumeId, resumeId)
-                .eq(PdfTask::getDeleted, BizConstant.NOT_DELETED);
-        List<PdfTask> tasks = pdfTaskMapper.selectList(wrapper);
-        for (PdfTask task : tasks) {
-            if (StringUtils.isNotBlank(task.getFilePath())) {
-                minioStorageService.remove(minioStorageService.getBucketPdfs(), task.getFilePath());
+    /**
+     * 将一寸照地址回填到指定简历的 profile Section 的 avatarUrl 字段。
+     * <p>
+     * 由 {@code AvatarService.optimize} 在优化成功后调用。若简历未找到或已被删除，
+     * 则跳过回填（仅记录 warn 日志），不影响头像优化任务本身的成功状态。
+     * </p>
+     *
+     * @param userId     用户 ID
+     * @param resumeId   关联简历 ID，可为 null
+     * @param avatarUrl  一寸照可访问 URL
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void fillAvatarUrl(String userId, String resumeId, String avatarUrl) {
+        if (StringUtils.isBlank(userId) || StringUtils.isBlank(resumeId) || StringUtils.isBlank(avatarUrl)) {
+            return;
+        }
+        Resume resume = resumeMapper.selectById(resumeId);
+        if (resume == null || BizConstant.DELETED.equals(resume.getDeleted())
+                || !userId.equals(resume.getUserId())) {
+            log.warn("fillAvatarUrl skipped: resume not found or not owned, userId={}, resumeId={}", userId, resumeId);
+            return;
+        }
+        List<SectionDTO> sections = resume.getSections();
+        if (sections == null || sections.isEmpty()) {
+            return;
+        }
+        boolean updated = false;
+        for (SectionDTO section : sections) {
+            if (BizConstant.SECTION_TYPE_PROFILE.equals(section.getType())
+                    && section.getData() instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> profile = (Map<String, Object>) section.getData();
+                profile.put("avatarUrl", avatarUrl);
+                updated = true;
+                break;
             }
         }
-        PdfTask deleted = new PdfTask();
-        deleted.setDeleted(BizConstant.DELETED);
-        pdfTaskMapper.update(deleted, wrapper);
-    }
-
-    private void cleanupAvatarTasks(String userId, String resumeId) {
-        LambdaQueryWrapper<AvatarTask> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(AvatarTask::getUserId, userId)
-                .eq(AvatarTask::getResumeId, resumeId)
-                .eq(AvatarTask::getDeleted, BizConstant.NOT_DELETED);
-        List<AvatarTask> tasks = avatarTaskMapper.selectList(wrapper);
-        for (AvatarTask task : tasks) {
-            String objectName = extractAvatarObjectName(task.getSourceImageUrl());
-            if (StringUtils.isNotBlank(objectName)) {
-                minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
-            }
+        if (updated) {
+            resume.setSections(sections);
+            resume.setLastEditedAt(LocalDateTime.now());
+            resume.setUpdatedAt(LocalDateTime.now());
+            resumeMapper.updateById(resume);
+            log.info("Avatar URL filled: userId={}, resumeId={}", userId, resumeId);
         }
-        AvatarTask deleted = new AvatarTask();
-        deleted.setDeleted(BizConstant.DELETED);
-        avatarTaskMapper.update(deleted, wrapper);
-    }
-
-    private String extractAvatarObjectName(String sourceImageUrl) {
-        if (StringUtils.isBlank(sourceImageUrl)) {
-            return null;
-        }
-        String prefix = "/uploads/avatars/";
-        if (sourceImageUrl.startsWith(prefix)) {
-            return sourceImageUrl.substring(prefix.length());
-        }
-        return null;
     }
 
     private void validateScene(String scene) {
@@ -361,6 +429,27 @@ public class ResumeService {
         response.setLastEditedAt(resume.getLastEditedAt());
         response.setCreatedAt(resume.getCreatedAt());
         response.setUpdatedAt(resume.getUpdatedAt());
+        return response;
+    }
+
+    private AdminResumeListItemResponse toAdminListItemResponse(Resume resume) {
+        AdminResumeListItemResponse response = new AdminResumeListItemResponse();
+        response.setId(resume.getId());
+        response.setUserId(resume.getUserId());
+        response.setTitle(resume.getTitle());
+        response.setScene(resume.getScene());
+        response.setTargetPosition(resume.getTargetPosition());
+        response.setTemplateId(resume.getTemplateId());
+        response.setExportCount(resume.getExportCount());
+        response.setStatus(resume.getStatus());
+        response.setLastEditedAt(resume.getLastEditedAt());
+        response.setCreatedAt(resume.getCreatedAt());
+        response.setUpdatedAt(resume.getUpdatedAt());
+        try {
+            response.setTemplateName(templateService.getTemplate(resume.getTemplateId()).getName());
+        } catch (Exception e) {
+            response.setTemplateName("未知模板");
+        }
         return response;
     }
 }

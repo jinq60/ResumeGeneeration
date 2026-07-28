@@ -12,6 +12,7 @@ import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.common.service.MinioStorageService;
+import com.resume.resume.service.ResumeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,6 +38,7 @@ public class AvatarService {
     private final AvatarTaskMapper avatarTaskMapper;
     private final MinioStorageService minioStorageService;
     private final ObjectMapper objectMapper;
+    private final ResumeService resumeService;
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final String[] ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"};
@@ -50,8 +53,21 @@ public class AvatarService {
 
         String originalFilename = StringUtils.defaultString(file.getOriginalFilename(), "avatar.png");
         String ext = getExtension(originalFilename);
-        String avatarId = "avatar_" + System.currentTimeMillis();
-        String objectName = userId + "/avatars/" + avatarId + "_source" + ext;
+
+        AvatarTask task = new AvatarTask();
+        task.setUserId(userId);
+        task.setResumeId(resumeId);
+        task.setBackgroundType(BizConstant.AVATAR_BACKGROUND_WHITE);
+        task.setStyle(BizConstant.AVATAR_STYLE_FORMAL);
+        task.setOptions(toJson(defaultOptions()));
+        task.setStatus(BizConstant.TASK_STATUS_SUCCESS);
+        task.setCompletedAt(LocalDateTime.now());
+        task.setDeleted(BizConstant.NOT_DELETED);
+        task.setCreatedAt(LocalDateTime.now());
+        task.setUpdatedAt(LocalDateTime.now());
+        avatarTaskMapper.insert(task);
+
+        String objectName = userId + "/avatars/" + task.getId() + "_source" + ext;
 
         try {
             minioStorageService.upload(minioStorageService.getBucketAvatars(), objectName,
@@ -60,27 +76,14 @@ public class AvatarService {
             throw new BusinessException(ResultCode.AVATAR_OPTIMIZE_FAILED, "头像上传失败。");
         }
 
-        // P0：原图 URL 使用相对路径，便于开发环境演示。
         String sourceUrl = "/uploads/avatars/" + objectName;
-
-        AvatarTask task = new AvatarTask();
-        task.setId(avatarId);
-        task.setUserId(userId);
-        task.setResumeId(resumeId);
         task.setSourceImageUrl(sourceUrl);
-        task.setBackgroundType(BizConstant.AVATAR_BACKGROUND_WHITE);
-        task.setStyle(BizConstant.AVATAR_STYLE_FORMAL);
-        task.setOptions(toJson(defaultOptions()));
-        task.setStatus(BizConstant.TASK_STATUS_SUCCESS);
         task.setResultImageUrl(sourceUrl);
-        task.setCompletedAt(LocalDateTime.now());
-        task.setDeleted(BizConstant.NOT_DELETED);
-        task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(LocalDateTime.now());
-        avatarTaskMapper.insert(task);
+        avatarTaskMapper.updateById(task);
 
         AvatarUploadResponse response = new AvatarUploadResponse();
-        response.setId(avatarId);
+        response.setId(task.getId());
         response.setSourceImageUrl(sourceUrl);
         response.setFileName(originalFilename);
         return response;
@@ -100,9 +103,7 @@ public class AvatarService {
         }
 
         // P0 占位：直接复用原图作为结果。
-        String taskId = "avatar_task_" + System.currentTimeMillis();
         AvatarTask task = new AvatarTask();
-        task.setId(taskId);
         task.setUserId(userId);
         task.setResumeId(request.getResumeId());
         task.setSourceImageUrl(request.getSourceImageUrl());
@@ -126,8 +127,19 @@ public class AvatarService {
         task.setUpdatedAt(LocalDateTime.now());
         avatarTaskMapper.updateById(task);
 
+        // 优化成功后，若传入 resumeId 则把一寸照地址回填到简历 profile.avatarUrl
+        if (StringUtils.isNotBlank(request.getResumeId())) {
+            try {
+                resumeService.fillAvatarUrl(userId, request.getResumeId(), task.getResultImageUrl());
+            } catch (Exception e) {
+                // 回填失败不影响头像优化任务本身的成功状态，仅记录日志
+                log.warn("fillAvatarUrl failed for userId={}, resumeId={}: {}",
+                        userId, request.getResumeId(), e.getMessage());
+            }
+        }
+
         Map<String, Object> result = new HashMap<>();
-        result.put("taskId", taskId);
+        result.put("taskId", task.getId());
         result.put("status", BizConstant.TASK_STATUS_SUCCESS);
         return result;
     }
@@ -179,6 +191,26 @@ public class AvatarService {
         wrapper.eq(AvatarTask::getUserId, userId)
                .eq(AvatarTask::getSourceImageUrl, sourceImageUrl);
         avatarTaskMapper.update(deleted, wrapper);
+    }
+
+    /**
+     * 清理指定简历关联的所有头像任务及 MinIO 文件。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void cleanupTasksByResume(String userId, String resumeId) {
+        LambdaQueryWrapper<AvatarTask> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AvatarTask::getUserId, userId)
+                .eq(AvatarTask::getResumeId, resumeId);
+        List<AvatarTask> tasks = avatarTaskMapper.selectList(wrapper);
+        for (AvatarTask task : tasks) {
+            String objectName = extractObjectName(task.getSourceImageUrl());
+            if (StringUtils.isNotBlank(objectName)) {
+                minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
+            }
+        }
+        if (!tasks.isEmpty()) {
+            avatarTaskMapper.delete(wrapper);
+        }
     }
 
     private String extractObjectName(String sourceImageUrl) {

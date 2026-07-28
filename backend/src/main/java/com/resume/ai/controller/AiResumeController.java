@@ -11,7 +11,7 @@ import com.resume.common.constant.ResultCode;
 import com.resume.common.entity.R;
 import com.resume.common.exception.BusinessException;
 import com.resume.resume.entity.Resume;
-import com.resume.resume.mapper.ResumeMapper;
+import com.resume.resume.service.ResumeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,7 +28,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AiResumeController {
 
-    private final ResumeMapper resumeMapper;
+    private final ResumeService resumeService;
     private final ResumeOptimizeTaskMapper optimizeTaskMapper;
     private final AiResumeOptimizeService aiResumeOptimizeService;
 
@@ -41,13 +41,7 @@ public class AiResumeController {
     public R<ResumeOptimizeResponse> createOptimize(@AuthenticationPrincipal String userId,
                                                      @PathVariable String resumeId,
                                                      @Valid @RequestBody ResumeOptimizeRequest request) {
-        Resume resume = resumeMapper.selectById(resumeId);
-        if (resume == null || BizConstant.DELETED.equals(resume.getDeleted())) {
-            throw new BusinessException(ResultCode.RESUME_NOT_FOUND, "简历不存在。");
-        }
-        if (!userId.equals(resume.getUserId())) {
-            throw new BusinessException(ResultCode.ACCESS_DENIED, "无权访问该资源。");
-        }
+        Resume resume = resumeService.getResumeEntity(userId, resumeId);
 
         long runningCount = optimizeTaskMapper.selectCount(
                 new LambdaQueryWrapper<ResumeOptimizeTask>()

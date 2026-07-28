@@ -62,19 +62,27 @@ public class AiResumeReviewService {
         } catch (BusinessException e) {
             log.warn("AI provider not configured, using placeholder: {}", e.getMessage());
             doPlaceholderReview(review);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.error("AI review failed for reviewId={}", reviewId, e);
             review.setStatus(BizConstant.REVIEW_STATUS_FAILED);
-            review.setErrorMsg(e.getMessage());
+            review.setErrorMsg(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+        } finally {
+            // 兜底：若状态未被显式设置，标记为 failed，避免任务永久卡在 processing
+            if (BizConstant.TASK_STATUS_PROCESSING.equals(review.getStatus())) {
+                log.error("Review ended in processing state, marking failed: reviewId={}", reviewId);
+                review.setStatus(BizConstant.REVIEW_STATUS_FAILED);
+                review.setErrorMsg("任务执行异常结束");
+            }
+            review.setUpdatedAt(LocalDateTime.now());
+            resumeReviewMapper.updateById(review);
         }
-
-        review.setUpdatedAt(LocalDateTime.now());
-        resumeReviewMapper.updateById(review);
     }
 
-    private void doRealReview(ResumeReview review, Resume resume, String jobDescription,
-                               LlmProvider provider, String model) {
+private void doRealReview(ResumeReview review, Resume resume, String jobDescription,
+                                LlmProvider provider, String model) {
         long start = System.currentTimeMillis();
+        log.info("AI review chat -> provider={}, model={}, reviewId={}",
+                provider.getProviderName(), review.getId());
         AiCallLog callLog = new AiCallLog();
         callLog.setUserId(resume.getUserId());
         callLog.setFeatureKey(FEATURE_KEY);

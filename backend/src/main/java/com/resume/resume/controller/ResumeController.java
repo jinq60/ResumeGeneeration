@@ -13,8 +13,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 /**
  * 简历相关接口。
  */
@@ -46,10 +44,10 @@ public class ResumeController {
         return R.success(resumeService.getResume(userId, id));
     }
 
-    @PutMapping("/{id}")
-    public R<Map<String, Object>> update(@AuthenticationPrincipal String userId,
-                                              @PathVariable String id,
-                                              @Valid @RequestBody UpdateResumeRequest request) {
+@PutMapping("/{id}")
+    public R<UpdateResumeResponse> update(@AuthenticationPrincipal String userId,
+                                               @PathVariable String id,
+                                               @Valid @RequestBody UpdateResumeRequest request) {
         return R.success(resumeService.updateResume(userId, id, request));
     }
 
@@ -60,14 +58,14 @@ public class ResumeController {
         return R.success();
     }
 
-    @PostMapping("/{id}/duplicate")
-    public R<Map<String, Object>> duplicate(@AuthenticationPrincipal String userId,
-                                             @PathVariable String id) {
+@PostMapping("/{id}/duplicate")
+    public R<DuplicateResumeResponse> duplicate(@AuthenticationPrincipal String userId,
+                                              @PathVariable String id) {
         return R.success(resumeService.duplicateResume(userId, id));
     }
 
     @PutMapping("/{id}/title")
-    public R<Map<String, Object>> rename(@AuthenticationPrincipal String userId,
+    public R<RenameResumeResponse> rename(@AuthenticationPrincipal String userId,
                                           @PathVariable String id,
                                           @Valid @RequestBody RenameResumeRequest request) {
         return R.success(resumeService.renameResume(userId, id, request));

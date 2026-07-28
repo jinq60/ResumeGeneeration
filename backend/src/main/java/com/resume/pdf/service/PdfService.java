@@ -1,5 +1,6 @@
 package com.resume.pdf.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -57,6 +59,7 @@ public class PdfService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> exportPdf(String userId, String resumeId, String templateId) {
+        log.info("exportPdf start: userId={}, resumeId={}, templateId={}", userId, resumeId, templateId);
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
 
         validateResumeForExport(resume);
@@ -64,9 +67,7 @@ public class PdfService {
         String exportTemplateId = StringUtils.isNotBlank(templateId) ? templateId : resume.getTemplateId();
         Template template = templateService.getTemplateEntity(exportTemplateId);
 
-        String taskId = "pdf_task_" + System.currentTimeMillis();
         PdfTask task = new PdfTask();
-        task.setId(taskId);
         task.setUserId(userId);
         task.setResumeId(resumeId);
         task.setTemplateId(exportTemplateId);
@@ -76,13 +77,12 @@ public class PdfService {
         task.setUpdatedAt(LocalDateTime.now());
         pdfTaskMapper.insert(task);
 
-        // 同步生成 PDF（P0 简单实现）
         generatePdf(task, resume, template);
 
         resumeService.incrementExportCount(resumeId);
 
         Map<String, Object> result = new java.util.HashMap<>();
-        result.put("taskId", taskId);
+        result.put("taskId", task.getId());
         result.put("status", task.getStatus());
         return result;
     }
@@ -127,11 +127,54 @@ public class PdfService {
         }
     }
 
+    /**
+     * 以流方式下载 PDF 文件，供 Controller 流式回写响应体，避免大文件 OOM。
+     * <p>
+     * 返回的 InputStream 由调用方负责关闭（Controller 中通过 try-with-resources 关闭）。
+     * </p>
+     */
+    public InputStream downloadPdfStream(String userId, String taskId) {
+        PdfTask task = pdfTaskMapper.selectById(taskId);
+        if (task == null || BizConstant.DELETED.equals(task.getDeleted())) {
+            throw new BusinessException(ResultCode.PDF_TASK_NOT_FOUND, "PDF 任务不存在。");
+        }
+        if (!userId.equals(task.getUserId())) {
+            throw new BusinessException(ResultCode.ACCESS_DENIED, "无权访问该资源。");
+        }
+        if (!BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
+            throw new BusinessException(ResultCode.PDF_FILE_NOT_READY, "PDF 文件尚未生成完成。");
+        }
+        if (StringUtils.isBlank(task.getFilePath())) {
+            throw new BusinessException(ResultCode.PDF_EXPORT_FAILED, "PDF 文件路径不存在。");
+        }
+        return minioStorageService.downloadStream(minioStorageService.getBucketPdfs(), task.getFilePath());
+    }
+
+    /**
+     * 清理指定简历关联的所有 PDF 任务及 MinIO 文件。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void cleanupTasksByResume(String userId, String resumeId) {
+        LambdaQueryWrapper<PdfTask> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PdfTask::getUserId, userId)
+                .eq(PdfTask::getResumeId, resumeId);
+        List<PdfTask> tasks = pdfTaskMapper.selectList(wrapper);
+        for (PdfTask task : tasks) {
+            if (StringUtils.isNotBlank(task.getFilePath())) {
+                minioStorageService.remove(minioStorageService.getBucketPdfs(), task.getFilePath());
+            }
+        }
+        if (!tasks.isEmpty()) {
+            pdfTaskMapper.delete(wrapper);
+        }
+    }
+
     private void generatePdf(PdfTask task, Resume resume, Template template) {
         Path tempDir = null;
         try {
             task.setStatus(BizConstant.TASK_STATUS_PROCESSING);
             pdfTaskMapper.updateById(task);
+            log.info("generatePdf -> processing: taskId={}, resumeId={}", task.getId(), resume.getId());
 
             String html = resumeRenderService.render(resume, template);
             String fileName = buildFileName(resume);
@@ -159,6 +202,8 @@ public class PdfService {
             task.setFileSize(pdfPath.toFile().length());
             task.setStatus(BizConstant.TASK_STATUS_SUCCESS);
             task.setCompletedAt(LocalDateTime.now());
+            log.info("generatePdf success: taskId={}, fileSize={}, fileName={}",
+                    task.getId(), task.getFileSize(), task.getFileName());
         } catch (Exception e) {
             log.error("Generate PDF failed: taskId={}", task.getId(), e);
             task.setStatus(BizConstant.TASK_STATUS_FAILED);

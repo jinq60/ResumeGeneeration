@@ -64,6 +64,8 @@ public class AiResumeOptimizeService {
         try {
             LlmProvider provider = providerRouter.resolve(FEATURE_KEY);
             String model = providerRouter.resolveModel(FEATURE_KEY);
+            log.info("AI optimize chat -> provider={}, model={}, taskId={}",
+                    provider.getProviderName(), model, taskId);
 
             String resumeContent = toJson(resume.getSections());
             String prompt = promptTemplates.render(FEATURE_KEY, Map.of(
@@ -104,14 +106,24 @@ public class AiResumeOptimizeService {
             callLog.setSuccess(false);
             callLog.setErrorMsg(e.getMessage());
             callLog.setLatencyMs(System.currentTimeMillis() - start);
+        } finally {
+            // 兜底：若状态未被显式设置，标记为 failed，避免任务永久卡在 processing
+            if (BizConstant.TASK_STATUS_PROCESSING.equals(task.getStatus())) {
+                log.error("Optimize task ended in processing state, marking failed: taskId={}", taskId);
+                task.setStatus(BizConstant.TASK_STATUS_FAILED);
+                task.setErrorMsg("任务执行异常结束");
+            }
+            task.setUpdatedAt(LocalDateTime.now());
+            if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
+                task.setCompletedAt(LocalDateTime.now());
+            }
+            optimizeTaskMapper.updateById(task);
+            try {
+                aiCallLogMapper.insert(callLog);
+            } catch (Exception logEx) {
+                log.warn("Insert AiCallLog failed for taskId={}: {}", taskId, logEx.getMessage());
+            }
         }
-
-        task.setUpdatedAt(LocalDateTime.now());
-        if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
-            task.setCompletedAt(LocalDateTime.now());
-        }
-        optimizeTaskMapper.updateById(task);
-        aiCallLogMapper.insert(callLog);
     }
 
     private void parseAndFillResult(ResumeOptimizeTask task, String content, String model) {

@@ -6,9 +6,12 @@ import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.user.dto.*;
+import com.resume.user.entity.RefreshToken;
 import com.resume.user.entity.User;
+import com.resume.user.mapper.RefreshTokenMapper;
 import com.resume.user.mapper.UserMapper;
 import com.resume.user.security.JwtTokenProvider;
+import com.resume.user.security.TokenHashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -16,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 /**
@@ -27,6 +31,7 @@ import java.time.LocalDateTime;
 public class UserService {
 
     private final UserMapper userMapper;
+    private final RefreshTokenMapper refreshTokenMapper;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
 
@@ -38,6 +43,8 @@ public class UserService {
      */
     @Transactional(rollbackFor = Exception.class)
     public AuthResponse register(RegisterRequest request) {
+        log.info("register start: phone={}, email={}", request.getPhone(),
+                maskEmail(request.getEmail()));
         if (StringUtils.isBlank(request.getPhone()) && StringUtils.isBlank(request.getEmail())) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "手机号与邮箱至少填写一个。");
         }
@@ -49,7 +56,9 @@ public class UserService {
         }
 
         // P0：验证码占位校验，任意 6 位数字均通过。
-        if (!request.getVerifyCode().matches("^\\d{6}$")) {
+        // 防御性校验：即使 DTO 校验被绕过，也不应在此抛 NPE。
+        String verifyCode = request.getVerifyCode();
+        if (verifyCode == null || !verifyCode.matches("^\\d{6}$")) {
             throw new BusinessException(ResultCode.AUTH_VERIFY_CODE_INVALID, "验证码不正确或已过期。");
         }
 
@@ -78,6 +87,7 @@ public class UserService {
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.insert(user);
 
+        log.info("register success: userId={}, phone={}", user.getId(), maskPhone(user.getPhone()));
         return buildAuthResponse(user);
     }
 
@@ -85,6 +95,7 @@ public class UserService {
      * 登录。当 loginType 未传时自动识别账号类型。
      */
     public AuthResponse login(LoginRequest request) {
+        log.info("login start: account={}", maskAccount(request.getAccount()));
         String loginType = request.getLoginType();
         if (StringUtils.isBlank(loginType)) {
             loginType = detectLoginType(request.getAccount());
@@ -107,6 +118,7 @@ public class UserService {
             throw new BusinessException(ResultCode.AUTH_ACCOUNT_LOCKED, "账号已被锁定，请稍后再试。");
         }
 
+        log.info("login success: userId={}", user.getId());
         return buildAuthResponse(user);
     }
 
@@ -124,23 +136,52 @@ public class UserService {
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.insert(user);
 
+        log.info("guest session created: userId={}", user.getId());
+
         AuthResponse response = new AuthResponse();
         response.setUserId(user.getId());
-        response.setAccessToken(jwtTokenProvider.generateAccessToken(user.getId(), true));
-        response.setRefreshToken(jwtTokenProvider.generateRefreshToken(user.getId()));
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), true);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+        response.setAccessToken(accessToken);
+        response.setRefreshToken(refreshToken);
         response.setExpiresIn(jwtTokenProvider.getAccessTokenExpiration() / 1000);
         response.setIsGuest(true);
+        storeRefreshToken(user.getId(), refreshToken);
         return response;
     }
 
     /**
      * 刷新 Token。
+     * <p>
+     * 校验顺序：
+     * <ol>
+     *   <li>JWT 签名 + 类型 {@code refresh} 有效；</li>
+     *   <li>计算 SHA-256 哈希后查库，确认该 refresh token 已落库且未过期、未删除；</li>
+     *   <li>用户存在且未逻辑删除；</li>
+     *   <li>删除当前 refresh 记录（一次性使用，避免复用），并颁发新的 access + refresh 对。</li>
+     * </ol>
+     * </p>
      */
+    @Transactional(rollbackFor = Exception.class)
     public AuthResponse refresh(RefreshRequest request) {
         if (!jwtTokenProvider.validateRefreshToken(request.getRefreshToken())) {
             throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌无效、已过期或类型不正确。");
         }
         String userId = jwtTokenProvider.getUserId(request.getRefreshToken());
+        String tokenHash = TokenHashUtil.hash(request.getRefreshToken());
+
+        LambdaQueryWrapper<RefreshToken> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(RefreshToken::getUserId, userId)
+                .eq(RefreshToken::getTokenHash, tokenHash)
+                .eq(RefreshToken::getDeleted, BizConstant.NOT_DELETED);
+        RefreshToken stored = refreshTokenMapper.selectOne(wrapper);
+        if (stored == null || stored.getExpiresAt() == null
+                || stored.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌无效或已过期。");
+        }
+        // refresh token rotation：当前 refresh 记录一次性使用，避免被盗用复用
+        refreshTokenMapper.deleteById(stored.getId());
+
         User user = userMapper.selectById(userId);
         if (user == null || BizConstant.DELETED.equals(user.getDeleted())) {
             throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌无效或已过期。");
@@ -152,6 +193,7 @@ public class UserService {
      * 获取当前用户信息。
      */
     public UserInfoResponse getCurrentUser(String userId) {
+        log.debug("getCurrentUser: userId={}", userId);
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "用户不存在。");
@@ -172,10 +214,28 @@ public class UserService {
         String role = user.getRole() == null ? BizConstant.USER_ROLE_USER : user.getRole();
         response.setAccessToken(jwtTokenProvider.generateAccessToken(user.getId(),
                 BizConstant.IS_GUEST.equals(user.getIsGuest()), role));
-        response.setRefreshToken(jwtTokenProvider.generateRefreshToken(user.getId()));
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+        response.setRefreshToken(refreshToken);
         response.setExpiresIn(jwtTokenProvider.getAccessTokenExpiration() / 1000);
         response.setIsGuest(BizConstant.IS_GUEST.equals(user.getIsGuest()));
+        storeRefreshToken(user.getId(), refreshToken);
         return response;
+    }
+
+    /**
+     * 将 refresh token 哈希落库，仅存哈希避免明文泄露。
+     */
+    private void storeRefreshToken(String userId, String refreshToken) {
+        if (StringUtils.isBlank(refreshToken)) {
+            return;
+        }
+        RefreshToken record = new RefreshToken();
+        record.setUserId(userId);
+        record.setTokenHash(TokenHashUtil.hash(refreshToken));
+        record.setExpiresAt(LocalDateTime.now().plus(Duration.ofMillis(jwtTokenProvider.getRefreshTokenExpiration())));
+        record.setDeleted(BizConstant.NOT_DELETED);
+        record.setCreatedAt(LocalDateTime.now());
+        refreshTokenMapper.insert(record);
     }
 
     /**
@@ -220,5 +280,18 @@ public class UserService {
         String local = parts[0];
         String mask = local.length() <= 2 ? "*" : local.charAt(0) + "***";
         return mask + "@" + parts[1];
+    }
+
+    /**
+     * 账号脱敏（用于日志中保留可识别但不暴露的标识）。
+     */
+    private String maskAccount(String account) {
+        if (StringUtils.isBlank(account)) {
+            return "";
+        }
+        if (account.matches("^1[3-9]\\d{9}$")) {
+            return maskPhone(account);
+        }
+        return maskEmail(account);
     }
 }
