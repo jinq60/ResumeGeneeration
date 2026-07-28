@@ -10,13 +10,14 @@ export interface TemplateConfig {
 }
 
 export interface Template {
-  id: string
-  name: string
-  category: string
-  thumbnailUrl?: string
-  description?: string
-  config: TemplateConfig
-  htmlTemplate?: string
+  id: string; name: string; category: string; thumbnailUrl?: string
+  description?: string; config: TemplateConfig; htmlTemplate?: string
+  renderEngine?: 'server' | 'client' | 'hybrid'
+  sortOrder?: number
+  isPremium?: boolean; isRecommended?: boolean
+  status?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export const templateApi = {

@@ -1,7 +1,7 @@
 import { onUnmounted, ref } from 'vue'
 
 export function useAutoSave() {
-  const saveStatus = ref<'saved' | 'saving' | 'unsaved'>('saved')
+  const saveStatus = ref<'saved' | 'saving' | 'unsaved' | 'error'>('saved')
   let timer: ReturnType<typeof setTimeout> | null = null
 
   function triggerSave(saveFn: () => Promise<void>) {
@@ -11,8 +11,12 @@ export function useAutoSave() {
     }
     timer = setTimeout(async () => {
       saveStatus.value = 'saving'
-      await saveFn()
-      saveStatus.value = 'saved'
+      try {
+        await saveFn()
+        saveStatus.value = 'saved'
+      } catch (e) {
+        saveStatus.value = 'error'
+      }
     }, 2000)
   }
 

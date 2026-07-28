@@ -8,11 +8,13 @@ export interface UserInfo {
   nickname?: string
   isGuest?: boolean
   accessToken: string
+  avatar?: string
 }
 
 export const useUserStore = defineStore('user', () => {
   const userId = ref<string | null>(null)
   const nickname = ref('')
+  const avatar = ref('')
   const isGuest = ref(true)
   const accessToken = ref('')
 
@@ -21,6 +23,7 @@ export const useUserStore = defineStore('user', () => {
   function setUser(info: UserInfo) {
     userId.value = info.userId
     nickname.value = info.nickname || ''
+    avatar.value = info.avatar || ''
     isGuest.value = info.isGuest ?? true
     accessToken.value = info.accessToken
     localStorage.setItem(STORAGE_KEY, JSON.stringify(info))
@@ -30,6 +33,7 @@ export const useUserStore = defineStore('user', () => {
   function clearUser() {
     userId.value = null
     nickname.value = ''
+    avatar.value = ''
     isGuest.value = true
     accessToken.value = ''
     localStorage.removeItem(STORAGE_KEY)
@@ -43,6 +47,7 @@ export const useUserStore = defineStore('user', () => {
         const info: UserInfo = JSON.parse(raw)
         userId.value = info.userId
         nickname.value = info.nickname || ''
+        avatar.value = info.avatar || ''
         isGuest.value = info.isGuest ?? true
         accessToken.value = info.accessToken
         localStorage.setItem('access_token', info.accessToken)
@@ -55,6 +60,7 @@ export const useUserStore = defineStore('user', () => {
   return {
     userId,
     nickname,
+    avatar,
     isGuest,
     accessToken,
     isLoggedIn,

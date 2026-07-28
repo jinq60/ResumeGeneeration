@@ -44,7 +44,8 @@ describe('LoginView', () => {
       }
     })
 
-    await wrapper.find('button.guest-btn').trigger('click')
+    // 切到登录标签（默认即登录）后点击游客按钮
+    await wrapper.find('button.login-ghost').trigger('click')
     await flushPromises()
 
     expect(authApi.guest).toHaveBeenCalled()
@@ -52,6 +53,6 @@ describe('LoginView', () => {
     expect(store.userId).toBe('guest_1')
     expect(store.isGuest).toBe(true)
     expect(store.accessToken).toBe('guest_token')
-    expect(pushMock).toHaveBeenCalledWith('/resumes')
+    expect(pushMock).toHaveBeenCalledWith('/dashboard')
   })
 })

@@ -14,27 +14,29 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,vue,scss,css,json}\""
   },
   "dependencies": {
-    "vue": "^3.4.21",
-    "vue-router": "^4.3.0",
-    "pinia": "^2.1.7",
+    "@element-plus/icons-vue": "^2.3.1",
     "axios": "^1.6.8",
     "element-plus": "^2.6.3",
-    "@element-plus/icons-vue": "^2.3.1",
-    "vue-cropper": "^1.1.1"
+    "pinia": "^2.1.7",
+    "vue": "^3.4.21",
+    "vue-cropper": "^1.1.1",
+    "vue-router": "^4.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.43.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-vue": "^5.0.4",
+    "@vue/eslint-config-typescript": "^13.0.0",
     "@vue/test-utils": "^2.4.5",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.24.0",
+    "jsdom": "^24.0.0",
+    "prettier": "^3.2.5",
+    "sass": "^1.74.1",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.4.5",
     "vite": "^5.2.8",
-    "vue-tsc": "^2.0.11",
     "vitest": "^1.4.0",
-    "jsdom": "^24.0.0",
-    "@playwright/test": "^1.43.0",
-    "eslint": "^8.57.0",
-    "@vue/eslint-config-typescript": "^13.0.0",
-    "eslint-plugin-vue": "^9.24.0",
-    "prettier": "^3.2.5",
-    "sass": "^1.74.1"
+    "vue-tsc": "^2.0.11"
   }
 }

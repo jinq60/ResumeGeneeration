@@ -1,0 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-headline: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-headline-lg: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-headline-md: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-title-lg: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-title-md: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-body-lg: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-body-md: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-label-md: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-navy-900: #0d2137;
+  --color-navy-800: #0f2a45;
+
+  /* Stitch design system colors */
+  --color-primary: #0057c2;
+  --color-primary-container: #006ef2;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #fefcff;
+  --color-primary-fixed: #d9e2ff;
+  --color-primary-fixed-dim: #afc6ff;
+  --color-inverse-primary: #afc6ff;
+  --color-secondary: #266d00;
+  --color-secondary-container: #85fa51;
+  --color-secondary-fixed: #88fd54;
+  --color-secondary-fixed-dim: #6de039;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #287100;
+  --color-tertiary: #7431d3;
+  --color-tertiary-container: #8e4fee;
+  --color-tertiary-fixed: #ecdcff;
+  --color-tertiary-fixed-dim: #d5baff;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #fffbff;
+  --color-background: #f7f9fc;
+  --color-surface: #f7f9fc;
+  --color-surface-bright: #f7f9fc;
+  --color-surface-dim: #d8dadd;
+  --color-surface-variant: #e0e3e6;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4f7;
+  --color-surface-container: #eceef1;
+  --color-surface-container-high: #e6e8eb;
+  --color-surface-container-highest: #e0e3e6;
+  --color-inverse-surface: #2d3133;
+  --color-inverse-on-surface: #eff1f4;
+  --color-on-background: #191c1e;
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #414755;
+  --color-outline: #727786;
+  --color-outline-variant: #c1c6d7;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  /* Stitch typography */
+  --font-size-headline-lg: 30px;
+  --font-size-headline-md: 24px;
+  --font-size-title-lg: 18px;
+  --font-size-title-md: 16px;
+  --font-size-body-lg: 16px;
+  --font-size-body-md: 14px;
+  --font-size-label-md: 12px;
+
+  /* Stitch spacing */
+  --spacing-sidebar-width: 220px;
+  --spacing-drawer-width: 400px;
+  --spacing-gutter: 16px;
+  --spacing-margin-page: 24px;
+  --spacing-stack-sm: 8px;
+  --spacing-stack-md: 16px;
+  --spacing-stack-lg: 24px;
+
+  /* Stitch radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.08); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.15); }
+
+/* Card utilities */
+.card-shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02); }
+.card-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.card-hover:hover { transform: translateY(-2px); box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.04); }
+
+/* Element Plus icon default size */
+.el-icon {
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+.el-icon svg {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* Reset body for full-height layouts */
+body { margin: 0; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+#app { min-height: 100vh; }

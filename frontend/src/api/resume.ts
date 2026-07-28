@@ -36,5 +36,8 @@ export const resumeApi = {
   },
   rename(id: string, title: string): Promise<Resume> {
     return request.put(`/resumes/${id}/title`, { title }) as Promise<Resume>
+  },
+  review(id: string, data: { jobDescription: string }): Promise<any> {
+    return request.post(`/resumes/${id}/review`, data) as Promise<any>
   }
 }

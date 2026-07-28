@@ -77,17 +77,35 @@ frontend/src/
 
 ```typescript
 const routes = [
-  { path: '/', redirect: '/resumes' },
+  { path: '/', redirect: '/dashboard' },
+  { path: '/landing', name: 'Landing', component: () => import('@/views/LandingView.vue') },
   { path: '/login', name: 'Login', component: () => import('@/views/LoginView.vue') },
+  { path: '/dashboard', name: 'Dashboard', component: () => import('@/views/DashboardView.vue') },
   { path: '/resumes', name: 'ResumeList', component: () => import('@/views/ResumeListView.vue') },
-  { path: '/editor/:id', name: 'Editor', component: () => import('@/views/EditorView.vue') }
+  { path: '/resumes/create', name: 'TemplateSelect', component: () => import('@/views/TemplateSelectView.vue') },
+  { path: '/templates', name: 'TemplateCenter', component: () => import('@/views/TemplateCenterView.vue') },
+  { path: '/templates/:id', name: 'TemplateDetail', component: () => import('@/views/TemplateDetailView.vue') },
+  { path: '/editor/:id', name: 'Editor', component: () => import('@/views/EditorView.vue') },
+  { path: '/resumes/:id', name: 'ResumeDetail', component: () => import('@/views/ResumeDetailView.vue') },
+  { path: '/resumes/:id/edit', name: 'ResumeEdit', component: () => import('@/views/EditorView.vue') },
+  { path: '/resumes/:id/export', name: 'Export', component: () => import('@/views/ExportView.vue') },
+  { path: '/resumes/:id/preview', name: 'Preview', component: () => import('@/views/ExportView.vue') },
+  { path: '/resumes/:id/review', name: 'AIReview', component: () => import('@/views/AIReviewView.vue') },
+  { path: '/ai-review', name: 'AIReviewCenter', component: () => import('@/views/AIReviewCenterView.vue') },
+  { path: '/avatar/upload', name: 'AvatarUpload', component: () => import('@/views/AvatarUploadView.vue') },
+  { path: '/delivery', name: 'DeliveryManagement', component: () => import('@/views/DeliveryManagementView.vue') },
+  { path: '/settings', name: 'Settings', component: () => import('@/views/SettingsView.vue') },
+  { path: '/downloads', name: 'DownloadCenter', component: () => import('@/views/DownloadCenterView.vue') },
+  { path: '/notifications', name: 'NotificationCenter', component: () => import('@/views/NotificationCenterView.vue') },
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/NotFoundView.vue') },
+  // admin routes ...
 ]
 ```
 
-**待补充**：
+**路由守卫**（已实现在 `src/router/index.ts`）：
 
-- 路由守卫：未登录用户访问 `/resumes`、`/editor/:id` 时重定向到 `/login`。
-- 已登录用户访问 `/login` 时重定向到 `/resumes`。
+- 用户侧：未登录用户访问受保护页面（除 `Login`、`Landing` 外）时重定向到 `/login`；已登录用户访问 `/login` 时重定向到 `/`。
+- 管理侧：访问 `/admin/*` 受保护页面时校验 `admin_token`，未登录则重定向到 `/admin/login`。管理员登录后自动进入 `/admin/dashboard`。
 
 ---
 
@@ -230,19 +248,32 @@ export interface Resume {
 ### 已完成
 
 - `LoginView.vue`：登录/注册/游客模式完整页面
+- `ResumeListView.vue`：简历列表、新建、重命名、复制、删除、分页
+- `DashboardView.vue`：用户工作台
+- `EditorView.vue`：左侧模块编辑区、右侧预览、模板切换、导出入口
+- `TemplateSelectView.vue` / `TemplateCenterView.vue`：模板选择与模板中心
+- `ExportView.vue`：PDF 导出流程 UI
+- `AIReviewView.vue` / `AIReviewCenterView.vue`：AI 简历点评入口与结果展示
+- `AvatarUploadView.vue`：头像上传、裁剪、一寸照优化 UI
+- `DeliveryManagementView.vue`：投递记录管理
+- `LandingView.vue`：官网首页
+- `SettingsView.vue`：用户账号设置
+- `NotFoundView.vue`：404 页面
+- `TemplateDetailView.vue`：模板详情页
+- `DownloadCenterView.vue`：下载中心（PDF/头像任务）
+- `NotificationCenterView.vue`：通知中心
+- `ResumeDetailView.vue`：简历详情/预览页
+- `AdminLayout.vue`、`admin/Dashboard.vue`、`admin/UserManagement.vue`、`admin/ResumeManagement.vue`、`admin/TemplateManagement.vue`、`admin/SystemSettings.vue`（AI 规则管理）、`admin/ContentAudit.vue`、`admin/DeliveryData.vue`、`admin/Login.vue`：管理后台页面与布局
 - `ResumePreview.vue`：iframe 加载后端 `/api/resumes/{id}/preview`
+- `frontend/src/utils/download.ts`：PDF/头像任务本地存储与读取工具
 - `useAutoSave.ts`：2 秒防抖自动保存 hook
-- 类型、API 封装、状态管理、路由骨架
+- 类型、API 封装、状态管理、路由骨架、路由守卫
 
 ### 待完善（占位）
 
-- `ResumeListView.vue`：简历列表、新建、重命名、复制、删除、分页
-- `EditorView.vue`：左侧模块编辑区、右侧预览、模板切换、导出入口
 - `ProfileForm.vue`：个人信息表单
 - 新增：`EducationForm.vue`、`WorkForm.vue`、`ProjectForm.vue`、`SkillForm.vue`、`IntroductionForm.vue`、`CustomForm.vue`
-- 头像上传/裁剪/优化 UI
-- PDF 导出流程 UI
-- AI 点评结果展示 UI（P1）
+- 以上表单组件与编辑器内部数据流的深度集成
 
 ---
 
