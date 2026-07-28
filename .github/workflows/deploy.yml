@@ -47,14 +47,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || '22' }}
-          source: |
-            backend/pom.xml
-            backend/src
-            backend/Dockerfile
-            frontend/dist
-            frontend/Dockerfile
-            frontend/nginx.conf
-            ops/docker-compose.server.yml
+          source: "backend/pom.xml,backend/src,backend/Dockerfile,frontend/dist,frontend/Dockerfile,frontend/nginx.conf,ops/docker-compose.server.yml"
           target: /opt/resume-generation/app
           strip_components: 0
 
