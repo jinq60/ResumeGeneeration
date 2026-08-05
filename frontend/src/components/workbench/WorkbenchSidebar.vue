@@ -149,12 +149,12 @@ async function handleLogout() {
   position: fixed;
   left: 0;
   top: 0;
-  background: #001a43;
-  color: rgba(255, 255, 255, 0.88);
+  background: var(--st-surface-container-lowest);
+  color: var(--st-on-surface);
   display: flex;
   flex-direction: column;
   z-index: 40;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid var(--st-outline-variant);
 }
 
 .sidebar-brand {
@@ -162,7 +162,7 @@ async function handleLogout() {
   align-items: center;
   gap: var(--st-stack-md);
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--st-outline-variant);
 }
 
 .sidebar-brand-mark {
@@ -173,14 +173,13 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--st-shadow-md);
 }
 
 .sidebar-brand-name {
   font-weight: 600;
   font-size: 16px;
   letter-spacing: -0.01em;
-  color: #fff;
+  color: var(--st-on-surface);
 }
 
 .sidebar-nav {
@@ -197,27 +196,28 @@ async function handleLogout() {
   align-items: center;
   gap: var(--st-stack-md);
   padding: 10px 12px;
-  border-radius: var(--st-radius-lg);
+  border-radius: var(--st-radius-md);
   font-size: 14px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--st-on-surface-variant);
   transition: all 0.2s ease;
   text-decoration: none;
 
   &:hover {
-    color: rgba(255, 255, 255, 0.92);
-    background: rgba(255, 255, 255, 0.04);
+    color: var(--st-on-surface);
+    background: var(--st-surface-container-low);
   }
 
   &.is-active {
-    color: #fff;
+    color: var(--st-primary);
     background: var(--st-primary-container);
+    font-weight: 600;
   }
 }
 
 .sidebar-badge {
   margin-left: auto;
-  background: var(--st-primary-container);
+  background: var(--st-primary);
   color: #fff;
   font-size: 10px;
   padding: 2px 6px;
@@ -227,17 +227,17 @@ async function handleLogout() {
 }
 
 .sidebar-item.is-active .sidebar-badge {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--st-primary);
 }
 
 .sidebar-divider {
   margin: 12px 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--st-outline-variant);
 }
 
 .sidebar-user {
   padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--st-outline-variant);
   display: flex;
   align-items: center;
   gap: var(--st-stack-md);
@@ -247,7 +247,7 @@ async function handleLogout() {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--st-secondary);
+  background: var(--st-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -265,7 +265,7 @@ async function handleLogout() {
 .sidebar-user-name {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--st-on-surface);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -273,14 +273,14 @@ async function handleLogout() {
 
 .sidebar-user-role {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.46);
+  color: var(--st-outline);
   margin-top: 2px;
 }
 
 .sidebar-user-logout {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.46);
+  color: var(--st-outline);
   cursor: pointer;
   padding: 6px;
   border-radius: var(--st-radius-md);
@@ -290,7 +290,7 @@ async function handleLogout() {
 
   &:hover {
     color: var(--st-error);
-    background: rgba(186, 26, 26, 0.12);
+    background: var(--st-error-container);
   }
 }
 </style>

@@ -4,6 +4,24 @@
 
 ---
 
+## v1.4（2026-08-05）
+
+### 新增
+
+- `POST /resumes/{id}/ai/write`：行内 AI 写作（generate/polish/shorten/expand/translate），字段白名单 + 每用户并发限制，复用多厂商 LLM 路由与 `ai_call_log` 审计。
+- `POST /resumes/{id}/share` / `GET /resumes/{id}/share` / `DELETE /resumes/{id}/share`：简历公开分享（创建/轮换、查询、关闭）。
+- `GET /share/{token}`：公开只读分享页（HTML，CSP/noindex/no-store）。
+- `GET /resumes/{id}/export/markdown`：导出 Markdown 文件。
+- `GET /resumes/{id}/export/word`：导出 Word（docx）文件。
+- `resume_share` 表（V8 迁移）。
+- 错误码：`AI_WRITING_FIELD_INVALID`(6007)、`AI_WRITING_CONTENT_TOO_LONG`(6008)。
+
+### 调整
+
+- 前端视觉简洁化：设计令牌收敛（单一强调色 + 中性灰）、编辑器两栏布局、深色侧栏浅色化；移除 Google Fonts 在线依赖（修复生产字体加载）。
+
+---
+
 ## v1.3（2026-08-05）
 
 ### 新增

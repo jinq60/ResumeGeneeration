@@ -16,7 +16,7 @@
         </div>
 
         <!-- 微缩 A4 简历 -->
-        <div class="relative z-10 bg-surface-container-lowest text-on-surface rounded-lg p-5 shadow-2xl -rotate-2 hover:rotate-0 transition-transform duration-300 max-w-[360px] mx-auto my-8">
+        <div class="relative z-10 bg-surface-container-lowest text-on-surface rounded-lg p-5 shadow-md max-w-[360px] mx-auto my-8">
           <div class="flex items-center gap-3 pb-3 border-b border-outline-variant">
             <div class="w-11 h-11 rounded-md bg-gradient-to-br from-primary-container to-primary flex items-center justify-center text-on-primary font-bold text-lg">
               Z
