@@ -12,13 +12,13 @@
       </p>
       <div class="not-found-actions">
         <RouterLink
-          to="/dashboard"
+          to="/"
           class="btn-primary"
         >
           <el-icon size="14">
             <HomeFilled />
           </el-icon>
-          <span>返回工作台</span>
+          <span>返回首页</span>
         </RouterLink>
         <button
           class="btn-ghost"
@@ -45,8 +45,8 @@ const router = useRouter()
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-6);
-  background: var(--color-desk-mist);
+  padding: 24px;
+  background: var(--st-background);
 }
 
 .not-found-content {
@@ -59,62 +59,62 @@ const router = useRouter()
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.04em;
-  color: var(--color-archive-blue);
+  color: var(--st-primary);
   opacity: 0.18;
 }
 
 .not-found-title {
-  margin-top: var(--space-4);
-  font-size: var(--font-size-2xl);
+  margin-top: 16px;
+  font-size: 24px;
   font-weight: 600;
-  color: var(--color-ink-navy);
+  color: var(--st-on-surface);
 }
 
 .not-found-desc {
-  margin-top: var(--space-2);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--st-on-surface-variant);
 }
 
 .not-found-actions {
-  margin-top: var(--space-8);
+  margin-top: 32px;
   display: flex;
   justify-content: center;
-  gap: var(--space-3);
+  gap: 12px;
 }
 
 .btn-primary,
 .btn-ghost {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 10px var(--space-5);
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-sm);
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--st-radius-lg);
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: var(--transition-base);
+  transition: all 0.2s ease;
   text-decoration: none;
 }
 
 .btn-primary {
-  background: var(--color-archive-blue);
+  background: var(--st-primary);
   color: #fff;
   border: none;
-  box-shadow: 0 4px 12px var(--color-archive-blue-12);
+  box-shadow: var(--st-shadow-md);
 
   &:hover {
-    background: var(--color-archive-blue-80);
+    background: var(--st-primary-container);
   }
 }
 
 .btn-ghost {
   background: transparent;
-  color: var(--color-text-regular);
-  border: 1px solid var(--color-border);
+  color: var(--st-on-surface-variant);
+  border: 1px solid var(--st-outline-variant);
 
   &:hover {
-    background: var(--color-paper-white);
+    background: var(--st-surface-container-low);
   }
 }
 </style>

@@ -48,7 +48,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { Loading, Warning } from '@element-plus/icons-vue'
-import axios from 'axios'
+import { fetchResumePreview, fetchLivePreview } from '@/api/preview'
 
 interface Props {
   resumeId?: string
@@ -63,61 +63,65 @@ const iframeRef = ref<HTMLIFrameElement>()
 const loading = ref(false)
 const error = ref('')
 
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let loadSeq = 0
+
 async function loadPreview() {
   loading.value = true
   error.value = ''
 
+  const seq = ++loadSeq
   try {
-    const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
-    const token = localStorage.getItem('access_token')
-
-    if (props.resumeId) {
-      // 通过resumeId加载
-      const response = await axios.get<string>(
-        `${baseURL}/resumes/${props.resumeId}/preview`,
-        {
-          params: props.templateId ? { templateId: props.templateId } : undefined,
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          responseType: 'text',
-          transformResponse: []
-        }
-      )
-      html.value = response.data
+    if (props.resumeId && !props.resume) {
+      html.value = await fetchResumePreview(props.resumeId, props.templateId)
     } else if (props.resume) {
-      // 直接使用resume对象（用于编辑器实时预览）
-      const response = await axios.post<string>(
-        `${baseURL}/resumes/preview`,
-        {
-          resume: props.resume,
-          templateId: props.templateId || props.resume.templateId
-        },
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          responseType: 'text',
-          transformResponse: []
-        }
-      )
-      html.value = response.data
+      html.value = await fetchLivePreview(props.resume, props.templateId || props.resume.templateId)
     } else {
       error.value = '缺少简历数据'
       return
     }
   } catch (e: any) {
-    error.value = e.message || '预览加载失败，请稍后重试'
-    console.error('预览加载失败', e)
+    if (seq === loadSeq) {
+      error.value = e.message || '预览加载失败，请稍后重试'
+      console.error('预览加载失败', e)
+    }
   } finally {
-    loading.value = false
+    if (seq === loadSeq) {
+      loading.value = false
+    }
   }
+}
+
+function scheduleLoadPreview() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+  }
+  debounceTimer = setTimeout(loadPreview, 300)
 }
 
 function handleIframeLoad() {
   // iframe加载完成后的处理
 }
 
+// 深监听 resume 内容（编辑器原地修改 sections 时也能触发），避免引用陷阱
 watch(
-  () => [props.resumeId, props.resume, props.templateId],
-  () => loadPreview(),
+  () => props.resume ? JSON.stringify(props.resume) : null,
+  () => {
+    if (props.resumeId && !props.resume) {
+      loadPreview()
+    } else if (props.resume) {
+      scheduleLoadPreview()
+    }
+  },
   { immediate: true }
+)
+
+watch(
+  () => [props.resumeId, props.templateId],
+  () => {
+    // 模板切换（无论是否携带 resume 对象）都需重新加载，保证预览与导出模板一致
+    loadPreview()
+  }
 )
 </script>
 

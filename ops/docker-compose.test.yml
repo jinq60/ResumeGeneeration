@@ -1,6 +1,6 @@
 services:
   mysql-test:
-    image: mysql:8.0
+    image: mysql:8.0.36
     container_name: resume-test-mysql
     restart: unless-stopped
     environment:
@@ -19,13 +19,14 @@ services:
     networks:
       - resume-test-net
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pResumeTest123"]
+      # CMD 数组形式不做 shell 展开，改用 CMD-SHELL
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -pResumeTest123"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   minio-test:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     container_name: resume-test-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"

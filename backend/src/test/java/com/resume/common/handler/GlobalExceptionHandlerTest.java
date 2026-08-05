@@ -46,4 +46,13 @@ class GlobalExceptionHandlerTest {
         assertEquals(401, response.getStatusCode().value());
         assertEquals(ResultCode.AUTH_PASSWORD_INCORRECT, response.getBody().getCode());
     }
+
+    @Test
+    void handleBusinessException_shouldMapParamLikeAuthErrorsTo400() {
+        BusinessException verifyCode = new BusinessException(ResultCode.AUTH_VERIFY_CODE_INVALID, "验证码不正确。");
+        BusinessException weakPassword = new BusinessException(ResultCode.AUTH_PASSWORD_TOO_WEAK, "密码强度不足。");
+
+        assertEquals(400, handler.handleBusinessException(verifyCode).getStatusCode().value());
+        assertEquals(400, handler.handleBusinessException(weakPassword).getStatusCode().value());
+    }
 }

@@ -165,8 +165,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
+import { useSectionSync } from '@/composables/useSectionSync'
 
 interface Props {
   sections: any[]
@@ -233,28 +234,33 @@ function handleDateRangeChange(item: any) {
   }
 }
 
-// 监听变化，触发更新
-watch(projectList, (newList) => {
-  const projectData = newList.map(item => ({
-    ...item,
-    techStack: item.techStackText ? item.techStackText.split(',').map((t: string) => t.trim()).filter((t: string) => t) : [],
-    description: item.descriptionText ? item.descriptionText.split('\n').map((d: string) => d.trim()).filter((d: string) => d) : [],
-    achievements: item.achievementsText ? item.achievementsText.split('\n').map((a: string) => a.trim()).filter((a: string) => a) : []
-  }))
-
-  emit('update', props.sections.map((section: any) => {
-    if (section.type === 'project') {
-      return {
-        ...section,
-        data: projectData
-      }
-    }
-    return section
-  }))
-}, { deep: true })
-
 // 初始化
 extractProjects()
+
+// 与父组件 sections 双向同步：外部变更时重新提取，自身 emit 的回传自动忽略
+useSectionSync(
+  projectList,
+  () => props.sections,
+  extractProjects,
+  () => {
+    const projectData = projectList.value.map((item: any) => ({
+      ...item,
+      techStack: item.techStackText ? item.techStackText.split(',').map((t: string) => t.trim()).filter((t: string) => t) : [],
+      description: item.descriptionText ? item.descriptionText.split('\n').map((d: string) => d.trim()).filter((d: string) => d) : [],
+      achievements: item.achievementsText ? item.achievementsText.split('\n').map((a: string) => a.trim()).filter((a: string) => a) : []
+    }))
+
+    emit('update', props.sections.map((section: any) => {
+      if (section.type === 'project') {
+        return {
+          ...section,
+          data: projectData
+        }
+      }
+      return section
+    }))
+  }
+)
 </script>
 
 <style scoped lang="scss">

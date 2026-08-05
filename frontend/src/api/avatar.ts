@@ -12,6 +12,7 @@ export interface AvatarTask {
 
 export interface OptimizeAvatarRequest {
   sourceImageUrl: string
+  resumeId?: string
   backgroundType: string
   style: string
   keepIdentity?: boolean

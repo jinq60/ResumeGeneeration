@@ -146,6 +146,21 @@
         />
       </el-form-item>
 
+      <el-form-item label="一寸照">
+        <div class="w-full">
+          <el-button
+            type="primary"
+            plain
+            @click="goAvatarUpload"
+          >
+            上传并优化一寸照
+          </el-button>
+          <p class="text-xs text-on-surface-variant mt-1">
+            优化完成后会自动回填到头像 URL
+          </p>
+        </div>
+      </el-form-item>
+
       <el-divider>展示设置</el-divider>
 
       <el-form-item label="显示性别">
@@ -168,8 +183,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import type { Profile } from '@/types/resume'
+import { useSectionSync } from '@/composables/useSectionSync'
 
 interface Props {
   resume: any
@@ -177,6 +193,13 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits(['update'])
+
+function goAvatarUpload() {
+  const resumeId = props.resume?.id
+  if (!resumeId) return
+  const url = `/workbench/avatar/upload?resumeId=${encodeURIComponent(resumeId)}`
+  window.location.href = url
+}
 
 const formData = ref<Profile>({
   name: '',
@@ -235,25 +258,30 @@ function extractProfile() {
   }
 }
 
-// 监听表单变化，触发更新
-watch(formData, (newData) => {
-  emit('update', {
-    title: props.resume.title,
-    targetPosition: newData.targetPosition,
-    sections: props.resume.sections.map((section: any) => {
-      if (section.type === 'profile') {
-        return {
-          ...section,
-          data: newData
-        }
-      }
-      return section
-    })
-  })
-}, { deep: true })
-
 // 初始化
 extractProfile()
+
+// 与父组件 sections 双向同步：外部变更时重新提取，自身 emit 的回传自动忽略
+useSectionSync(
+  formData,
+  () => props.resume?.sections,
+  extractProfile,
+  () => {
+    emit('update', {
+      title: props.resume.title,
+      targetPosition: formData.value.targetPosition,
+      sections: props.resume.sections.map((section: any) => {
+        if (section.type === 'profile') {
+          return {
+            ...section,
+            data: { ...formData.value }
+          }
+        }
+        return section
+      })
+    })
+  }
+)
 </script>
 
 <style scoped lang="scss">

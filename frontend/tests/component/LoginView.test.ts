@@ -53,6 +53,6 @@ describe('LoginView', () => {
     expect(store.userId).toBe('guest_1')
     expect(store.isGuest).toBe(true)
     expect(store.accessToken).toBe('guest_token')
-    expect(pushMock).toHaveBeenCalledWith('/dashboard')
+    expect(pushMock).toHaveBeenCalledWith('/workbench/dashboard')
   })
 })

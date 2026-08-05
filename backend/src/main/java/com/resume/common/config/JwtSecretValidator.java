@@ -11,14 +11,14 @@ import java.util.Base64;
 /**
  * JWT secret 启动校验。
  * <p>
- * 在非 test profile 下，要求 {@code app.jwt.secret} 显式来自环境变量，
+ * 仅生产 profile 要求 {@code app.jwt.secret} 显式来自环境变量，
  * 且 Base64 解码后长度 ≥ 256 bit（32 字节），否则启动即失败。
- * 测试 profile（{@code test}）跳过此校验。
+ * dev/test 环境由 {@code JwtTokenProvider} 自动生成临时 secret（与现有降级逻辑一致）。
  * </p>
  */
 @Slf4j
 @Component
-@Profile("!test")
+@Profile("prod")
 public class JwtSecretValidator {
 
     private static final int MIN_KEY_BYTES = 32;

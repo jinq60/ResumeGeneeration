@@ -1,30 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import adminRoutes from './admin'
+import websiteRoutes from './website'
+import workbenchRoutes from './workbench'
 
 const routes: RouteRecordRaw[] = [
-  { path: '/', redirect: '/dashboard' },
-  { path: '/landing', name: 'Landing', component: () => import('@/views/LandingView.vue') },
-  { path: '/login', name: 'Login', component: () => import('@/views/LoginView.vue') },
-  { path: '/dashboard', name: 'Dashboard', component: () => import('@/views/DashboardView.vue') },
-  { path: '/resumes', name: 'ResumeList', component: () => import('@/views/ResumeListView.vue') },
-  { path: '/resumes/create', name: 'TemplateSelect', component: () => import('@/views/TemplateSelectView.vue') },
-  { path: '/templates', name: 'TemplateCenter', component: () => import('@/views/TemplateCenterView.vue') },
-  { path: '/templates/:id', name: 'TemplateDetail', component: () => import('@/views/TemplateDetailView.vue') },
-  { path: '/editor/:id', name: 'Editor', component: () => import('@/views/EditorView.vue') },
-  { path: '/resumes/:id/edit', name: 'ResumeEdit', component: () => import('@/views/EditorView.vue') },
-  { path: '/resumes/:id/export', name: 'Export', component: () => import('@/views/ExportView.vue') },
-  { path: '/resumes/:id/preview', name: 'Preview', component: () => import('@/views/ExportView.vue') },
-  { path: '/resumes/:id/review', name: 'AIReview', component: () => import('@/views/AIReviewView.vue') },
-  { path: '/resumes/:id', name: 'ResumeDetail', component: () => import('@/views/ResumeDetailView.vue') },
-  { path: '/avatar/upload', name: 'AvatarUpload', component: () => import('@/views/AvatarUploadView.vue') },
-  { path: '/ai-review', name: 'AIReviewCenter', component: () => import('@/views/AIReviewCenterView.vue') },
-  { path: '/delivery', name: 'DeliveryManagement', component: () => import('@/views/DeliveryManagementView.vue') },
-  { path: '/settings', name: 'Settings', component: () => import('@/views/SettingsView.vue') },
-  { path: '/downloads', name: 'DownloadCenter', component: () => import('@/views/DownloadCenterView.vue') },
-  { path: '/notifications', name: 'NotificationCenter', component: () => import('@/views/NotificationCenterView.vue') },
-  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/NotFoundView.vue') },
-  ...adminRoutes
+  { path: '/login', name: 'Login', component: () => import('@/views/LoginView.vue'), meta: { title: '登录' } },
+  ...websiteRoutes,
+  ...workbenchRoutes,
+  ...adminRoutes,
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/NotFoundView.vue'), meta: { title: '页面不存在' } }
 ]
 
 const router = createRouter({
@@ -32,9 +17,11 @@ const router = createRouter({
   routes
 })
 
-const publicRoutes = ['Login', 'AdminLogin', 'Landing']
+const publicRouteNames = ['Login', 'AdminLogin', 'Home', 'Features', 'TemplatesShowcase', 'Pricing', 'About', 'Contact', 'HelpDocs']
 
 router.beforeEach((to, _from, next) => {
+  document.title = to.meta.title ? `${to.meta.title} - 智能简历` : '智能简历'
+
   // Admin routes use separate token
   if (to.path.startsWith('/admin')) {
     const adminToken = localStorage.getItem('admin_token')
@@ -48,12 +35,22 @@ router.beforeEach((to, _from, next) => {
     return
   }
 
-  // User routes
+  // Workbench routes
   const token = localStorage.getItem('access_token')
-  if (!token && !publicRoutes.includes(to.name as string)) {
+  if (to.path.startsWith('/workbench')) {
+    if (!token) {
+      next({ name: 'Login' })
+    } else {
+      next()
+    }
+    return
+  }
+
+  // Public website routes
+  if (!token && !publicRouteNames.includes(to.name as string)) {
     next({ name: 'Login' })
   } else if (token && to.name === 'Login') {
-    next({ path: '/' })
+    next({ path: '/workbench/dashboard' })
   } else {
     next()
   }

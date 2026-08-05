@@ -65,15 +65,22 @@ public class UserService {
         }
 
         if (StringUtils.isNotBlank(request.getPhone())) {
-            User exist = findByPhone(request.getPhone());
-            if (exist != null) {
+            User exist = findByPhoneIncludingDeleted(request.getPhone());
+            if (exist != null && BizConstant.NOT_DELETED.equals(exist.getDeleted())) {
                 throw new BusinessException(ResultCode.AUTH_PHONE_REGISTERED, "该手机号已注册。");
+            }
+            if (exist != null) {
+                // 回收被逻辑删除账号占用的唯一索引，允许重新注册
+                releaseUserIdentity(exist.getId(), request.getPhone(), null);
             }
         }
         if (StringUtils.isNotBlank(request.getEmail())) {
-            User exist = findByEmail(request.getEmail());
-            if (exist != null) {
+            User exist = findByEmailIncludingDeleted(request.getEmail());
+            if (exist != null && BizConstant.NOT_DELETED.equals(exist.getDeleted())) {
                 throw new BusinessException(ResultCode.AUTH_EMAIL_REGISTERED, "该邮箱已注册。");
+            }
+            if (exist != null) {
+                releaseUserIdentity(exist.getId(), null, request.getEmail());
             }
         }
 
@@ -149,8 +156,9 @@ public class UserService {
      * <ol>
      *   <li>JWT 签名 + 类型 {@code refresh} 有效；</li>
      *   <li>计算 SHA-256 哈希后查库，确认该 refresh token 已落库且未过期、未删除；</li>
-     *   <li>用户存在且未逻辑删除；</li>
-     *   <li>删除当前 refresh 记录（一次性使用，避免复用），并颁发新的 access + refresh 对。</li>
+     *   <li>原子删除当前 refresh 记录（先删后验，一次性使用，防并发复用）；</li>
+     *   <li>用户存在、未逻辑删除、未被禁用；</li>
+     *   <li>颁发新的 access + refresh 对。</li>
      * </ol>
      * </p>
      */
@@ -171,8 +179,13 @@ public class UserService {
                 || stored.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌无效或已过期。");
         }
-        // refresh token rotation：当前 refresh 记录一次性使用，避免被盗用复用
-        refreshTokenMapper.deleteById(stored.getId());
+
+        // refresh token rotation：先删后验。并发复用同一令牌时只有第一个请求能删除成功，
+        // 后续请求影响 0 行即判定为复用攻击直接拒绝。
+        int removed = refreshTokenMapper.delete(wrapper);
+        if (removed == 0) {
+            throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌已失效，请重新登录。");
+        }
 
         User user = userMapper.selectById(userId);
         if (user == null || BizConstant.DELETED.equals(user.getDeleted())) {
@@ -182,6 +195,64 @@ public class UserService {
             throw new BusinessException(ResultCode.AUTH_ACCOUNT_LOCKED, "账号已被锁定，无法刷新令牌。");
         }
         return buildAuthResponse(user);
+    }
+
+    /**
+     * 登出：吊销指定刷新令牌（按哈希删除），使该会话立即失效。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void logout(LogoutRequest request) {
+        if (request == null || StringUtils.isBlank(request.getRefreshToken())) {
+            return;
+        }
+        String tokenHash = TokenHashUtil.hash(request.getRefreshToken());
+        LambdaUpdateWrapper<RefreshToken> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(RefreshToken::getTokenHash, tokenHash);
+        refreshTokenMapper.delete(wrapper);
+        log.info("logout: refresh token revoked");
+    }
+
+    /**
+     * 吊销指定用户全部有效刷新令牌（禁用/删除/重置密码时调用）。
+     */
+    public void revokeUserRefreshTokens(String userId) {
+        if (StringUtils.isBlank(userId)) {
+            return;
+        }
+        LambdaUpdateWrapper<RefreshToken> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(RefreshToken::getUserId, userId);
+        refreshTokenMapper.delete(wrapper);
+    }
+
+    /**
+     * 修改当前用户密码：校验旧密码后更新哈希，并吊销全部刷新令牌使旧会话失效。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void changePassword(String userId, ChangePasswordRequest request) {
+        User user = userMapper.selectById(userId);
+        if (user == null || BizConstant.DELETED.equals(user.getDeleted())) {
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "用户不存在。");
+        }
+        if (BizConstant.IS_GUEST.equals(user.getIsGuest())) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "游客账号无需修改密码。");
+        }
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
+            throw new BusinessException(ResultCode.AUTH_PASSWORD_INCORRECT, "当前密码不正确。");
+        }
+        if (StringUtils.isBlank(request.getNewPassword())
+                || request.getNewPassword().length() < MIN_PASSWORD_LENGTH
+                || request.getNewPassword().length() > MAX_PASSWORD_LENGTH
+                || !PASSWORD_COMPLEXITY.matcher(request.getNewPassword()).matches()) {
+            throw new BusinessException(ResultCode.AUTH_PASSWORD_TOO_WEAK,
+                    "密码长度应为 " + MIN_PASSWORD_LENGTH + "–" + MAX_PASSWORD_LENGTH + " 位，且需同时包含字母和数字。");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.updateById(user);
+        // 旧会话全部失效：吊销该用户所有刷新令牌
+        revokeUserRefreshTokens(userId);
+        log.info("changePassword success: userId={}", userId);
     }
 
     /**
@@ -258,6 +329,37 @@ public class UserService {
         wrapper.eq(User::getEmail, email)
                 .eq(User::getDeleted, BizConstant.NOT_DELETED);
         return userMapper.selectOne(wrapper);
+    }
+
+    /**
+     * 查询含逻辑删除记录（唯一索引不区分 deleted，注册查重需包含已删记录）。
+     */
+    private User findByPhoneIncludingDeleted(String phone) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getPhone, phone);
+        return userMapper.selectOne(wrapper);
+    }
+
+    private User findByEmailIncludingDeleted(String email) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getEmail, email);
+        return userMapper.selectOne(wrapper);
+    }
+
+    /**
+     * 释放逻辑删除账号占用的唯一键（phone/email 置 NULL，MySQL 唯一索引允许多个 NULL）。
+     */
+    private void releaseUserIdentity(String userId, String phone, String email) {
+        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(User::getId, userId);
+        if (phone != null) {
+            wrapper.set(User::getPhone, null);
+        }
+        if (email != null) {
+            wrapper.set(User::getEmail, null);
+        }
+        wrapper.set(User::getUpdatedAt, LocalDateTime.now());
+        userMapper.update(null, wrapper);
     }
 
     private String maskPhone(String phone) {

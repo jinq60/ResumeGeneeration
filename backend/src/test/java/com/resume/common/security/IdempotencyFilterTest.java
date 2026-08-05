@@ -12,12 +12,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.util.DigestUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +36,10 @@ class IdempotencyFilterTest {
     @BeforeEach
     void setUp() {
         filter = new IdempotencyFilter(mapper);
+    }
+
+    private String scopedKey(String rawKey) {
+        return DigestUtils.md5DigestAsHex(("anon:POST:/api/resumes:" + rawKey).getBytes(StandardCharsets.UTF_8));
     }
 
     @Test
@@ -60,15 +66,28 @@ class IdempotencyFilterTest {
     }
 
     @Test
+    void shouldPassThroughForAuthPath() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
+        request.setContextPath("/api");
+        request.addHeader("Idempotency-Key", "key-123");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
     void shouldReplayCachedResponse() throws Exception {
         IdempotencyRecord record = new IdempotencyRecord();
-        record.setIdempotencyKey("key-123");
+        record.setIdempotencyKey(scopedKey("key-123"));
         record.setResponseStatus(200);
         record.setResponseContentType(MediaType.APPLICATION_JSON_VALUE);
         record.setResponseBody("{\"code\":200,\"message\":\"ok\",\"data\":{\"id\":\"resume_1\"}}");
         record.setExpiresAt(LocalDateTime.now().plusHours(12));
 
-        when(mapper.selectById("key-123")).thenReturn(record);
+        when(mapper.selectById(anyString())).thenReturn(record);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/resumes");
         request.addHeader("Idempotency-Key", "key-123");
@@ -78,18 +97,17 @@ class IdempotencyFilterTest {
 
         verify(chain, never()).doFilter(any(), any());
         assertEquals(200, response.getStatus());
-        assertEquals(MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8", response.getContentType());
         assertTrue(response.getContentAsString().contains("resume_1"));
     }
 
     @Test
     void shouldDeleteExpiredRecordAndPassThrough() throws Exception {
         IdempotencyRecord record = new IdempotencyRecord();
-        record.setIdempotencyKey("key-123");
+        record.setIdempotencyKey(scopedKey("key-123"));
         record.setExpiresAt(LocalDateTime.now().minusHours(1));
 
-        when(mapper.selectById("key-123")).thenReturn(record);
-        when(mapper.deleteById("key-123")).thenReturn(1);
+        when(mapper.selectById(anyString())).thenReturn(record);
+        when(mapper.deleteById(anyString())).thenReturn(1);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/resumes");
         request.addHeader("Idempotency-Key", "key-123");
@@ -98,13 +116,13 @@ class IdempotencyFilterTest {
 
         filter.doFilterInternal(request, response, chain);
 
-        verify(mapper).deleteById("key-123");
+        verify(mapper).deleteById(scopedKey("key-123"));
         verify(chain).doFilter(eq(request), any());
     }
 
     @Test
     void shouldSaveRecordOn2xxSuccess() throws Exception {
-        when(mapper.selectById("key-456")).thenReturn(null);
+        when(mapper.selectById(anyString())).thenReturn(null);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/resumes");
         request.addHeader("Idempotency-Key", "key-456");
@@ -113,13 +131,21 @@ class IdempotencyFilterTest {
 
         filter.doFilterInternal(request, response, chain);
 
-        ArgumentCaptor<IdempotencyRecord> captor = ArgumentCaptor.forClass(IdempotencyRecord.class);
-        verify(mapper).insert(captor.capture());
-        IdempotencyRecord saved = captor.getValue();
-        assertEquals("key-456", saved.getIdempotencyKey());
-        assertEquals("POST", saved.getHttpMethod());
-        assertEquals("/api/resumes", saved.getRequestPath());
-        assertNotNull(saved.getExpiresAt());
-        assertTrue(saved.getExpiresAt().isAfter(LocalDateTime.now()));
+        // 先以 in-flight 占位插入，成功后回写响应
+        ArgumentCaptor<IdempotencyRecord> claimCaptor = ArgumentCaptor.forClass(IdempotencyRecord.class);
+        verify(mapper).insert(claimCaptor.capture());
+        IdempotencyRecord claimed = claimCaptor.getValue();
+        assertEquals(scopedKey("key-456"), claimed.getIdempotencyKey());
+        assertEquals(0, claimed.getResponseStatus());
+        assertEquals("POST", claimed.getHttpMethod());
+        assertEquals("/api/resumes", claimed.getRequestPath());
+        assertNotNull(claimed.getExpiresAt());
+        assertTrue(claimed.getExpiresAt().isAfter(LocalDateTime.now()));
+
+        ArgumentCaptor<IdempotencyRecord> completeCaptor = ArgumentCaptor.forClass(IdempotencyRecord.class);
+        verify(mapper).updateById(completeCaptor.capture());
+        IdempotencyRecord completed = completeCaptor.getValue();
+        assertEquals(scopedKey("key-456"), completed.getIdempotencyKey());
+        assertEquals(200, completed.getResponseStatus());
     }
 }

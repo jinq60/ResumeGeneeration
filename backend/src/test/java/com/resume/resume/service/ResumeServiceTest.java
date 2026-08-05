@@ -51,6 +51,47 @@ class ResumeServiceTest {
     }
 
     @Test
+    void updateResume_shouldAllowDefaultSectionsDraft() {
+        String resumeId = "resume_1";
+        String userId = "user_1";
+
+        Resume existing = new Resume();
+        existing.setId(resumeId);
+        existing.setUserId(userId);
+        existing.setTitle("我的简历");
+        existing.setTemplateId("template_classic_single");
+        existing.setSections(List.of(
+                createSection("profile", "个人信息", 0, new HashMap<String, Object>()),
+                createSection("education", "教育经历", 1, new java.util.ArrayList<>()),
+                createSection("project", "项目经历", 2, new java.util.ArrayList<>()),
+                createSection("work", "工作经历", 3, new java.util.ArrayList<>()),
+                createSection("skill", "技能 & 技术栈", 4, new java.util.ArrayList<>()),
+                createSection("introduction", "自我介绍", 5, new HashMap<String, Object>())
+        ));
+
+        when(resumeMapper.selectById(resumeId)).thenReturn(existing);
+
+        UpdateResumeRequest request = new UpdateResumeRequest();
+        request.setTitle(existing.getTitle());
+        request.setTargetPosition("");
+        request.setSections(existing.getSections());
+
+        assertDoesNotThrow(() -> resumeService.updateResume(userId, resumeId, request));
+        verify(resumeMapper).updateById(any(Resume.class));
+    }
+
+    private SectionDTO createSection(String type, String title, int order, Object data) {
+        SectionDTO section = new SectionDTO();
+        section.setId("sec_" + order);
+        section.setType(type);
+        section.setTitle(title);
+        section.setOrder(order);
+        section.setVisible(true);
+        section.setData(data);
+        return section;
+    }
+
+    @Test
     void updateResume_shouldAllowEmptyProfileDraft() {
         String resumeId = "resume_1";
         String userId = "user_1";

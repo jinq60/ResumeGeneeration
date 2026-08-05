@@ -48,6 +48,27 @@ public class ResumeRenderService {
     private final ObjectMapper objectMapper;
 
     /**
+     * 站内资源（/uploads/**）在 PDF/独立页面渲染时的外部可访问前缀。
+     * 配置后（如 http://localhost），相对路径会被拼成绝对 URL，否则保持原样。
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.render.public-base-url:}")
+    private String publicBaseUrl;
+
+    /**
+     * 将站内相对路径拼上外部前缀，供 Playwright 以 file:// 打开 HTML 时仍能加载图片。
+     */
+    private String absolutizeUrl(String url) {
+        if (StringUtils.isBlank(url) || StringUtils.isBlank(publicBaseUrl)) {
+            return url;
+        }
+        String trimmed = url.trim();
+        if (trimmed.startsWith("/uploads/")) {
+            return publicBaseUrl + trimmed;
+        }
+        return url;
+    }
+
+    /**
      * 将简历与模板渲染为完整 HTML 页面。
      *
      * @param resume   简历实体
@@ -209,7 +230,10 @@ public class ResumeRenderService {
         StringBuilder sb = new StringBuilder();
         sb.append("      <div class=\"profile-header\">\n");
         if (showAvatar && StringUtils.isNotBlank(avatarUrl)) {
-            sb.append("        <img class=\"profile-avatar\" src=\"").append(escapeHtml(avatarUrl)).append("\" alt=\"头像\">\n");
+            String safeAvatar = safeUrl(avatarUrl);
+            if (StringUtils.isNotBlank(safeAvatar)) {
+                sb.append("        <img class=\"profile-avatar\" src=\"").append(escapeHtml(absolutizeUrl(safeAvatar))).append("\" alt=\"头像\">\n");
+            }
         }
         sb.append("        <div class=\"profile-info\">\n")
           .append("          <div class=\"profile-name\">").append(escapeHtml(name)).append("</div>\n");
@@ -246,16 +270,19 @@ public class ResumeRenderService {
             sb.append("          <div class=\"profile-meta\">").append(escapeHtml(meta.toString())).append("</div>\n");
         }
         StringBuilder links = new StringBuilder();
-        if (StringUtils.isNotBlank(personalWebsite)) {
-            links.append("<a href=\"").append(escapeHtml(personalWebsite)).append("\">个人网站</a>");
+        String safeWebsite = safeUrl(personalWebsite);
+        if (StringUtils.isNotBlank(safeWebsite)) {
+            links.append("<a href=\"").append(escapeHtml(safeWebsite)).append("\">个人网站</a>");
         }
-        if (StringUtils.isNotBlank(github)) {
+        String safeGithub = safeUrl(github);
+        if (StringUtils.isNotBlank(safeGithub)) {
             if (links.length() > 0) links.append(" | ");
-            links.append("<a href=\"").append(escapeHtml(github)).append("\">GitHub</a>");
+            links.append("<a href=\"").append(escapeHtml(safeGithub)).append("\">GitHub</a>");
         }
-        if (StringUtils.isNotBlank(portfolio)) {
+        String safePortfolio = safeUrl(portfolio);
+        if (StringUtils.isNotBlank(safePortfolio)) {
             if (links.length() > 0) links.append(" | ");
-            links.append("<a href=\"").append(escapeHtml(portfolio)).append("\">作品集</a>");
+            links.append("<a href=\"").append(escapeHtml(safePortfolio)).append("\">作品集</a>");
         }
         if (links.length() > 0) {
             sb.append("          <div class=\"profile-meta\">").append(links).append("</div>\n");
@@ -375,6 +402,22 @@ public class ResumeRenderService {
                    .replace(">", "&gt;")
                    .replace("\"", "&quot;")
                    .replace("'", "&#39;");
+    }
+
+    /**
+     * URL scheme 白名单：仅允许 http/https 与站内 /uploads 相对路径，防止 javascript:/data: 注入。
+     */
+    private String safeUrl(String url) {
+        if (StringUtils.isBlank(url)) {
+            return "";
+        }
+        String trimmed = url.trim();
+        String lower = trimmed.toLowerCase();
+        if (lower.startsWith("http://") || lower.startsWith("https://")
+                || lower.startsWith("/uploads/")) {
+            return trimmed;
+        }
+        return "";
     }
 
     @SuppressWarnings("unchecked")

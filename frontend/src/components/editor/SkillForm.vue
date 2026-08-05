@@ -84,9 +84,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import type { SkillItem } from '@/types/resume'
+import { useSectionSync } from '@/composables/useSectionSync'
 
 interface Props {
   sections: any[]
@@ -119,14 +120,14 @@ function getCategoryLabel(value: string): string {
 function extractSkills() {
   if (props.sections) {
     const skillSection = props.sections.find((s: any) => s.type === 'skill')
-    if (skillSection && skillSection.data) {
+    if (skillSection && Array.isArray(skillSection.data)) {
       skillCategories.value = skillSection.data.map((item: SkillItem) => ({
         category: item.category,
         items: item.items || []
       }))
     }
   }
-  
+
   // 如果没有技能，添加默认分类
   if (skillCategories.value.length === 0) {
     addCategory('programming_language')
@@ -153,28 +154,33 @@ function removeSkillItem(category: any, skillIndex: number) {
   category.items.splice(skillIndex, 1)
 }
 
-// 监听变化，触发更新
-watch(skillCategories, (newCategories) => {
-  const skillData = newCategories
-    .filter(cat => cat.items.length > 0)
-    .map(cat => ({
-      category: cat.category,
-      items: cat.items
-    }))
-
-  emit('update', props.sections.map((section: any) => {
-    if (section.type === 'skill') {
-      return {
-        ...section,
-        data: skillData
-      }
-    }
-    return section
-  }))
-}, { deep: true })
-
 // 初始化
 extractSkills()
+
+// 与父组件 sections 双向同步：外部变更时重新提取，自身 emit 的回传自动忽略
+useSectionSync(
+  skillCategories,
+  () => props.sections,
+  extractSkills,
+  () => {
+    const skillData = skillCategories.value
+      .filter(cat => cat.items.length > 0)
+      .map(cat => ({
+        category: cat.category,
+        items: cat.items
+      }))
+
+    emit('update', props.sections.map((section: any) => {
+      if (section.type === 'skill') {
+        return {
+          ...section,
+          data: skillData
+        }
+      }
+      return section
+    }))
+  }
+)
 </script>
 
 <style scoped lang="scss">

@@ -1,16 +1,17 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ResumePreview from '@/components/preview/ResumePreview.vue'
 
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn(() => Promise.resolve({ data: '<html>preview</html>' })),
-    post: vi.fn(() => Promise.resolve({ data: '<html>preview</html>' }))
-  },
-  __esModule: true
+vi.mock('@/api/preview', () => ({
+  fetchResumePreview: vi.fn(() => Promise.resolve('<html>preview</html>')),
+  fetchLivePreview: vi.fn(() => Promise.resolve('<html>preview</html>'))
 }))
 
 describe('ResumePreview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('renders iframe preview after loading', async () => {
     const wrapper = mount(ResumePreview, {
       props: { resumeId: 'resume_1' }

@@ -46,6 +46,9 @@ app:
     refresh-token-expiration: 604800000
   playwright:
     chromium-args: --no-sandbox,--disable-setuid-sandbox
+  render:
+    # PDF/独立页面渲染时 /uploads/** 相对路径的外部前缀（如 http://your-domain），留空则保持相对路径
+    public-base-url: ${APP_PUBLIC_BASE_URL:}
   rate-limit:
     max-requests: 60
     window-seconds: 60

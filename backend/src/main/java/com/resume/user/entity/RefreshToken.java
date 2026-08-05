@@ -2,7 +2,6 @@ package com.resume.user.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -34,8 +33,11 @@ public class RefreshToken {
 
     /**
      * 逻辑删除标记：0 未删除，1 已删除。
+     * <p>
+     * 注意：refresh_token 为一次性令牌，删除操作必须物理删除以释放唯一索引并回收空间，
+     * 因此该字段不启用 {@code @TableLogic}，{@code delete} 直接删行。
+     * </p>
      */
-    @TableLogic
     private Integer deleted;
 
     private LocalDateTime createdAt;

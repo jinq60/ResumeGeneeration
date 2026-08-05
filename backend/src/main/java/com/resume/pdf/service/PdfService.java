@@ -19,6 +19,7 @@ import com.microsoft.playwright.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 /**
  * PDF 导出任务服务。
@@ -46,15 +51,28 @@ public class PdfService {
     @Value("${app.playwright.chromium-args:--no-sandbox,--disable-setuid-sandbox}")
     private String chromiumArgsString;
 
+    /** 同时执行的 Playwright 导出上限，防止 Chromium 进程耗尽服务器内存。 */
+    private static final int MAX_CONCURRENT_EXPORTS = 4;
+    /** 排队等待导出信号量的最长时间。 */
+    private static final long SEMAPHORE_WAIT_SECONDS = 30;
+
     private final PdfTaskMapper pdfTaskMapper;
     private final ResumeService resumeService;
     private final TemplateService templateService;
     private final ResumeRenderService resumeRenderService;
     private final MinioStorageService minioStorageService;
     private final ResumeSectionValidator resumeSectionValidator;
+    @Qualifier("pdfTaskExecutor")
+    private final Executor pdfTaskExecutor;
+
+    private final Semaphore exportSemaphore = new Semaphore(MAX_CONCURRENT_EXPORTS);
 
     /**
      * 创建 PDF 导出任务。
+     * <p>
+     * 仅创建 pending 任务并提交到专用线程池，立即返回；
+     * 实际渲染在后台执行，前端通过 GET /pdf/tasks/{taskId} 轮询结果。
+     * </p>
      * templateId 为可选字段：传入则仅覆盖本次导出使用的模板，不修改 resume.template_id。
      */
     @Transactional(rollbackFor = Exception.class)
@@ -77,14 +95,64 @@ public class PdfService {
         task.setUpdatedAt(LocalDateTime.now());
         pdfTaskMapper.insert(task);
 
-        generatePdf(task, resume, template);
-
-        resumeService.incrementExportCount(resumeId);
+        try {
+            pdfTaskExecutor.execute(() -> executeExport(task.getId(), userId, resumeId, exportTemplateId));
+        } catch (RejectedExecutionException e) {
+            log.warn("PDF export queue full: taskId={}", task.getId());
+            PdfTask failed = new PdfTask();
+            failed.setId(task.getId());
+            failed.setStatus(BizConstant.TASK_STATUS_FAILED);
+            failed.setErrorMsg("导出任务过多，请稍后再试。");
+            failed.setUpdatedAt(LocalDateTime.now());
+            pdfTaskMapper.updateById(failed);
+        }
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("taskId", task.getId());
         result.put("status", task.getStatus());
         return result;
+    }
+
+    /**
+     * 后台执行 PDF 导出（专用线程池，信号量限流）。
+     */
+    public void executeExport(String taskId, String userId, String resumeId, String exportTemplateId) {
+        boolean acquired;
+        try {
+            acquired = exportSemaphore.tryAcquire(SEMAPHORE_WAIT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            markTaskFailed(taskId, "导出被中断。");
+            return;
+        }
+        if (!acquired) {
+            log.warn("PDF export concurrency limit reached, task rejected: taskId={}", taskId);
+            markTaskFailed(taskId, "导出任务繁忙，请稍后再试。");
+            return;
+        }
+        try {
+            Resume resume = resumeService.getResumeEntity(userId, resumeId);
+            Template template = templateService.getTemplateEntity(exportTemplateId);
+            generatePdf(taskId, resume, template);
+            resumeService.incrementExportCount(resumeId);
+        } catch (BusinessException e) {
+            log.warn("PDF export failed: taskId={}, cause={}", taskId, e.getMessage());
+            markTaskFailed(taskId, e.getMessage());
+        } catch (Exception e) {
+            log.error("PDF export failed: taskId={}", taskId, e);
+            markTaskFailed(taskId, "PDF 生成失败，请稍后再试。");
+        } finally {
+            exportSemaphore.release();
+        }
+    }
+
+    private void markTaskFailed(String taskId, String errorMsg) {
+        PdfTask failed = new PdfTask();
+        failed.setId(taskId);
+        failed.setStatus(BizConstant.TASK_STATUS_FAILED);
+        failed.setErrorMsg(errorMsg);
+        failed.setUpdatedAt(LocalDateTime.now());
+        pdfTaskMapper.updateById(failed);
     }
 
     /**
@@ -169,12 +237,11 @@ public class PdfService {
         }
     }
 
-    private void generatePdf(PdfTask task, Resume resume, Template template) {
+    private void generatePdf(String taskId, Resume resume, Template template) {
         Path tempDir = null;
         try {
-            task.setStatus(BizConstant.TASK_STATUS_PROCESSING);
-            pdfTaskMapper.updateById(task);
-            log.info("generatePdf -> processing: taskId={}, resumeId={}", task.getId(), resume.getId());
+            updateTaskStatus(taskId, BizConstant.TASK_STATUS_PROCESSING, null);
+            log.info("generatePdf -> processing: taskId={}, resumeId={}", taskId, resume.getId());
 
             String html = resumeRenderService.render(resume, template);
             String fileName = buildFileName(resume);
@@ -187,28 +254,35 @@ public class PdfService {
                  Browser browser = playwright.chromium().launch(buildLaunchOptions());
                  BrowserContext context = browser.newContext();
                  Page page = context.newPage()) {
-                page.navigate(htmlPath.toUri().toString());
+                page.navigate(htmlPath.toUri().toString(),
+                        new Page.NavigateOptions().setTimeout(60_000));
                 page.pdf(new Page.PdfOptions().setPath(pdfPath)
                         .setFormat("A4")
                         .setPrintBackground(true));
             }
 
-            String objectName = task.getUserId() + "/pdfs/" + task.getId() + "/" + fileName;
-            minioStorageService.upload(minioStorageService.getBucketPdfs(), objectName,
-                    new FileInputStream(pdfPath.toFile()), pdfPath.toFile().length(), "application/pdf");
+            String objectName = resume.getUserId() + "/pdfs/" + taskId + "/" + fileName;
+            try (InputStream in = new FileInputStream(pdfPath.toFile())) {
+                minioStorageService.upload(minioStorageService.getBucketPdfs(), objectName,
+                        in, pdfPath.toFile().length(), "application/pdf");
+            }
 
-            task.setFilePath(objectName);
-            task.setFileName(fileName);
-            task.setFileSize(pdfPath.toFile().length());
-            task.setStatus(BizConstant.TASK_STATUS_SUCCESS);
-            task.setCompletedAt(LocalDateTime.now());
+            PdfTask update = new PdfTask();
+            update.setId(taskId);
+            update.setFilePath(objectName);
+            update.setFileName(fileName);
+            update.setFileSize(pdfPath.toFile().length());
+            update.setStatus(BizConstant.TASK_STATUS_SUCCESS);
+            update.setCompletedAt(LocalDateTime.now());
+            update.setUpdatedAt(LocalDateTime.now());
+            pdfTaskMapper.updateById(update);
             log.info("generatePdf success: taskId={}, fileSize={}, fileName={}",
-                    task.getId(), task.getFileSize(), task.getFileName());
+                    taskId, update.getFileSize(), update.getFileName());
         } catch (Exception e) {
-            log.error("Generate PDF failed: taskId={}", task.getId(), e);
-            task.setStatus(BizConstant.TASK_STATUS_FAILED);
+            log.error("Generate PDF failed: taskId={}", taskId, e);
             String msg = e.getMessage() == null ? "" : e.getMessage();
-            task.setErrorMsg(StringUtils.abbreviate("PDF 生成失败：" + msg, 500));
+            updateTaskStatus(taskId, BizConstant.TASK_STATUS_FAILED,
+                    StringUtils.abbreviate("PDF 生成失败：" + msg, 500));
         } finally {
             if (tempDir != null) {
                 try {
@@ -221,9 +295,16 @@ public class PdfService {
                     log.warn("Failed to clean temp dir: {}", tempDir, e);
                 }
             }
-            task.setUpdatedAt(LocalDateTime.now());
-            pdfTaskMapper.updateById(task);
         }
+    }
+
+    private void updateTaskStatus(String taskId, String status, String errorMsg) {
+        PdfTask update = new PdfTask();
+        update.setId(taskId);
+        update.setStatus(status);
+        update.setErrorMsg(errorMsg);
+        update.setUpdatedAt(LocalDateTime.now());
+        pdfTaskMapper.updateById(update);
     }
 
     private void validateResumeForExport(Resume resume) {
@@ -246,12 +327,22 @@ public class PdfService {
         }
 
         if (StringUtils.isNotBlank(name) && StringUtils.isNotBlank(targetPosition)) {
-            return name + "_" + targetPosition + "_简历.pdf";
+            return truncateFileName(name + "_" + targetPosition + "_简历.pdf");
         }
         if (StringUtils.isNotBlank(name)) {
-            return name + "_简历.pdf";
+            return truncateFileName(name + "_简历.pdf");
         }
         return "我的简历_" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
+    }
+
+    /**
+     * 截断文件名，避免超出数据库 file_name VARCHAR(128) 列宽。
+     */
+    private String truncateFileName(String fileName) {
+        if (fileName == null || fileName.length() <= 100) {
+            return fileName;
+        }
+        return fileName.substring(0, 97) + ".pdf";
     }
 
     private BrowserType.LaunchOptions buildLaunchOptions() {

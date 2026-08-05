@@ -10,7 +10,9 @@ import com.resume.user.dto.AdminUserDetailResponse;
 import com.resume.user.dto.AdminUserListItemResponse;
 import com.resume.user.dto.ResetPasswordResponse;
 import com.resume.user.dto.UserStatsResponse;
+import com.resume.user.entity.RefreshToken;
 import com.resume.user.entity.User;
+import com.resume.user.mapper.RefreshTokenMapper;
 import com.resume.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,7 @@ public class AdminUserService {
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenMapper refreshTokenMapper;
 
     /**
      * 默认临时密码长度，可在配置中覆盖。
@@ -135,33 +138,49 @@ public class AdminUserService {
      * 更新用户状态（启用/禁用）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateStatus(String userId, String status) {
+    public void updateStatus(String userId, String status, String operatorId) {
         User user = findUserById(userId);
         if (!BizConstant.USER_STATUS_ACTIVE.equals(status)
                 && !BizConstant.USER_STATUS_DISABLED.equals(status)) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "用户状态仅支持 active 或 disabled。");
         }
+        if (operatorId != null && operatorId.equals(userId)) {
+            throw new BusinessException(ResultCode.ACCESS_DENIED, "不能对自己的账号执行此操作。");
+        }
+        assertNotLastAdmin(user);
         user.setStatus(status);
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.updateById(user);
+        if (BizConstant.USER_STATUS_DISABLED.equals(status)) {
+            revokeUserRefreshTokens(userId);
+        }
     }
 
     /**
      * 设置/取消管理员角色。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateRole(String userId, String role) {
+    public void updateRole(String userId, String role, String operatorId) {
         User user = findUserById(userId);
         if (!BizConstant.USER_ROLE_USER.equals(role) && !BizConstant.USER_ROLE_ADMIN.equals(role)) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "角色仅支持 USER 或 ADMIN。");
         }
+        if (operatorId != null && operatorId.equals(userId)) {
+            throw new BusinessException(ResultCode.ACCESS_DENIED, "不能修改自己的角色。");
+        }
+        if (BizConstant.USER_ROLE_ADMIN.equals(user.getRole()) && BizConstant.USER_ROLE_USER.equals(role)) {
+            assertNotLastAdmin(user);
+        }
         user.setRole(role);
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.updateById(user);
+        if (BizConstant.USER_ROLE_USER.equals(role)) {
+            revokeUserRefreshTokens(userId);
+        }
     }
 
     /**
-     * 管理员重置用户密码：生成一次性临时密码，BCrypt 哈希入库。
+     * 管理员重置用户密码：生成一次性临时密码，BCrypt 哈希入库，并吊销该用户全部刷新令牌。
      */
     @Transactional(rollbackFor = Exception.class)
     public ResetPasswordResponse resetPassword(String userId) {
@@ -174,6 +193,8 @@ public class AdminUserService {
         user.setPasswordHash(passwordEncoder.encode(tempPassword));
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.updateById(user);
+        // 旧会话全部失效：吊销该用户所有刷新令牌
+        revokeUserRefreshTokens(userId);
 
         log.info("Admin reset password for userId={}", userId);
 
@@ -184,11 +205,15 @@ public class AdminUserService {
     }
 
     /**
-     * 后台逻辑删除用户（同步禁用账号，防止再登录）。
+     * 后台逻辑删除用户（同步禁用账号、吊销令牌，防止再登录）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void deleteUser(String userId) {
+    public void deleteUser(String userId, String operatorId) {
         User user = findUserById(userId);
+        if (operatorId != null && operatorId.equals(userId)) {
+            throw new BusinessException(ResultCode.ACCESS_DENIED, "不能删除自己的账号。");
+        }
+        assertNotLastAdmin(user);
         User update = new User();
         update.setId(user.getId());
         update.setStatus(BizConstant.USER_STATUS_DISABLED);
@@ -197,6 +222,31 @@ public class AdminUserService {
         LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(User::getId, userId);
         userMapper.update(update, wrapper);
+        revokeUserRefreshTokens(userId);
+    }
+
+    /**
+     * 防止移除最后一个 ADMIN，导致系统失去管理员。
+     */
+    private void assertNotLastAdmin(User user) {
+        if (!BizConstant.USER_ROLE_ADMIN.equals(user.getRole())) {
+            return;
+        }
+        LambdaQueryWrapper<User> adminCount = new LambdaQueryWrapper<>();
+        adminCount.eq(User::getDeleted, BizConstant.NOT_DELETED)
+                .eq(User::getRole, BizConstant.USER_ROLE_ADMIN);
+        if (userMapper.selectCount(adminCount) <= 1) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "系统至少需要保留一名管理员。");
+        }
+    }
+
+    /**
+     * 吊销指定用户的全部刷新令牌。
+     */
+    private void revokeUserRefreshTokens(String userId) {
+        LambdaUpdateWrapper<com.resume.user.entity.RefreshToken> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(com.resume.user.entity.RefreshToken::getUserId, userId);
+        refreshTokenMapper.delete(wrapper);
     }
 
     private User findUserById(String userId) {

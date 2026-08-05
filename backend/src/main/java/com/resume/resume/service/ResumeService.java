@@ -151,9 +151,8 @@ private final ResumeMapper resumeMapper;
                 .eq(Resume::getStatus, BizConstant.RESUME_STATUS_ACTIVE);
         response.setActiveResumes(resumeMapper.selectCount(active));
 
-        LambdaQueryWrapper<Resume> deleted = new LambdaQueryWrapper<>();
-        deleted.eq(Resume::getDeleted, BizConstant.DELETED);
-        response.setDeletedResumes(resumeMapper.selectCount(deleted));
+        // 已删除简历：@TableLogic 会拦截显式 deleted 条件，需用自定义 SQL 统计真实逻辑删除行
+        response.setDeletedResumes(resumeMapper.countDeletedResumes());
 
         LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
         LambdaQueryWrapper<Resume> todayNew = new LambdaQueryWrapper<>();

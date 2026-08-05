@@ -1,6 +1,7 @@
 package com.resume.template.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -139,9 +140,18 @@ public class TemplateService {
      */
     @Transactional(rollbackFor = Exception.class)
     public TemplateDTO createTemplate(AdminTemplateRequest request, String operatorId) {
-        Template exist = findByCode(request.getCode());
+        // 唯一索引不区分 deleted，查重需包含已删记录
+        Template exist = findByCodeIncludingDeleted(request.getCode());
         if (exist != null) {
-            throw new BusinessException(ResultCode.TEMPLATE_CODE_EXISTS, "模板编码已存在。");
+            if (BizConstant.NOT_DELETED.equals(exist.getDeleted())) {
+                throw new BusinessException(ResultCode.TEMPLATE_CODE_EXISTS, "模板编码已存在。");
+            }
+            // 回收被逻辑删除模板占用的唯一索引
+            LambdaUpdateWrapper<Template> release = new LambdaUpdateWrapper<>();
+            release.eq(Template::getId, exist.getId())
+                    .set(Template::getCode, null)
+                    .set(Template::getUpdatedAt, LocalDateTime.now());
+            templateMapper.update(null, release);
         }
         validateConfig(request.getConfig());
 
@@ -248,6 +258,12 @@ public class TemplateService {
         LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Template::getCode, code)
                 .eq(Template::getDeleted, BizConstant.NOT_DELETED);
+        return templateMapper.selectOne(wrapper);
+    }
+
+    private Template findByCodeIncludingDeleted(String code) {
+        LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Template::getCode, code);
         return templateMapper.selectOne(wrapper);
     }
 

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -55,8 +56,9 @@ class PdfServiceTest {
     @BeforeEach
     void setUp() {
         resumeSectionValidator = new ResumeSectionValidator();
+        Executor executor = (command) -> command.run();
         pdfService = new PdfService(pdfTaskMapper, resumeService, templateService,
-                resumeRenderService, minioStorageService, resumeSectionValidator);
+                resumeRenderService, minioStorageService, resumeSectionValidator, executor);
         when(minioStorageService.getBucketPdfs()).thenReturn("pdfs");
     }
 

@@ -19,7 +19,9 @@ export default defineConfig({
       },
       '/uploads': {
         target: 'http://localhost:8080',
-        changeOrigin: true
+        changeOrigin: true,
+        // 后端 context-path 为 /api，/uploads/** 实际由 /api/uploads/** 提供服务
+        rewrite: (path) => path.replace(/^\/uploads/, '/api/uploads')
       }
     }
   },

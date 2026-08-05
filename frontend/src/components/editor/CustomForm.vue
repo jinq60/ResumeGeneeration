@@ -74,8 +74,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
+import { useSectionSync } from '@/composables/useSectionSync'
 
 interface Props {
   sections: any[]
@@ -125,30 +126,35 @@ function removeCustomSection(index: number) {
   customSections.value.splice(index, 1)
 }
 
-// 监听变化，触发更新
-watch(customSections, (newSections) => {
-  // 先移除所有自定义section
-  let updatedSections = props.sections.filter((s: any) => s.type !== 'custom')
-  
-  // 添加新的自定义sections
-  const customSectionData = newSections.map(item => ({
-    id: item.id,
-    type: 'custom',
-    title: item.title,
-    order: item.order,
-    visible: item.visible,
-    data: {
-      content: item.content
-    }
-  }))
-  
-  updatedSections = [...updatedSections, ...customSectionData]
-  
-  emit('update', updatedSections)
-}, { deep: true })
-
 // 初始化
 extractCustomSections()
+
+// 与父组件 sections 双向同步：外部变更时重新提取，自身 emit 的回传自动忽略
+useSectionSync(
+  customSections,
+  () => props.sections,
+  extractCustomSections,
+  () => {
+    // 先移除所有自定义section
+    let updatedSections = props.sections.filter((s: any) => s.type !== 'custom')
+
+    // 添加新的自定义sections
+    const customSectionData = customSections.value.map(item => ({
+      id: item.id,
+      type: 'custom',
+      title: item.title,
+      order: item.order,
+      visible: item.visible,
+      data: {
+        content: item.content
+      }
+    }))
+
+    updatedSections = [...updatedSections, ...customSectionData]
+
+    emit('update', updatedSections)
+  }
+)
 </script>
 
 <style scoped lang="scss">

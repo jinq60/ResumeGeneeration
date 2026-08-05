@@ -4,6 +4,19 @@
 
 ---
 
+## v1.2（2026-08-05）
+
+### 新增
+
+- `PUT /users/me/password`：修改当前用户密码（校验旧密码，成功后吊销全部刷新令牌，需重新登录）。
+- `app.render.public-base-url` 配置：PDF 渲染时把 `/uploads/**` 相对路径拼为绝对地址，保证导出的 PDF 中头像可加载。
+
+### 调整
+
+- `/uploads/**` 静态资源实际访问路径为 `/api/uploads/**`（后端 context-path 为 `/api`），由网关（Vite 代理 / nginx）将 `/uploads/*` 改写为 `/api/uploads/*`。
+
+---
+
 ## v1.1（2026-07-07）
 
 ### 新增

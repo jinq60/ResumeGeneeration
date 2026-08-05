@@ -15,18 +15,31 @@ export interface UpdateResumeRequest {
   sections?: Section[]
 }
 
+export interface Page<T> {
+  records: T[]
+  total: number
+  size: number
+  current: number
+  pages: number
+}
+
+export interface UpdateResumeResponse {
+  id: string
+  updatedAt: string
+}
+
 export const resumeApi = {
   create(data: CreateResumeRequest): Promise<Resume> {
     return request.post('/resumes', data) as Promise<Resume>
   },
-  list(page = 1, size = 20): Promise<{ list: Resume[]; total: number; page: number; size: number }> {
-    return request.get('/resumes', { params: { page, size } }) as Promise<{ list: Resume[]; total: number; page: number; size: number }>
+  list(page = 1, size = 20): Promise<Page<Resume>> {
+    return request.get('/resumes', { params: { page, size } }) as Promise<Page<Resume>>
   },
   get(id: string): Promise<Resume> {
     return request.get(`/resumes/${id}`) as Promise<Resume>
   },
-  update(id: string, data: UpdateResumeRequest): Promise<Resume> {
-    return request.put(`/resumes/${id}`, data) as Promise<Resume>
+  update(id: string, data: UpdateResumeRequest): Promise<UpdateResumeResponse> {
+    return request.put(`/resumes/${id}`, data) as Promise<UpdateResumeResponse>
   },
   remove(id: string): Promise<void> {
     return request.delete(`/resumes/${id}`) as Promise<void>
@@ -38,6 +51,9 @@ export const resumeApi = {
     return request.put(`/resumes/${id}/title`, { title }) as Promise<Resume>
   },
   review(id: string, data: { jobDescription: string }): Promise<any> {
-    return request.post(`/resumes/${id}/review`, data) as Promise<any>
+    return request.post(`/resumes/${id}/reviews`, data) as Promise<any>
+  },
+  getLatestReview(id: string): Promise<any> {
+    return request.get(`/resumes/${id}/reviews/latest`) as Promise<any>
   }
 }

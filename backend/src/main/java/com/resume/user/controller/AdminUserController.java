@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -60,9 +61,10 @@ public class AdminUserController {
      * 更新用户状态（启用 / 禁用）。
      */
     @PatchMapping("/{id}/status")
-    public R<Void> updateStatus(@PathVariable String id,
+    public R<Void> updateStatus(@AuthenticationPrincipal String operatorId,
+                                @PathVariable String id,
                                 @Valid @RequestBody UpdateUserStatusRequest request) {
-        adminUserService.updateStatus(id, request.getStatus());
+        adminUserService.updateStatus(id, request.getStatus(), operatorId);
         return R.success();
     }
 
@@ -70,9 +72,10 @@ public class AdminUserController {
      * 设置用户角色（USER / ADMIN）。
      */
     @PatchMapping("/{id}/role")
-    public R<Void> updateRole(@PathVariable String id,
+    public R<Void> updateRole(@AuthenticationPrincipal String operatorId,
+                              @PathVariable String id,
                               @RequestBody Map<String, String> body) {
-        adminUserService.updateRole(id, body.get("role"));
+        adminUserService.updateRole(id, body.get("role"), operatorId);
         return R.success();
     }
 
@@ -88,8 +91,8 @@ public class AdminUserController {
      * 逻辑删除用户。
      */
     @DeleteMapping("/{id}")
-    public R<Void> delete(@PathVariable String id) {
-        adminUserService.deleteUser(id);
+    public R<Void> delete(@AuthenticationPrincipal String operatorId, @PathVariable String id) {
+        adminUserService.deleteUser(id, operatorId);
         return R.success();
     }
 }

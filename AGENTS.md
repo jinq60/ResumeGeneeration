@@ -83,7 +83,7 @@ ResumeGeneeration/
 ```
 
 - `code = 200` 表示成功；非 200 表示业务错误，详见 `docs/superpowers/specs/2026-07-03-validation-rules.md` §13。
-- HTTP 状态码：200 表示请求到达；业务错误仍返回 200 + 非 200 code；参数校验失败返回 400；未认证返回 401；未授权返回 403；未找到返回 404。
+- HTTP 状态码与业务错误码（`R.code`）均返回：200 表示成功；参数校验失败 400；未认证 401；无权限 403；未找到 404；资源冲突 409；限流 429；服务器内部错误 500。具体映射见 `GlobalExceptionHandler.resolveHttpStatus`。
 
 ### 4.2 认证
 

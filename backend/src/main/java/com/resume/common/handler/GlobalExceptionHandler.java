@@ -68,7 +68,11 @@ public class GlobalExceptionHandler {
     private int resolveHttpStatus(int errorCode) {
         return switch (errorCode) {
             case ResultCode.PARAM_INVALID -> 400;
-            case ResultCode.UNAUTHORIZED -> 401;
+            case ResultCode.UNAUTHORIZED,
+                 ResultCode.AUTH_ACCOUNT_NOT_FOUND,
+                 ResultCode.AUTH_PASSWORD_INCORRECT,
+                 ResultCode.AUTH_ACCOUNT_LOCKED,
+                 ResultCode.AUTH_REFRESH_TOKEN_INVALID -> 401;
             case ResultCode.ACCESS_DENIED -> 403;
             case ResultCode.RESOURCE_NOT_FOUND,
                  ResultCode.RESUME_NOT_FOUND,
@@ -83,15 +87,8 @@ public class GlobalExceptionHandler {
             case ResultCode.RATE_LIMITED -> 429;
             case ResultCode.PDF_EXPORT_FAILED -> 500;
             case ResultCode.INTERNAL_ERROR -> 500;
-            default -> {
-                if (errorCode >= 1000 && errorCode < 2000) {
-                    yield 401;
-                }
-                if (errorCode >= 2000 && errorCode < 6000) {
-                    yield 400;
-                }
-                yield 400;
-            }
+            // 参数/业务类错误（含验证码错误、密码强度不足等）统一按 400 返回
+            default -> 400;
         };
     }
 }

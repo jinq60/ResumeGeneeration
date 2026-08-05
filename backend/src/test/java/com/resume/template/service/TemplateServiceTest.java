@@ -61,6 +61,7 @@ class TemplateServiceTest {
         AdminTemplateRequest request = buildRequest("classic-existing");
         Template existing = new Template();
         existing.setCode("classic-existing");
+        existing.setDeleted(BizConstant.NOT_DELETED);
         when(templateMapper.selectOne(any())).thenReturn(existing);
 
         BusinessException ex = assertThrows(BusinessException.class,

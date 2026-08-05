@@ -55,7 +55,7 @@ export type ProfileSection = BaseSection<'profile', Profile>
 export type EducationSection = BaseSection<'education', EducationItem[]>
 export type WorkSection = BaseSection<'work', WorkItem[]>
 export type ProjectSection = BaseSection<'project', ProjectItem[]>
-export type SkillSection = BaseSection<'skill', SkillItem>
+export type SkillSection = BaseSection<'skill', SkillItem[]>
 export type IntroductionSection = BaseSection<'introduction', { content: string; keywords?: string[]; style?: string; maxWords?: number }>
 export type CustomSection = BaseSection<'custom', { content: string }>
 
@@ -65,7 +65,6 @@ export interface Resume {
   id: string; userId: string; title: string; scene: string; targetPosition?: string
   templateId: string; sections: Section[]; createdAt: string; updatedAt: string
   exportCount?: number; lastEditedAt?: string
-  thumbnail?: string
 }
 
 export interface Profile {

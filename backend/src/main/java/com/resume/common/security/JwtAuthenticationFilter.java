@@ -30,6 +30,7 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final org.springframework.beans.factory.ObjectProvider<UserAccountStatusProvider> statusProvider;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -38,11 +39,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
         if (StringUtils.hasText(token) && jwtTokenProvider.validateAccessToken(token)) {
             String userId = jwtTokenProvider.getUserId(token);
-            String role = jwtTokenProvider.getRole(token);
-            List<GrantedAuthority> authorities = buildAuthorities(role);
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(userId, token, authorities);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            // 账号被禁用/删除后旧 token 尽快失效（含管理员降权场景）
+            UserAccountStatusProvider provider = statusProvider.getIfAvailable();
+            if (provider == null || provider.isEnabled(userId)) {
+                String role = jwtTokenProvider.getRole(token);
+                List<GrantedAuthority> authorities = buildAuthorities(role);
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(userId, token, authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
         }
         filterChain.doFilter(request, response);
     }

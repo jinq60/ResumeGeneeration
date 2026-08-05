@@ -158,9 +158,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import type { EducationItem } from '@/types/resume'
+import { useSectionSync } from '@/composables/useSectionSync'
 
 interface Props {
   sections: any[]
@@ -211,27 +212,32 @@ function removeEducation(index: number) {
   educationList.value.splice(index, 1)
 }
 
-// 监听变化，触发更新
-watch(educationList, (newList) => {
-  const educationData = newList.map(item => ({
-    ...item,
-    honors: item.honorsText ? item.honorsText.split(',').map(h => h.trim()).filter(h => h) : [],
-    courses: item.coursesText ? item.coursesText.split(',').map(c => c.trim()).filter(c => c) : []
-  }))
-
-  emit('update', props.sections.map((section: any) => {
-    if (section.type === 'education') {
-      return {
-        ...section,
-        data: educationData
-      }
-    }
-    return section
-  }))
-}, { deep: true })
-
 // 初始化
 extractEducation()
+
+// 与父组件 sections 双向同步：外部变更时重新提取，自身 emit 的回传自动忽略
+useSectionSync(
+  educationList,
+  () => props.sections,
+  extractEducation,
+  () => {
+    const educationData = educationList.value.map(item => ({
+      ...item,
+      honors: item.honorsText ? item.honorsText.split(',').map(h => h.trim()).filter(h => h) : [],
+      courses: item.coursesText ? item.coursesText.split(',').map(c => c.trim()).filter(c => c) : []
+    }))
+
+    emit('update', props.sections.map((section: any) => {
+      if (section.type === 'education') {
+        return {
+          ...section,
+          data: educationData
+        }
+      }
+      return section
+    }))
+  }
+)
 </script>
 
 <style scoped lang="scss">

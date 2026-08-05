@@ -30,7 +30,7 @@ public class StaticResourceController {
 
         byte[] data = minioStorageService.download(minioStorageService.getBucketAvatars(), objectName);
 
-        return buildResponse(objectName, data);
+        return buildResponse(objectName, data, false);
     }
 
     @GetMapping("/uploads/templates/**")
@@ -40,7 +40,7 @@ public class StaticResourceController {
 
         byte[] data = minioStorageService.download(minioStorageService.getBucketTemplates(), objectName);
 
-        return buildResponse(objectName, data);
+        return buildResponse(objectName, data, true);
     }
 
     private String extractObjectName(HttpServletRequest request, String prefix) {
@@ -63,12 +63,15 @@ public class StaticResourceController {
         }
     }
 
-    private ResponseEntity<byte[]> buildResponse(String objectName, byte[] data) {
+    private ResponseEntity<byte[]> buildResponse(String objectName, byte[] data, boolean cacheable) {
         String contentType = guessContentType(objectName);
-        return ResponseEntity.ok()
+        org.springframework.http.ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
-                .body(data);
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(cacheable
+                        ? CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic()
+                        : CacheControl.noStore());
+        return builder.body(data);
     }
 
     private String guessContentType(String filename) {
@@ -77,7 +80,7 @@ public class StaticResourceController {
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
         if (lower.endsWith(".webp")) return "image/webp";
         if (lower.endsWith(".gif")) return "image/gif";
-        if (lower.endsWith(".html")) return "text/html";
+        // HTML/JS/SVG 等可执行内容一律按二进制返回，防止同源存储型 XSS
         return "application/octet-stream";
     }
 }

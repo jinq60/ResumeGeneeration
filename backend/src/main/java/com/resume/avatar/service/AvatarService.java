@@ -51,6 +51,11 @@ public class AvatarService {
     public AvatarUploadResponse uploadAvatar(String userId, MultipartFile file, String resumeId) {
         validateAvatarFile(file);
 
+        // 校验简历归属：非空时必须属于当前用户，防止把他人简历与本次头像关联
+        if (StringUtils.isNotBlank(resumeId)) {
+            resumeService.getResumeEntity(userId, resumeId);
+        }
+
         String originalFilename = StringUtils.defaultString(file.getOriginalFilename(), "avatar.png");
         String ext = getExtension(originalFilename);
 
@@ -73,6 +78,8 @@ public class AvatarService {
             minioStorageService.upload(minioStorageService.getBucketAvatars(), objectName,
                     file.getInputStream(), file.getSize(), file.getContentType());
         } catch (IOException e) {
+            // 事务回滚删 DB 记录，但 MinIO 不参与事务，主动删除已上传对象避免孤儿文件
+            minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
             throw new BusinessException(ResultCode.AVATAR_OPTIMIZE_FAILED, "头像上传失败。");
         }
 
@@ -100,6 +107,14 @@ public class AvatarService {
         }
         if (!Arrays.asList(BizConstant.AVATAR_STYLES).contains(request.getStyle())) {
             throw new BusinessException(ResultCode.AVATAR_STYLE_INVALID, "照片风格不正确。");
+        }
+
+        // 校验原图归属：只允许使用当前用户自己上传的头像，防止越权引用他人对象
+        assertOwnAvatarUrl(userId, request.getSourceImageUrl());
+
+        // 校验简历归属：非空时必须属于当前用户
+        if (StringUtils.isNotBlank(request.getResumeId())) {
+            resumeService.getResumeEntity(userId, request.getResumeId());
         }
 
         // P0 占位：直接复用原图作为结果。
@@ -176,12 +191,14 @@ public class AvatarService {
 
         String sourceImageUrl = task.getSourceImageUrl();
         String sourceObjectName = extractObjectName(sourceImageUrl);
-        if (StringUtils.isNotBlank(sourceObjectName)) {
+        if (StringUtils.isNotBlank(sourceObjectName) && isOwnedObject(userId, sourceObjectName)) {
             minioStorageService.remove(minioStorageService.getBucketAvatars(), sourceObjectName);
         }
         String resultImageUrl = task.getResultImageUrl();
         String resultObjectName = extractObjectName(resultImageUrl);
-        if (StringUtils.isNotBlank(resultObjectName) && !resultObjectName.equals(sourceObjectName)) {
+        if (StringUtils.isNotBlank(resultObjectName)
+                && !resultObjectName.equals(sourceObjectName)
+                && isOwnedObject(userId, resultObjectName)) {
             minioStorageService.remove(minioStorageService.getBucketAvatars(), resultObjectName);
         }
 
@@ -204,7 +221,7 @@ public class AvatarService {
         List<AvatarTask> tasks = avatarTaskMapper.selectList(wrapper);
         for (AvatarTask task : tasks) {
             String objectName = extractObjectName(task.getSourceImageUrl());
-            if (StringUtils.isNotBlank(objectName)) {
+            if (StringUtils.isNotBlank(objectName) && isOwnedObject(userId, objectName)) {
                 minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
             }
         }
@@ -222,6 +239,23 @@ public class AvatarService {
             return sourceImageUrl.substring(prefix.length());
         }
         return null;
+    }
+
+    /**
+     * 校验头像 URL 属于当前用户（对象路径以 {userId}/ 开头）。
+     */
+    private void assertOwnAvatarUrl(String userId, String sourceImageUrl) {
+        String objectName = extractObjectName(sourceImageUrl);
+        if (StringUtils.isBlank(objectName) || !objectName.startsWith(userId + "/")) {
+            throw new BusinessException(ResultCode.ACCESS_DENIED, "无权引用该头像资源。");
+        }
+    }
+
+    /**
+     * 判断对象路径是否属于当前用户，防止跨用户删除 MinIO 对象。
+     */
+    private boolean isOwnedObject(String userId, String objectName) {
+        return objectName != null && objectName.startsWith(userId + "/");
     }
 
     private void transitionStatus(AvatarTask task, String newStatus) {
@@ -252,6 +286,37 @@ public class AvatarService {
         }
         if (file.getSize() > MAX_FILE_SIZE) {
             throw new BusinessException(ResultCode.AVATAR_FILE_TOO_LARGE, "图片大小不能超过 10MB。");
+        }
+        if (!isValidImageMagic(file)) {
+            throw new BusinessException(ResultCode.AVATAR_FORMAT_UNSUPPORTED, "图片内容校验失败，请上传 JPG、PNG 或 WEBP 格式图片。");
+        }
+    }
+
+    /**
+     * 通过文件头魔数校验真实图片格式，防止伪造 Content-Type 上传任意内容。
+     */
+    private boolean isValidImageMagic(MultipartFile file) {
+        try (java.io.InputStream in = file.getInputStream()) {
+            byte[] header = in.readNBytes(12);
+            if (header.length < 4) {
+                return false;
+            }
+            if (header[0] == (byte) 0xFF && header[1] == (byte) 0xD8 && header[2] == (byte) 0xFF) {
+                return true;
+            }
+            if ((header[0] & 0xFF) == 0x89 && header[1] == (byte) 0x50 && header[2] == (byte) 0x4E
+                    && header[3] == (byte) 0x47) {
+                return true;
+            }
+            if (header[0] == (byte) 0x52 && header[1] == (byte) 0x49 && header[2] == (byte) 0x46
+                    && header[3] == (byte) 0x46 && header.length >= 12
+                    && header[8] == (byte) 0x57 && header[9] == (byte) 0x45
+                    && header[10] == (byte) 0x42 && header[11] == (byte) 0x50) {
+                return true;
+            }
+            return false;
+        } catch (IOException e) {
+            return false;
         }
     }
 

@@ -49,13 +49,18 @@ frontend/src/
 ├── components/         # Vue 组件
 │   ├── common/         # 通用组件
 │   ├── editor/         # 编辑器表单组件
-│   └── preview/        # 预览相关组件
+│   ├── preview/        # 预览相关组件
+│   ├── website/        # 官网布局与组件
+│   └── workbench/      # 用户工作台布局与组件
 ├── composables/        # 组合式函数
 ├── router/             # Vue Router 配置
 ├── stores/             # Pinia stores
 ├── types/              # TypeScript 类型
 ├── utils/              # 工具函数
 ├── views/              # 页面视图
+│   ├── admin/          # 后台管理页面
+│   ├── website/        # 官网页面
+│   └── workbench/      # 用户工作台页面
 ├── App.vue             # 根组件
 └── main.ts             # 应用入口
 ```
@@ -73,38 +78,47 @@ frontend/src/
 
 ## 4. 路由
 
-文件：`src/router/index.ts`
+文件：`src/router/index.ts`，按端拆分为：
+
+- `src/router/website.ts`：官网路由（`/` 下无鉴权）
+- `src/router/workbench.ts`：用户工作台路由（`/workbench/*` 需登录）
+- `src/router/admin.ts`：后台管理路由（`/admin/*`）
 
 ```typescript
 const routes = [
-  { path: '/', redirect: '/dashboard' },
-  { path: '/landing', name: 'Landing', component: () => import('@/views/LandingView.vue') },
   { path: '/login', name: 'Login', component: () => import('@/views/LoginView.vue') },
-  { path: '/dashboard', name: 'Dashboard', component: () => import('@/views/DashboardView.vue') },
-  { path: '/resumes', name: 'ResumeList', component: () => import('@/views/ResumeListView.vue') },
-  { path: '/resumes/create', name: 'TemplateSelect', component: () => import('@/views/TemplateSelectView.vue') },
-  { path: '/templates', name: 'TemplateCenter', component: () => import('@/views/TemplateCenterView.vue') },
-  { path: '/templates/:id', name: 'TemplateDetail', component: () => import('@/views/TemplateDetailView.vue') },
-  { path: '/editor/:id', name: 'Editor', component: () => import('@/views/EditorView.vue') },
-  { path: '/resumes/:id', name: 'ResumeDetail', component: () => import('@/views/ResumeDetailView.vue') },
-  { path: '/resumes/:id/edit', name: 'ResumeEdit', component: () => import('@/views/EditorView.vue') },
-  { path: '/resumes/:id/export', name: 'Export', component: () => import('@/views/ExportView.vue') },
-  { path: '/resumes/:id/preview', name: 'Preview', component: () => import('@/views/ExportView.vue') },
-  { path: '/resumes/:id/review', name: 'AIReview', component: () => import('@/views/AIReviewView.vue') },
-  { path: '/ai-review', name: 'AIReviewCenter', component: () => import('@/views/AIReviewCenterView.vue') },
-  { path: '/avatar/upload', name: 'AvatarUpload', component: () => import('@/views/AvatarUploadView.vue') },
-  { path: '/delivery', name: 'DeliveryManagement', component: () => import('@/views/DeliveryManagementView.vue') },
-  { path: '/settings', name: 'Settings', component: () => import('@/views/SettingsView.vue') },
-  { path: '/downloads', name: 'DownloadCenter', component: () => import('@/views/DownloadCenterView.vue') },
-  { path: '/notifications', name: 'NotificationCenter', component: () => import('@/views/NotificationCenterView.vue') },
-  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/NotFoundView.vue') },
-  // admin routes ...
+  // 官网 /（Home / Features / TemplatesShowcase / Pricing / About / Contact / HelpDocs）
+  ...websiteRoutes,
+  // 工作台 /workbench/*
+  ...workbenchRoutes,
+  // 后台 /admin/*
+  ...adminRoutes,
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/NotFoundView.vue') }
 ]
+```
+
+工作台主要子路由示例：
+
+```typescript
+{ path: '/workbench/dashboard', name: 'Dashboard', component: () => import('@/views/workbench/DashboardView.vue') },
+{ path: '/workbench/resumes', name: 'ResumeList', component: () => import('@/views/workbench/ResumeListView.vue') },
+{ path: '/workbench/resumes/create', name: 'TemplateSelect', component: () => import('@/views/workbench/TemplateSelectView.vue') },
+{ path: '/workbench/templates', name: 'TemplateCenter', component: () => import('@/views/workbench/TemplateCenterView.vue') },
+{ path: '/workbench/editor/:id', name: 'Editor', component: () => import('@/views/workbench/EditorView.vue') },
+{ path: '/workbench/resumes/:id', name: 'ResumeDetail', component: () => import('@/views/workbench/ResumeDetailView.vue') },
+{ path: '/workbench/resumes/:id/export', name: 'Export', component: () => import('@/views/workbench/ExportView.vue') },
+{ path: '/workbench/ai-review', name: 'AIReviewCenter', component: () => import('@/views/workbench/AIReviewCenterView.vue') },
+{ path: '/workbench/avatar/upload', name: 'AvatarUpload', component: () => import('@/views/workbench/AvatarUploadView.vue') },
+{ path: '/workbench/delivery', name: 'DeliveryManagement', component: () => import('@/views/workbench/DeliveryManagementView.vue') },
+{ path: '/workbench/settings', name: 'Settings', component: () => import('@/views/workbench/SettingsView.vue') },
+{ path: '/workbench/downloads', name: 'DownloadCenter', component: () => import('@/views/workbench/DownloadCenterView.vue') },
+{ path: '/workbench/notifications', name: 'NotificationCenter', component: () => import('@/views/workbench/NotificationCenterView.vue') }
 ```
 
 **路由守卫**（已实现在 `src/router/index.ts`）：
 
-- 用户侧：未登录用户访问受保护页面（除 `Login`、`Landing` 外）时重定向到 `/login`；已登录用户访问 `/login` 时重定向到 `/`。
+- 官网侧：`/` 下页面（首页、功能、模板、定价、关于、联系、帮助）无需登录。
+- 工作台侧：访问 `/workbench/*` 需校验 `access_token`，未登录重定向到 `/login`；已登录用户访问 `/login` 时重定向到 `/workbench/dashboard`。
 - 管理侧：访问 `/admin/*` 受保护页面时校验 `admin_token`，未登录则重定向到 `/admin/login`。管理员登录后自动进入 `/admin/dashboard`。
 
 ---
@@ -247,23 +261,37 @@ export interface Resume {
 
 ### 已完成
 
-- `LoginView.vue`：登录/注册/游客模式完整页面
-- `ResumeListView.vue`：简历列表、新建、重命名、复制、删除、分页
+#### 官网（`views/website/`）
+- `HomeView.vue`：官网首页（Hero / 合作伙伴 / 功能 / 演示 / CTA）
+- `FeaturesView.vue`：功能特性页
+- `TemplatesShowcaseView.vue`：模板展示页
+- `PricingView.vue`：定价方案页
+- `AboutView.vue`：关于我们页
+- `ContactView.vue`：联系我们页
+- `HelpDocsView.vue`：帮助文档页
+- `WebsiteLayout.vue`：官网统一 Header / Footer 布局
+
+#### 用户工作台（`views/workbench/`）
 - `DashboardView.vue`：用户工作台
+- `ResumeListView.vue`：简历列表、新建、重命名、复制、删除、分页
 - `EditorView.vue`：左侧模块编辑区、右侧预览、模板切换、导出入口
 - `TemplateSelectView.vue` / `TemplateCenterView.vue`：模板选择与模板中心
 - `ExportView.vue`：PDF 导出流程 UI
 - `AIReviewView.vue` / `AIReviewCenterView.vue`：AI 简历点评入口与结果展示
 - `AvatarUploadView.vue`：头像上传、裁剪、一寸照优化 UI
 - `DeliveryManagementView.vue`：投递记录管理
-- `LandingView.vue`：官网首页
 - `SettingsView.vue`：用户账号设置
-- `NotFoundView.vue`：404 页面
-- `TemplateDetailView.vue`：模板详情页
 - `DownloadCenterView.vue`：下载中心（PDF/头像任务）
 - `NotificationCenterView.vue`：通知中心
 - `ResumeDetailView.vue`：简历详情/预览页
+- `WorkbenchLayout.vue` / `WorkbenchSidebar.vue`：工作台左侧导航布局
+
+#### 后台管理
 - `AdminLayout.vue`、`admin/Dashboard.vue`、`admin/UserManagement.vue`、`admin/ResumeManagement.vue`、`admin/TemplateManagement.vue`、`admin/SystemSettings.vue`（AI 规则管理）、`admin/ContentAudit.vue`、`admin/DeliveryData.vue`、`admin/Login.vue`：管理后台页面与布局
+
+#### 公共
+- `LoginView.vue`：登录/注册/游客模式完整页面
+- `NotFoundView.vue`：404 页面
 - `ResumePreview.vue`：iframe 加载后端 `/api/resumes/{id}/preview`
 - `frontend/src/utils/download.ts`：PDF/头像任务本地存储与读取工具
 - `useAutoSave.ts`：2 秒防抖自动保存 hook

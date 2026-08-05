@@ -135,13 +135,13 @@
               <span class="absolute left-3 text-outline pointer-events-none">
                 <el-icon size="16"><Lock /></el-icon>
               </span>
-              <input
-                v-model="loginForm.password"
-                :type="showPassword ? 'text' : 'password'"
-                required
-                placeholder="请输入 6-32 位密码"
-                class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-10 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
-              >
+            <input
+              v-model="loginForm.password"
+              :type="showPassword ? 'text' : 'password'"
+              required
+              placeholder="请输入 8-32 位密码"
+              class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-10 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
+            >
               <button
                 type="button"
                 class="absolute right-3 text-outline hover:text-on-surface transition-colors"
@@ -233,7 +233,7 @@
               v-model="registerForm.password"
               type="password"
               required
-              placeholder="6-32 位密码"
+              placeholder="8-32 位，需包含字母和数字"
               class="w-full bg-surface-container-low border-none rounded-lg px-3 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
             >
 
@@ -335,8 +335,8 @@ async function handleLogin() {
   try {
     const loginType = loginForm.account.includes('@') ? 'email' : 'phone'
     const res = await authApi.login({ account: loginForm.account, password: loginForm.password, loginType } as any)
-    userStore.setUser({ userId: res.userId, accessToken: res.accessToken, isGuest: res.isGuest })
-    router.push('/dashboard')
+    userStore.setUser({ userId: res.userId, accessToken: res.accessToken, refreshToken: res.refreshToken, isGuest: res.isGuest })
+    router.push('/workbench/dashboard')
   } catch (e: any) {
     errorMsg.value = e.message || '登录失败'
   } finally {
@@ -349,8 +349,8 @@ async function handleRegister() {
   loading.value = true
   try {
     const res = await authApi.register({ phone: registerForm.phone, verifyCode: registerForm.verifyCode, password: registerForm.password })
-    userStore.setUser({ userId: res.userId, accessToken: res.accessToken, isGuest: res.isGuest })
-    router.push('/dashboard')
+    userStore.setUser({ userId: res.userId, accessToken: res.accessToken, refreshToken: res.refreshToken, isGuest: res.isGuest })
+    router.push('/workbench/dashboard')
   } catch (e: any) {
     errorMsg.value = e.message || '注册失败'
   } finally {
@@ -363,8 +363,8 @@ async function handleGuest() {
   loading.value = true
   try {
     const res = await authApi.guest()
-    userStore.setUser({ userId: res.userId, accessToken: res.accessToken, isGuest: true })
-    router.push('/dashboard')
+    userStore.setUser({ userId: res.userId, accessToken: res.accessToken, refreshToken: res.refreshToken, isGuest: true })
+    router.push('/workbench/dashboard')
   } catch (e: any) {
     errorMsg.value = e.message || '游客登录失败'
   } finally {

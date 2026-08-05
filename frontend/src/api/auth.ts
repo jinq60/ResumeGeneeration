@@ -33,5 +33,11 @@ export const authApi = {
   },
   refresh(refreshToken: string): Promise<AuthResponse> {
     return request.post('/auth/refresh', { refreshToken }) as Promise<AuthResponse>
+  },
+  logout(refreshToken: string): Promise<void> {
+    return request.post('/auth/logout', { refreshToken }) as Promise<void>
+  },
+  changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    return request.put('/users/me/password', { oldPassword, newPassword }) as Promise<void>
   }
 }

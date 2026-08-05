@@ -51,7 +51,10 @@ public class OpenAiLlmProvider implements LlmProvider {
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(String.class)
-                    .retryWhen(Retry.backoff(2, Duration.ofSeconds(1)))
+                    // 仅对 5xx（服务端/网络瞬时故障）重试，4xx（参数/鉴权错误）直接失败
+                    .retryWhen(Retry.backoff(2, Duration.ofSeconds(1))
+                            .filter(e -> e instanceof org.springframework.web.reactive.function.client.WebClientResponseException w
+                                    && w.getStatusCode().is5xxServerError()))
                     .block(Duration.ofSeconds(120));
 
             return parseResponse(raw, start);
@@ -97,12 +100,12 @@ public class OpenAiLlmProvider implements LlmProvider {
         List<Map<String, String>> messages;
         if (request.getMessages() != null && !request.getMessages().isEmpty()) {
             messages = request.getMessages().stream()
-                    .map(m -> Map.of("role", m.getRole(), "content", m.getContent()))
+                    .map(m -> message(m.getRole(), m.getContent()))
                     .toList();
         } else {
             messages = List.of(
-                    Map.of("role", "system", "content", request.getSystemPrompt()),
-                    Map.of("role", "user", "content", request.getUserPrompt())
+                    message("system", request.getSystemPrompt()),
+                    message("user", request.getUserPrompt())
             );
         }
 
@@ -117,6 +120,13 @@ public class OpenAiLlmProvider implements LlmProvider {
             body.put("response_format", Map.of("type", "json_object"));
         }
         return body;
+    }
+
+    private Map<String, String> message(String role, String content) {
+        Map<String, String> m = new java.util.HashMap<>();
+        m.put("role", role);
+        m.put("content", content != null ? content : "");
+        return m;
     }
 
     private AiChatResponse parseResponse(String raw, long start) {

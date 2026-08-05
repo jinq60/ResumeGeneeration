@@ -109,8 +109,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useSectionSync } from '@/composables/useSectionSync'
 
 interface Props {
   sections: any[]
@@ -187,28 +188,33 @@ function applyTemplate() {
   }
 }
 
-// 监听变化，触发更新
-watch(formData, (newData) => {
-  const introductionData = {
-    content: newData.content,
-    keywords: newData.keywordsText ? newData.keywordsText.split(',').map(k => k.trim()).filter(k => k) : [],
-    style: newData.style,
-    maxWords: newData.maxWords
-  }
-
-  emit('update', props.sections.map((section: any) => {
-    if (section.type === 'introduction') {
-      return {
-        ...section,
-        data: introductionData
-      }
-    }
-    return section
-  }))
-}, { deep: true })
-
 // 初始化
 extractIntroduction()
+
+// 与父组件 sections 双向同步：外部变更时重新提取，自身 emit 的回传自动忽略
+useSectionSync(
+  formData,
+  () => props.sections,
+  extractIntroduction,
+  () => {
+    const introductionData = {
+      content: formData.value.content,
+      keywords: formData.value.keywordsText ? formData.value.keywordsText.split(',').map(k => k.trim()).filter(k => k) : [],
+      style: formData.value.style,
+      maxWords: formData.value.maxWords
+    }
+
+    emit('update', props.sections.map((section: any) => {
+      if (section.type === 'introduction') {
+        return {
+          ...section,
+          data: introductionData
+        }
+      }
+      return section
+    }))
+  }
+)
 </script>
 
 <style scoped lang="scss">

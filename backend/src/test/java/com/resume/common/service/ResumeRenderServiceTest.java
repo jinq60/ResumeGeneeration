@@ -100,4 +100,57 @@ class ResumeRenderServiceTest {
         // CSS 占位被替换为模板配置生成的 CSS
         assertTrue(html.contains("#1a5276"));
     }
+
+    @Test
+    void render_shouldPrefixUploadsWithPublicBaseUrl() throws Exception {
+        ResumeRenderService renderService = new ResumeRenderService(new ObjectMapper());
+        org.springframework.test.util.ReflectionTestUtils.setField(renderService, "publicBaseUrl", "http://localhost");
+
+        Resume resume = new Resume();
+        Map<String, Object> profileData = new HashMap<>();
+        profileData.put("name", "王五");
+        profileData.put("showAvatar", true);
+        profileData.put("avatarUrl", "/uploads/avatars/user_1/avatars/a.png");
+        SectionDTO section = new SectionDTO();
+        section.setId("sec_profile");
+        section.setType("profile");
+        section.setTitle("个人信息");
+        section.setOrder(0);
+        section.setVisible(true);
+        section.setData(profileData);
+        resume.setSections(List.of(section));
+
+        Template template = new Template();
+        template.setHtmlTemplate(null);
+        template.setConfig("{}");
+
+        String html = renderService.render(resume, template);
+
+        assertTrue(html.contains("src=\"http://localhost/uploads/avatars/user_1/avatars/a.png\""));
+    }
+
+    @Test
+    void render_shouldKeepRelativeUploadsUrlWhenBaseUrlNotConfigured() {
+        Resume resume = new Resume();
+        Map<String, Object> profileData = new HashMap<>();
+        profileData.put("name", "赵六");
+        profileData.put("showAvatar", true);
+        profileData.put("avatarUrl", "/uploads/avatars/user_1/avatars/b.png");
+        SectionDTO section = new SectionDTO();
+        section.setId("sec_profile");
+        section.setType("profile");
+        section.setTitle("个人信息");
+        section.setOrder(0);
+        section.setVisible(true);
+        section.setData(profileData);
+        resume.setSections(List.of(section));
+
+        Template template = new Template();
+        template.setHtmlTemplate(null);
+        template.setConfig("{}");
+
+        String html = renderService.render(resume, template);
+
+        assertTrue(html.contains("src=\"/uploads/avatars/user_1/avatars/b.png\""));
+    }
 }

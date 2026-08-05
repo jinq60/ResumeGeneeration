@@ -9,7 +9,7 @@
           <Document />
         </el-icon>
       </div>
-      <span class="sidebar-brand-name">ResumePro</span>
+      <span class="sidebar-brand-name">智能简历</span>
     </div>
 
     <nav class="sidebar-nav">
@@ -34,6 +34,21 @@
 
       <RouterLink
         v-for="item in toolItems"
+        :key="item.path"
+        :to="item.path"
+        class="sidebar-item"
+        :class="{ 'is-active': isActive(item.path) }"
+      >
+        <el-icon size="18">
+          <component :is="item.icon" />
+        </el-icon>
+        <span>{{ item.label }}</span>
+      </RouterLink>
+
+      <div class="sidebar-divider" />
+
+      <RouterLink
+        v-for="item in bottomItems"
         :key="item.path"
         :to="item.path"
         class="sidebar-item"
@@ -75,7 +90,10 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { Document, DataBoard, Files, Picture, MagicStick, Postcard } from '@element-plus/icons-vue'
+import {
+  Document, DataAnalysis, Files, Picture, MagicStick, Postcard,
+  TrendCharts, Download, Setting, Bell
+} from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -84,14 +102,21 @@ const userStore = useUserStore()
 interface NavItem { path: string; label: string; icon: any; badge?: string }
 
 const navItems: NavItem[] = [
-  { path: '/dashboard', label: '工作台', icon: DataBoard },
-  { path: '/resumes', label: '我的简历', icon: Files },
-  { path: '/templates', label: '选择模板', icon: Postcard },
+  { path: '/workbench/dashboard', label: '工作台', icon: DataAnalysis },
+  { path: '/workbench/resumes', label: '我的简历', icon: Files },
+  { path: '/workbench/templates', label: '选择模板', icon: Postcard },
 ]
 
 const toolItems: NavItem[] = [
-  { path: '/avatar/upload', label: '头像管理', icon: Picture },
-  { path: '/ai-review', label: 'AI 点评', icon: MagicStick, badge: 'Beta' },
+  { path: '/workbench/avatar/upload', label: '头像管理', icon: Picture },
+  { path: '/workbench/ai-review', label: 'AI 点评', icon: MagicStick, badge: 'Beta' },
+  { path: '/workbench/delivery', label: '投递管理', icon: TrendCharts }
+]
+
+const bottomItems: NavItem[] = [
+  { path: '/workbench/downloads', label: '下载中心', icon: Download },
+  { path: '/workbench/notifications', label: '通知中心', icon: Bell },
+  { path: '/workbench/settings', label: '账号设置', icon: Setting }
 ]
 
 const userInitial = computed(() => {
@@ -103,7 +128,15 @@ function isActive(path: string) {
   return route.path === path || route.path.startsWith(path + '/')
 }
 
-function handleLogout() {
+async function handleLogout() {
+  try {
+    if (userStore.refreshToken) {
+      const { authApi } = await import('@/api/auth')
+      await authApi.logout(userStore.refreshToken)
+    }
+  } catch {
+    // 服务端吊销失败不阻塞本地登出
+  }
   userStore.clearUser()
   router.push('/login')
 }
@@ -111,46 +144,48 @@ function handleLogout() {
 
 <style scoped lang="scss">
 .app-sidebar {
-  width: 240px;
+  width: var(--st-sidebar-width, 220px);
   height: 100vh;
   position: fixed;
   left: 0;
   top: 0;
-  background: var(--color-ink-navy);
+  background: #001a43;
   color: rgba(255, 255, 255, 0.88);
   display: flex;
   flex-direction: column;
   z-index: 40;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-5);
+  gap: var(--st-stack-md);
+  padding: 16px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-brand-mark {
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, #5584FF, #2962FF);
+  border-radius: var(--st-radius-lg);
+  background: var(--st-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px var(--color-archive-blue-12);
+  box-shadow: var(--st-shadow-md);
 }
 
 .sidebar-brand-name {
   font-weight: 600;
-  font-size: var(--font-size-md);
+  font-size: 16px;
   letter-spacing: -0.01em;
+  color: #fff;
 }
 
 .sidebar-nav {
   flex: 1;
-  padding: var(--space-3);
+  padding: 12px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -160,13 +195,14 @@ function handleLogout() {
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: 10px var(--space-3);
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-sm);
+  gap: var(--st-stack-md);
+  padding: 10px 12px;
+  border-radius: var(--st-radius-lg);
+  font-size: 14px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.62);
-  transition: var(--transition-fast);
+  transition: all 0.2s ease;
+  text-decoration: none;
 
   &:hover {
     color: rgba(255, 255, 255, 0.92);
@@ -175,18 +211,17 @@ function handleLogout() {
 
   &.is-active {
     color: #fff;
-    background: var(--color-archive-blue);
-    box-shadow: 0 2px 8px var(--color-archive-blue-12);
+    background: var(--st-primary-container);
   }
 }
 
 .sidebar-badge {
   margin-left: auto;
-  background: var(--color-archive-blue);
+  background: var(--st-primary-container);
   color: #fff;
   font-size: 10px;
   padding: 2px 6px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--st-radius-full);
   line-height: 1.4;
   letter-spacing: 0.02em;
 }
@@ -196,23 +231,23 @@ function handleLogout() {
 }
 
 .sidebar-divider {
-  margin: var(--space-3) 0;
+  margin: 12px 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-user {
-  padding: var(--space-4);
+  padding: 12px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--st-stack-md);
 }
 
 .sidebar-user-avatar {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #F1C948, #D9892B);
+  background: var(--st-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -228,7 +263,7 @@ function handleLogout() {
 }
 
 .sidebar-user-name {
-  font-size: var(--font-size-sm);
+  font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.92);
   white-space: nowrap;
@@ -248,14 +283,14 @@ function handleLogout() {
   color: rgba(255, 255, 255, 0.46);
   cursor: pointer;
   padding: 6px;
-  border-radius: var(--radius-md);
+  border-radius: var(--st-radius-md);
   display: flex;
   align-items: center;
-  transition: var(--transition-base);
+  transition: all 0.2s ease;
 
   &:hover {
-    color: var(--color-signal-coral);
-    background: var(--color-signal-coral-12);
+    color: var(--st-error);
+    background: rgba(186, 26, 26, 0.12);
   }
 }
 </style>

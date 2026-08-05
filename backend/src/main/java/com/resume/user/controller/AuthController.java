@@ -37,4 +37,10 @@ public class AuthController {
     public R<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         return R.success(userService.refresh(request));
     }
+
+    @PostMapping("/logout")
+    public R<Void> logout(@Valid @RequestBody LogoutRequest request) {
+        userService.logout(request);
+        return R.success();
+    }
 }

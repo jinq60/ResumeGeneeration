@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -31,6 +33,8 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ResumeReviewService {
+
+    private static final int MAX_CONCURRENT_PER_USER = 3;
 
     private final ResumeReviewMapper resumeReviewMapper;
     private final ResumeMapper resumeMapper;
@@ -59,10 +63,26 @@ public class ResumeReviewService {
             throw new BusinessException(ResultCode.RESUME_CONTENT_TOO_SHORT, "简历内容过少，无法生成有效点评。");
         }
 
+        // 每用户进行中点评数上限，防止刷接口导致异步队列与 LLM 费用失控
+        long runningCount = resumeReviewMapper.selectCount(
+                new LambdaQueryWrapper<ResumeReview>()
+                        .eq(ResumeReview::getUserId, userId)
+                        .in(ResumeReview::getStatus, List.of(
+                                BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING)));
+        if (runningCount >= MAX_CONCURRENT_PER_USER) {
+            throw new BusinessException(ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED,
+                    "同时进行的 AI 任务过多，请等待当前任务完成后再试。");
+        }
+
         ResumeReview review = new ResumeReview();
         review.setResumeId(resumeId);
         review.setUserId(userId);
         review.setJobDescription(request.getJobDescription());
+        // 占位初值，避免 NOT NULL 列插入失败；真实结果由异步任务回填。
+        review.setOverallScore(0);
+        review.setDimensionScores(Map.of());
+        review.setSuggestions(List.of());
+        review.setHighlights(List.of());
         // model_name 留空，等异步任务真正调用 LLM 后由 AiResumeReviewService 填入；
         // 避免使用 "pending" 字符串污染模型字段语义（status 已表达 pending 状态）。
         review.setModelName(null);
@@ -72,7 +92,18 @@ public class ResumeReviewService {
         review.setUpdatedAt(LocalDateTime.now());
         resumeReviewMapper.insert(review);
 
-        aiResumeReviewService.executeReview(review.getId(), resume, request.getJobDescription());
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            // 事务提交后再触发异步任务，避免异步线程在 REPEATABLE READ 下读不到未提交的记录。
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    aiResumeReviewService.executeReview(review.getId(), resume, request.getJobDescription());
+                }
+            });
+        } else {
+            // 无事务场景（如单元测试直调）直接触发
+            aiResumeReviewService.executeReview(review.getId(), resume, request.getJobDescription());
+        }
 
         ResumeReviewResponse response = new ResumeReviewResponse();
         response.setReviewId(review.getId());

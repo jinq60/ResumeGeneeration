@@ -105,6 +105,7 @@ class UserServiceTest {
 
         User exist = new User();
         exist.setId("user_old");
+        exist.setDeleted(BizConstant.NOT_DELETED);
         when(userMapper.selectOne(argThat(wrapper -> true))).thenReturn(exist);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> userService.register(request));
@@ -242,12 +243,88 @@ class UserServiceTest {
         user.setIsGuest(0);
         user.setStatus("active");
         when(userMapper.selectById("user_1")).thenReturn(user);
+        when(refreshTokenMapper.delete(any())).thenReturn(1);
 
         AuthResponse response = userService.refresh(request);
 
         assertEquals("user_1", response.getUserId());
         assertEquals("access_token", response.getAccessToken());
         assertEquals("refresh_token", response.getRefreshToken());
-        verify(refreshTokenMapper).deleteById("rt_1");
+        verify(refreshTokenMapper).delete(any());
+    }
+
+    @Test
+    void changePassword_shouldSucceedAndRevokeRefreshTokens() {
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setOldPassword("OldPass123");
+        request.setNewPassword("NewPass456");
+
+        User user = new User();
+        user.setId("user_1");
+        user.setPasswordHash("old_hashed");
+        user.setIsGuest(0);
+        user.setStatus("active");
+        when(userMapper.selectById("user_1")).thenReturn(user);
+        when(passwordEncoder.matches("OldPass123", "old_hashed")).thenReturn(true);
+        when(passwordEncoder.encode("NewPass456")).thenReturn("new_hashed");
+
+        userService.changePassword("user_1", request);
+
+        verify(userMapper).updateById(argThat(u -> "new_hashed".equals(((User) u).getPasswordHash())));
+        verify(refreshTokenMapper).delete(any());
+    }
+
+    @Test
+    void changePassword_shouldRejectWrongOldPassword() {
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setOldPassword("WrongPass123");
+        request.setNewPassword("NewPass456");
+
+        User user = new User();
+        user.setId("user_1");
+        user.setPasswordHash("old_hashed");
+        user.setIsGuest(0);
+        when(userMapper.selectById("user_1")).thenReturn(user);
+        when(passwordEncoder.matches("WrongPass123", "old_hashed")).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> userService.changePassword("user_1", request));
+        assertEquals(ResultCode.AUTH_PASSWORD_INCORRECT, ex.getErrorCode());
+        verify(userMapper, never()).updateById(any());
+    }
+
+    @Test
+    void changePassword_shouldRejectWeakNewPassword() {
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setOldPassword("OldPass123");
+        request.setNewPassword("123456");
+
+        User user = new User();
+        user.setId("user_1");
+        user.setPasswordHash("old_hashed");
+        user.setIsGuest(0);
+        when(userMapper.selectById("user_1")).thenReturn(user);
+        when(passwordEncoder.matches("OldPass123", "old_hashed")).thenReturn(true);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> userService.changePassword("user_1", request));
+        assertEquals(ResultCode.AUTH_PASSWORD_TOO_WEAK, ex.getErrorCode());
+        verify(userMapper, never()).updateById(any());
+    }
+
+    @Test
+    void changePassword_shouldRejectGuest() {
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setOldPassword("OldPass123");
+        request.setNewPassword("NewPass456");
+
+        User user = new User();
+        user.setId("guest_1");
+        user.setIsGuest(1);
+        when(userMapper.selectById("guest_1")).thenReturn(user);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> userService.changePassword("guest_1", request));
+        assertEquals(ResultCode.PARAM_INVALID, ex.getErrorCode());
     }
 }
