@@ -58,10 +58,26 @@ public class AvatarService {
 
         String originalFilename = StringUtils.defaultString(file.getOriginalFilename(), "avatar.png");
         String ext = getExtension(originalFilename);
+        // 先预生成任务 ID，用于拼对象名与在插入前完成 MinIO 上传（source_image_url 为 NOT NULL）
+        String taskId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getIdStr();
+        String objectName = userId + "/avatars/" + taskId + "_source" + ext;
+        String sourceUrl = "/uploads/avatars/" + objectName;
+
+        try {
+            minioStorageService.upload(minioStorageService.getBucketAvatars(), objectName,
+                    file.getInputStream(), file.getSize(), file.getContentType());
+        } catch (IOException e) {
+            // 失败时主动删除已上传对象避免孤儿文件
+            minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
+            throw new BusinessException(ResultCode.AVATAR_OPTIMIZE_FAILED, "头像上传失败。");
+        }
 
         AvatarTask task = new AvatarTask();
+        task.setId(taskId);
         task.setUserId(userId);
         task.setResumeId(resumeId);
+        task.setSourceImageUrl(sourceUrl);
+        task.setResultImageUrl(sourceUrl);
         task.setBackgroundType(BizConstant.AVATAR_BACKGROUND_WHITE);
         task.setStyle(BizConstant.AVATAR_STYLE_FORMAL);
         task.setOptions(toJson(defaultOptions()));
@@ -71,23 +87,6 @@ public class AvatarService {
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(LocalDateTime.now());
         avatarTaskMapper.insert(task);
-
-        String objectName = userId + "/avatars/" + task.getId() + "_source" + ext;
-
-        try {
-            minioStorageService.upload(minioStorageService.getBucketAvatars(), objectName,
-                    file.getInputStream(), file.getSize(), file.getContentType());
-        } catch (IOException e) {
-            // 事务回滚删 DB 记录，但 MinIO 不参与事务，主动删除已上传对象避免孤儿文件
-            minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
-            throw new BusinessException(ResultCode.AVATAR_OPTIMIZE_FAILED, "头像上传失败。");
-        }
-
-        String sourceUrl = "/uploads/avatars/" + objectName;
-        task.setSourceImageUrl(sourceUrl);
-        task.setResultImageUrl(sourceUrl);
-        task.setUpdatedAt(LocalDateTime.now());
-        avatarTaskMapper.updateById(task);
 
         AvatarUploadResponse response = new AvatarUploadResponse();
         response.setId(task.getId());
