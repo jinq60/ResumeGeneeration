@@ -37,19 +37,22 @@ private final ResumeMapper resumeMapper;
     private final AvatarService avatarService;
     private final ResumeSectionValidator resumeSectionValidator;
     private final AuditLogService auditLogService;
+    private final com.resume.resume.share.service.ShareService shareService;
 
     public ResumeService(ResumeMapper resumeMapper,
                           TemplateService templateService,
                           @Lazy PdfService pdfService,
                           @Lazy AvatarService avatarService,
                           ResumeSectionValidator resumeSectionValidator,
-                          AuditLogService auditLogService) {
+                          AuditLogService auditLogService,
+                          @Lazy com.resume.resume.share.service.ShareService shareService) {
         this.resumeMapper = resumeMapper;
         this.templateService = templateService;
         this.pdfService = pdfService;
         this.avatarService = avatarService;
         this.resumeSectionValidator = resumeSectionValidator;
         this.auditLogService = auditLogService;
+        this.shareService = shareService;
     }
 
     private static final int MAX_TITLE_LENGTH = 128;
@@ -238,6 +241,7 @@ private final ResumeMapper resumeMapper;
 
         pdfService.cleanupTasksByResume(userId, resumeId);
         avatarService.cleanupTasksByResume(userId, resumeId);
+        shareService.revokeByResume(resumeId);
 
         resumeMapper.deleteById(resumeId);
         auditLogService.record(userId, "delete_resume", resumeId, "title=" + resume.getTitle());

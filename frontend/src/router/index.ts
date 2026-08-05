@@ -6,6 +6,7 @@ import workbenchRoutes from './workbench'
 
 const routes: RouteRecordRaw[] = [
   { path: '/login', name: 'Login', component: () => import('@/views/LoginView.vue'), meta: { title: '登录' } },
+  { path: '/share/:token', name: 'Share', component: () => import('@/views/ShareView.vue'), meta: { title: '简历分享' } },
   ...websiteRoutes,
   ...workbenchRoutes,
   ...adminRoutes,
@@ -17,7 +18,7 @@ const router = createRouter({
   routes
 })
 
-const publicRouteNames = ['Login', 'AdminLogin', 'Home', 'Features', 'TemplatesShowcase', 'Pricing', 'About', 'Contact', 'HelpDocs']
+const publicRouteNames = ['Login', 'AdminLogin', 'Share', 'Home', 'Features', 'TemplatesShowcase', 'Pricing', 'About', 'Contact', 'HelpDocs']
 
 router.beforeEach((to, _from, next) => {
   document.title = to.meta.title ? `${to.meta.title} - 智能简历` : '智能简历'

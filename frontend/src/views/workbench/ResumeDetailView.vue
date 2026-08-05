@@ -23,6 +23,15 @@
       <div class="flex flex-wrap gap-2">
         <button
           class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2 flex items-center gap-2 transition-colors"
+          @click="openShareDialog"
+        >
+          <el-icon size="14">
+            <Share />
+          </el-icon>
+          <span>分享</span>
+        </button>
+        <button
+          class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2 flex items-center gap-2 transition-colors"
           @click="goReview"
         >
           <el-icon size="14">
@@ -86,14 +95,63 @@
       </div>
     </div>
   </main>
+
+  <!-- 分享对话框 -->
+  <el-dialog
+    v-model="shareDialogVisible"
+    title="分享简历"
+    width="480px"
+    align-center
+  >
+    <div
+      v-if="shareInfo"
+      class="flex flex-col gap-4"
+    >
+      <el-switch
+        v-model="shareEnabled"
+        active-text="公开分享"
+        inactive-text="已关闭"
+        @change="handleShareToggle"
+      />
+      <template v-if="shareEnabled">
+        <el-input
+          :model-value="shareUrl"
+          readonly
+        >
+          <template #append>
+            <el-button @click="copyShareUrl">
+              复制链接
+            </el-button>
+          </template>
+        </el-input>
+        <div class="text-xs text-on-surface-variant">
+          链接对所有人可见，包含简历中的联系方式。关闭分享后链接立即失效。
+        </div>
+        <RouterLink
+          :to="`/share/${shareInfo.token}`"
+          target="_blank"
+          class="text-primary text-sm hover:underline"
+        >
+          预览分享页 →
+        </RouterLink>
+      </template>
+    </div>
+    <div
+      v-else-if="shareLoading"
+      class="py-4 text-center text-on-surface-variant text-sm"
+    >
+      加载中…
+    </div>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, MagicStick, Download, Edit, Document } from '@element-plus/icons-vue'
+import { ArrowLeft, MagicStick, Download, Edit, Document, Share } from '@element-plus/icons-vue'
 import { resumeApi } from '@/api/resume'
+import { shareApi, type ShareInfo } from '@/api/share'
 import type { Resume } from '@/types/resume'
 import ResumePreview from '@/components/preview/ResumePreview.vue'
 
@@ -103,6 +161,59 @@ const resumeId = route.params.id as string
 
 const loading = ref(false)
 const resume = ref<Resume | null>(null)
+
+const shareDialogVisible = ref(false)
+const shareLoading = ref(false)
+const shareInfo = ref<ShareInfo | null>(null)
+
+const shareEnabled = computed({
+  get: () => !!shareInfo.value && shareInfo.value.status === 'active',
+  set: () => { /* 由 handleShareToggle 处理 */ }
+})
+
+const shareUrl = computed(() => {
+  if (!shareInfo.value) return ''
+  return `${window.location.origin}${shareInfo.value.url}`
+})
+
+async function openShareDialog() {
+  shareDialogVisible.value = true
+  shareLoading.value = true
+  try {
+    shareInfo.value = await shareApi.get(resumeId)
+  } catch (e: any) {
+    shareInfo.value = null
+    ElMessage.error(e.message || '查询分享状态失败')
+  } finally {
+    shareLoading.value = false
+  }
+}
+
+async function handleShareToggle(enabled: boolean) {
+  try {
+    if (enabled) {
+      shareInfo.value = await shareApi.create(resumeId)
+      ElMessage.success('分享已开启')
+    } else {
+      await shareApi.revoke(resumeId)
+      shareInfo.value = { ...shareInfo.value!, status: 'revoked' } as ShareInfo
+      ElMessage.success('分享已关闭')
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message || '操作失败')
+    // 回滚开关状态
+    shareInfo.value = null
+  }
+}
+
+async function copyShareUrl() {
+  try {
+    await navigator.clipboard.writeText(shareUrl.value)
+    ElMessage.success('链接已复制')
+  } catch {
+    ElMessage.warning('复制失败，请手动复制')
+  }
+}
 
 async function loadResume() {
   loading.value = true

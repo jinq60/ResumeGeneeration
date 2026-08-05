@@ -82,7 +82,7 @@ public class SecurityConfig {
                 .requestMatchers("/auth/**", "/templates", "/templates/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                .requestMatchers("/uploads/**", "/templates/**").permitAll()
+                .requestMatchers("/uploads/**", "/templates/**", "/share/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                 .anyRequest().authenticated()
             );
