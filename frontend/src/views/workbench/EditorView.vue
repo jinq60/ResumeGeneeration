@@ -64,14 +64,18 @@
             ]"
             @click="activeTab = tab.name"
           >
-            <el-icon :size="14"><component :is="tab.icon" /></el-icon>
+            <el-icon :size="14">
+              <component :is="tab.icon" />
+            </el-icon>
             <span>{{ tab.label }}</span>
           </button>
           <button
             class="editor-tab flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors text-sm whitespace-nowrap text-on-surface-variant hover:bg-surface-container-low"
             @click="sectionsDialogVisible = true"
           >
-            <el-icon :size="14"><Menu /></el-icon>
+            <el-icon :size="14">
+              <Menu />
+            </el-icon>
             <span>模块</span>
           </button>
         </div>
@@ -180,7 +184,9 @@
             class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
             @click="aiDrawerVisible = true"
           >
-            <el-icon size="14"><MagicStick /></el-icon>
+            <el-icon size="14">
+              <MagicStick />
+            </el-icon>
             <span class="text-label-md">AI 评估</span>
           </div>
           <div
@@ -321,7 +327,9 @@
     <div class="space-y-4">
       <div class="p-4 border border-outline-variant rounded-lg">
         <div class="flex items-center gap-2 text-sm font-semibold mb-2 text-error">
-          <el-icon size="14"><WarningFilled /></el-icon>
+          <el-icon size="14">
+            <WarningFilled />
+          </el-icon>
           <span>最值得修改</span>
         </div>
         <ul class="text-xs space-y-2 text-on-surface-variant">
@@ -331,7 +339,9 @@
       </div>
       <div class="p-4 border border-outline-variant rounded-lg">
         <div class="flex items-center gap-2 text-sm font-semibold mb-2 text-secondary">
-          <el-icon size="14"><Opportunity /></el-icon>
+          <el-icon size="14">
+            <Opportunity />
+          </el-icon>
           <span>可增强</span>
         </div>
         <ul class="text-xs space-y-2 text-on-surface-variant">
@@ -423,8 +433,6 @@ const tabs: TabDef[] = [
   { name: 'introduction', label: '个人简介', icon: CirclePlus },
   { name: 'custom', label: '补充信息', icon: CirclePlus }
 ]
-
-const currentTab = computed(() => tabs.find(t => t.name === activeTab.value))
 
 const { saveStatus, triggerSave } = useAutoSave()
 const saveError = ref('')
@@ -546,10 +554,6 @@ function triggerAutoSave() {
       }
     })
   }
-}
-
-function addSectionItem() {
-  // Form components handle add internally
 }
 
 function zoomIn() {

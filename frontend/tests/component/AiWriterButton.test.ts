@@ -16,7 +16,7 @@ describe('AiWriterButton', () => {
   })
 
   it('should call aiWrite and open dialog on action', async () => {
-    ;(resumeApi.aiWrite as any).mockResolvedValue({ content: 'AI 生成的内容' })
+    (resumeApi.aiWrite as any).mockResolvedValue({ content: 'AI 生成的内容' })
     const wrapper = mount(AiWriterButton, {
       props: {
         resumeId: 'resume_1',
@@ -36,7 +36,7 @@ describe('AiWriterButton', () => {
   })
 
   it('should emit apply when applying content', async () => {
-    ;(resumeApi.aiWrite as any).mockResolvedValue({ content: '结果' })
+    (resumeApi.aiWrite as any).mockResolvedValue({ content: '结果' })
     const wrapper = mount(AiWriterButton, {
       props: {
         resumeId: 'resume_1',
@@ -59,7 +59,7 @@ describe('AiWriterButton', () => {
   })
 
   it('should show error message when api fails', async () => {
-    ;(resumeApi.aiWrite as any).mockRejectedValue(new Error('AI 服务不可用'))
+    (resumeApi.aiWrite as any).mockRejectedValue(new Error('AI 服务不可用'))
     const wrapper = mount(AiWriterButton, {
       props: {
         resumeId: 'resume_1',
@@ -73,7 +73,7 @@ describe('AiWriterButton', () => {
   })
 
   it('should include targetLang when translating', async () => {
-    ;(resumeApi.aiWrite as any).mockResolvedValue({ content: 'Hello' })
+    (resumeApi.aiWrite as any).mockResolvedValue({ content: 'Hello' })
     const wrapper = mount(AiWriterButton, {
       props: {
         resumeId: 'resume_1',

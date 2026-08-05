@@ -31,10 +31,14 @@
         frameborder="0"
       />
       <div class="py-4 text-xs text-outline text-center">
-        由 <RouterLink
+        由
+        <RouterLink
           to="/"
           class="text-primary no-underline"
-        >智能简历</RouterLink> 生成 · 本页面为公开只读预览
+        >
+          智能简历
+        </RouterLink>
+        生成 · 本页面为公开只读预览
       </div>
     </div>
   </main>

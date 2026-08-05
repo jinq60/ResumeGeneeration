@@ -34,7 +34,8 @@
           :on-change="handleFileChange"
           accept="image/*"
           drag
-        >          <div
+        >
+          <div
             v-if="!imageUrl"
             class="flex flex-col items-center gap-2 text-center"
           >

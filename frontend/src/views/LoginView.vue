@@ -135,13 +135,13 @@
               <span class="absolute left-3 text-outline pointer-events-none">
                 <el-icon size="16"><Lock /></el-icon>
               </span>
-            <input
-              v-model="loginForm.password"
-              :type="showPassword ? 'text' : 'password'"
-              required
-              placeholder="请输入 8-32 位密码"
-              class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-10 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
-            >
+              <input
+                v-model="loginForm.password"
+                :type="showPassword ? 'text' : 'password'"
+                required
+                placeholder="请输入 8-32 位密码"
+                class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-10 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
+              >
               <button
                 type="button"
                 class="absolute right-3 text-outline hover:text-on-surface transition-colors"
