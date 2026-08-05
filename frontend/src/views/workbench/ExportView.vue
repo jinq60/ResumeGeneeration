@@ -81,6 +81,27 @@
         </div>
 
         <div class="mt-5 flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-on-surface-variant tracking-wide">导出格式</label>
+          <el-radio-group
+            v-model="exportFormat"
+            class="w-full"
+          >
+            <el-radio-button
+              value="pdf"
+              label="PDF（推荐）"
+            />
+            <el-radio-button
+              value="word"
+              label="Word"
+            />
+            <el-radio-button
+              value="markdown"
+              label="Markdown"
+            />
+          </el-radio-group>
+        </div>
+
+        <div class="mt-5 flex flex-col gap-1.5">
           <label class="text-xs font-semibold text-on-surface-variant tracking-wide">文件名</label>
           <div class="relative">
             <input
@@ -89,17 +110,17 @@
               class="w-full px-3 py-2.5 pr-12 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
               placeholder="文件名"
             >
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm pointer-events-none font-mono tabular-nums">.pdf</span>
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm pointer-events-none font-mono tabular-nums">.{{ exportFormat === 'pdf' ? 'pdf' : exportFormat === 'word' ? 'docx' : 'md' }}</span>
           </div>
         </div>
 
         <button
           class="mt-6 bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md flex items-center justify-center gap-2 shadow-sm hover:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="!selectedTemplateId || exporting"
+          :disabled="!selectedTemplateId || exporting || (exportFormat !== 'pdf' && directExporting)"
           @click="handleExport"
         >
           <el-icon
-            v-if="exporting"
+            v-if="exporting || directExporting"
             class="animate-spin"
             size="16"
           >
@@ -111,7 +132,7 @@
           >
             <Download />
           </el-icon>
-          <span>{{ exporting ? '导出中…' : '导出 PDF' }}</span>
+          <span>{{ exporting || directExporting ? '导出中…' : '导出 ' + formatLabel }}</span>
         </button>
 
         <hr class="my-6 border-none border-t border-outline-variant">
@@ -196,6 +217,7 @@ import { ArrowLeft, Download, Edit, Document, Loading } from '@element-plus/icon
 import { resumeApi } from '@/api/resume'
 import { templateApi } from '@/api/template'
 import { pdfApi } from '@/api/pdf'
+import { exportApi } from '@/api/export'
 import type { Template } from '@/api/template'
 import type { PdfTask } from '@/api/pdf'
 import type { Resume } from '@/types/resume'
@@ -210,9 +232,16 @@ const resume = ref<Resume | null>(null)
 const templates = ref<Template[]>([])
 const selectedTemplateId = ref('')
 const exporting = ref(false)
+const directExporting = ref(false)
+const exportFormat = ref<'pdf' | 'word' | 'markdown'>('pdf')
 const exportTask = ref<PdfTask | null>(null)
 const exportForm = ref({ fileName: '' })
 let taskPollingTimer: number | null = null
+
+const formatLabel = computed(() => {
+  const map: Record<string, string> = { pdf: 'PDF', word: 'Word', markdown: 'Markdown' }
+  return map[exportFormat.value]
+})
 
 const taskTagClass = computed(() => {
   const status = exportTask.value?.status
@@ -262,6 +291,31 @@ async function handleExport() {
     ElMessage.warning('请选择模板')
     return
   }
+  if (exportFormat.value === 'pdf') {
+    await exportPdf()
+  } else {
+    await exportDirect()
+  }
+}
+
+async function exportDirect() {
+  directExporting.value = true
+  try {
+    if (exportFormat.value === 'word') {
+      const fileName = await exportApi.downloadWord(resumeId)
+      ElMessage.success(`Word 已下载：${fileName}`)
+    } else {
+      const fileName = await exportApi.downloadMarkdown(resumeId)
+      ElMessage.success(`Markdown 已下载：${fileName}`)
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message || '导出失败')
+  } finally {
+    directExporting.value = false
+  }
+}
+
+async function exportPdf() {
   exporting.value = true
   exportTask.value = null
   try {

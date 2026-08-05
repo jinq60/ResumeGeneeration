@@ -1,0 +1,303 @@
+package com.resume.resume.service;
+
+import com.resume.common.constant.ResultCode;
+import com.resume.common.exception.BusinessException;
+import com.resume.resume.dto.SectionDTO;
+import com.resume.resume.entity.Resume;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.docx4j.convert.in.xhtml.XHTMLImporter;
+import org.docx4j.convert.in.xhtml.XHTMLImporterImpl;
+import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
+import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayOutputStream;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 简历多格式导出（Markdown / Word）。
+ * <p>
+ * Markdown 零依赖拼接；Word 使用"Word 友好"简化 HTML 经 docx4j 转换，
+ * 保证导出为可编辑文档且中文正常。
+ * </p>
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ResumeExportService {
+
+    private final ResumeService resumeService;
+    private final ResumeSectionValidator resumeSectionValidator;
+
+    /**
+     * 生成 Markdown 内容。
+     */
+    public String buildMarkdown(String userId, String resumeId) {
+        Resume resume = resumeService.getResumeEntity(userId, resumeId);
+        resumeSectionValidator.validateForExport(resume.getSections());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("# ").append(profileValue(resume, "name")).append("\n\n");
+        sb.append("> 目标岗位：").append(profileValue(resume, "targetPosition")).append("\n\n");
+        String contact = buildContactLine(resume);
+        if (StringUtils.isNotBlank(contact)) {
+            sb.append("> ").append(contact).append("\n\n");
+        }
+
+        for (SectionDTO section : resume.getSections()) {
+            if (!Boolean.TRUE.equals(section.getVisible())) {
+                continue;
+            }
+            sb.append("## ").append(section.getTitle()).append("\n\n");
+            appendSectionMarkdown(sb, section);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 生成 Word 文档字节。
+     */
+    public byte[] buildWord(String userId, String resumeId) {
+        Resume resume = resumeService.getResumeEntity(userId, resumeId);
+        resumeSectionValidator.validateForExport(resume.getSections());
+
+        String html = renderWordHtml(resume);
+        try {
+            WordprocessingMLPackage wordPackage = WordprocessingMLPackage.createPackage();
+            XHTMLImporter importer = new XHTMLImporterImpl(wordPackage);
+            List<Object> imports = importer.convert(html, null);
+            wordPackage.getMainDocumentPart().getContent().addAll(imports);
+            try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                wordPackage.save(out);
+                return out.toByteArray();
+            }
+        } catch (Exception e) {
+            log.error("Word export failed: resumeId={}", resumeId, e);
+            throw new BusinessException(ResultCode.PDF_EXPORT_FAILED, "Word 文档生成失败，请稍后重试。");
+        }
+    }
+
+    /**
+     * 导出文件名（与 PDF 命名规则一致，仅扩展名不同）。
+     */
+    public String buildExportFileName(String userId, String resumeId, String extension) {
+        Resume resume = resumeService.getResumeEntity(userId, resumeId);
+        String name = profileValue(resume, "name");
+        String targetPosition = resume.getTargetPosition();
+        String base;
+        if (StringUtils.isNotBlank(name) && StringUtils.isNotBlank(targetPosition)) {
+            base = name + "_" + targetPosition + "_简历";
+        } else if (StringUtils.isNotBlank(name)) {
+            base = name + "_简历";
+        } else {
+            base = "我的简历_" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        }
+        if (base.length() > 100) {
+            base = base.substring(0, 97);
+        }
+        return base + "." + extension;
+    }
+
+    /**
+     * Word 友好 HTML：仅段落/无序列表/行内加粗，无 CSS 依赖。
+     * 注意：docx4j XHTMLImporter 按严格 XML（XHTML）解析，所有空标签必须自闭合。
+     */
+    private String renderWordHtml(Resume resume) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"/></head><body>\n");
+        sb.append("<h1>").append(escapeHtml(profileValue(resume, "name"))).append("</h1>\n");
+        String contact = buildContactLine(resume);
+        if (StringUtils.isNotBlank(contact)) {
+            sb.append("<p>").append(escapeHtml(contact)).append("</p>\n");
+        }
+        String targetPosition = profileValue(resume, "targetPosition");
+        if (StringUtils.isNotBlank(targetPosition)) {
+            sb.append("<p><strong>目标岗位：</strong>").append(escapeHtml(targetPosition)).append("</p>\n");
+        }
+        for (SectionDTO section : resume.getSections()) {
+            if (!Boolean.TRUE.equals(section.getVisible())) {
+                continue;
+            }
+            sb.append("<h2>").append(escapeHtml(section.getTitle())).append("</h2>\n");
+            appendSectionHtml(sb, section);
+        }
+        sb.append("</body></html>");
+        return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendSectionMarkdown(StringBuilder sb, SectionDTO section) {
+        Object data = section.getData();
+        switch (section.getType()) {
+            case "profile" -> appendProfileMarkdown(sb, toMap(data));
+            case "introduction" -> {
+                Map<String, Object> intro = toMap(data);
+                sb.append(getString(intro, "content")).append("\n\n");
+            }
+            case "education", "work", "project", "skill" -> {
+                if (data instanceof List<?> items) {
+                    for (Object obj : items) {
+                        if (obj instanceof Map<?, ?> item) {
+                            Map<String, Object> map = (Map<String, Object>) item;
+                            sb.append("- **").append(firstNonBlank(getString(map, "school"),
+                                    getString(map, "company"), getString(map, "name"), getString(map, "category")))
+                              .append("**");
+                            String sub = firstNonBlank(getString(map, "degree"), getString(map, "position"),
+                                    getString(map, "role"));
+                            if (StringUtils.isNotBlank(sub)) {
+                                sb.append(" · ").append(sub);
+                            }
+                            sb.append("\n");
+                            appendListMarkdown(sb, map, "description");
+                            appendListMarkdown(sb, map, "achievements");
+                            appendListMarkdown(sb, map, "items");
+                        }
+                    }
+                }
+                sb.append("\n");
+            }
+            default -> sb.append("\n");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendSectionHtml(StringBuilder sb, SectionDTO section) {
+        Object data = section.getData();
+        switch (section.getType()) {
+            case "profile" -> { /* 已在头部输出 */ }
+            case "introduction" -> {
+                Map<String, Object> intro = toMap(data);
+                sb.append("<p>").append(escapeHtml(getString(intro, "content"))).append("</p>\n");
+            }
+            case "education", "work", "project", "skill" -> {
+                if (data instanceof List<?> items) {
+                    for (Object obj : items) {
+                        if (obj instanceof Map<?, ?> item) {
+                            Map<String, Object> map = (Map<String, Object>) item;
+                            String title = firstNonBlank(getString(map, "school"), getString(map, "company"),
+                                    getString(map, "name"), getString(map, "category"));
+                            String sub = firstNonBlank(getString(map, "degree"), getString(map, "position"),
+                                    getString(map, "role"));
+                            sb.append("<p><strong>").append(escapeHtml(title)).append("</strong>");
+                            if (StringUtils.isNotBlank(sub)) {
+                                sb.append(" · ").append(escapeHtml(sub));
+                            }
+                            sb.append("</p>\n");
+                            appendListHtml(sb, map, "description");
+                            appendListHtml(sb, map, "achievements");
+                            appendListHtml(sb, map, "items");
+                        }
+                    }
+                }
+            }
+            default -> { }
+        }
+    }
+
+    private void appendProfileMarkdown(StringBuilder sb, Map<String, Object> profile) {
+        String contact = buildContactLine(profile);
+        if (StringUtils.isNotBlank(contact)) {
+            sb.append(contact).append("\n\n");
+        }
+    }
+
+    private void appendListMarkdown(StringBuilder sb, Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof List<?> list) {
+            for (Object obj : list) {
+                if (obj instanceof Map<?, ?> skill) {
+                    sb.append("  - ").append(getString((Map<String, Object>) skill, "name")).append("\n");
+                } else if (obj != null) {
+                    sb.append("  - ").append(obj.toString()).append("\n");
+                }
+            }
+        }
+    }
+
+    private void appendListHtml(StringBuilder sb, Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof List<?> list && !list.isEmpty()) {
+            sb.append("<ul>\n");
+            for (Object obj : list) {
+                if (obj instanceof Map<?, ?> skill) {
+                    sb.append("<li>").append(escapeHtml(getString((Map<String, Object>) skill, "name"))).append("</li>\n");
+                } else if (obj != null) {
+                    sb.append("<li>").append(escapeHtml(obj.toString())).append("</li>\n");
+                }
+            }
+            sb.append("</ul>\n");
+        }
+    }
+
+    private String buildContactLine(Resume resume) {
+        return buildContactLine(findProfile(resume.getSections()));
+    }
+
+    private String buildContactLine(Map<String, Object> profile) {
+        StringBuilder sb = new StringBuilder();
+        String phone = getString(profile, "phone");
+        String email = getString(profile, "email");
+        String city = getString(profile, "city");
+        if (StringUtils.isNotBlank(phone)) sb.append(phone);
+        if (StringUtils.isNotBlank(email)) {
+            if (sb.length() > 0) sb.append(" | ");
+            sb.append(email);
+        }
+        if (StringUtils.isNotBlank(city)) {
+            if (sb.length() > 0) sb.append(" | ");
+            sb.append(city);
+        }
+        return sb.toString();
+    }
+
+    private String profileValue(Resume resume, String key) {
+        return getString(findProfile(resume.getSections()), key);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> findProfile(List<SectionDTO> sections) {
+        if (sections == null) {
+            return Map.of();
+        }
+        return sections.stream()
+                .filter(s -> "profile".equals(s.getType()))
+                .filter(s -> s.getData() instanceof Map)
+                .map(s -> (Map<String, Object>) s.getData())
+                .findFirst()
+                .orElse(Map.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toMap(Object data) {
+        if (data instanceof Map) {
+            return (Map<String, Object>) data;
+        }
+        return Map.of();
+    }
+
+    private String getString(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        return value != null ? value.toString() : "";
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StringUtils.isNotBlank(value)) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private String escapeHtml(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&#39;");
+    }
+}
