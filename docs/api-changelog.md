@@ -4,6 +4,27 @@
 
 ---
 
+## v1.3（2026-08-05）
+
+### 新增
+
+- `audit_log` 表（V7 迁移）：敏感操作审计（登录/注册/删除/导出/后台管理操作等）。
+- 首个管理员引导：`ADMIN_BOOTSTRAP_PHONE` / `ADMIN_BOOTSTRAP_PASSWORD` 环境变量，仅当系统无任何 ADMIN 账号时生效。
+- 安全风控：
+  - 登录连续失败锁定：`LOGIN_MAX_FAILURES`（默认 5）/ `LOGIN_LOCKOUT_MINUTES`（默认 15）。
+  - 游客会话限额：`GUEST_MAX_PER_IP_PER_DAY`（默认 50），超限返回 429。
+  - 验证码模式：`VERIFY_CODE_MODE=placeholder|strict`；生产（strict）未接入真实验证码服务时注册被安全拒绝。
+- `/templates/thumbs/**`：内置模板缩略图静态资源（classpath:static/templates/*.svg），V6 迁移更新 6 套内置模板缩略图地址。
+- 模板 HTML 骨架新增 5 套（classic-double 双栏 / tech / fresh / business / postgraduate），由 `template.html_template` 指定加载。
+- 监控：`/actuator/prometheus` 指标端点（micrometer-registry-prometheus）。
+
+### 调整
+
+- 注册验证码校验改为通过 `VerifyCodeService` 抽象执行（不再固定"任意 6 位数字"）；dev/test 默认 placeholder 行为不变。
+- `/auth/guest` 增加每 IP 每日限额（GuestAccountGuard）。
+
+---
+
 ## v1.2（2026-08-05）
 
 ### 新增

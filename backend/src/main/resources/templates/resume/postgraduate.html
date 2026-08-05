@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>${resumeTitle}</title>
+  <style>${css}
+    /* postgraduate：学术风格，衬线字体、居中标题、细线分隔 */
+    body {
+      font-family: "SimSun", "Noto Serif SC", serif !important;
+    }
+    .section-title {
+      font-family: "SimSun", "Noto Serif SC", serif !important;
+      text-align: center;
+      border-bottom: 1px solid #000000 !important;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+      letter-spacing: 0.12em;
+    }
+    .profile-name {
+      text-align: center;
+      font-size: 20pt !important;
+    }
+    .profile-meta {
+      text-align: center;
+    }
+    .item-header span:last-child {
+      color: #555555;
+      font-size: 9pt;
+    }
+    .skill-tag {
+      border: 1px solid #999999;
+      background: #fafafa;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="resume-page">
+    ${body}
+  </div>
+</body>
+</html>

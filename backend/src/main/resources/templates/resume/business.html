@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>${resumeTitle}</title>
+  <style>${css}
+    /* business：商务稳重，衬线标题 + 双线分隔 */
+    .section-title {
+      font-family: "Georgia", "SimSun", "Noto Sans SC", serif !important;
+      border-bottom: 2px solid #c0392b !important;
+      text-transform: none;
+    }
+    .section-title::after {
+      content: "";
+      display: block;
+      width: 40mm;
+      height: 1px;
+      background: #c0392b;
+      margin-top: 2px;
+    }
+    .profile-name {
+      color: #2c3e50;
+      letter-spacing: 0.06em;
+    }
+    .item-header {
+      border-bottom: 1px dotted #cccccc;
+      padding-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="resume-page">
+    ${body}
+  </div>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>${resumeTitle}</title>
+  <style>${css}
+    /* tech：顶部强调条 + 圆角卡片式技能标签 */
+    .resume-page {
+      border-top: 4px solid #2563eb;
+      padding-top: 12mm;
+    }
+    .section-title {
+      border-bottom: 2px solid #2563eb !important;
+      padding-bottom: 6px;
+    }
+    .skill-tag {
+      background: #eff6ff;
+      border: 1px solid #dbeafe;
+      border-radius: 999px;
+      padding: 3px 12px;
+      color: #1e40af;
+      font-size: 9.5pt;
+    }
+    .item-header {
+      border-left: 3px solid #2563eb;
+      padding-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="resume-page">
+    ${body}
+  </div>
+</body>
+</html>

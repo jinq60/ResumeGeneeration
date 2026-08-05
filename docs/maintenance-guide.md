@@ -390,6 +390,49 @@ mvn spring-boot:run -Dspring-boot.run.profiles=dev   # 本地启动
 - 数据库：直连 MySQL 查 `resume_generation` 库。
 - 测试：`mvn test -Dtest=com.resume.xxx.**` 只跑某个模块的测试。
 
+### 8.2 备份与恢复
+
+备份脚本：`ops/backup.sh`（MySQL mysqldump + MinIO 对象镜像，保留最近 7 份）。
+
+```bash
+# 手动备份
+/opt/resume-generation/app/ops/backup.sh /opt/resume-generation/backups
+
+# 每日自动备份（crontab -e）
+0 2 * * * /opt/resume-generation/app/ops/backup.sh >> /var/log/resume-backup.log 2>&1
+```
+
+恢复步骤（以灾难恢复为例）：
+
+```bash
+# 1) 恢复 MySQL
+docker exec -i resume-mysql mysql -u resume -p'<密码>' resume_generation < backups/mysql/resume_generation_20260805_020000.sql
+
+# 2) 恢复 MinIO（mc 镜像回滚）
+mc mirror --overwrite backups/minio/20260805_020000/ resume-local
+
+# 3) 重启后端让 Flyway 状态与数据一致（如备份早于当前迁移版本，需评估迁移回退）
+cd /opt/resume-generation/app/ops && docker compose -f docker-compose.server.yml up -d backend
+```
+
+> 注意：恢复前先确认 Flyway `flyway_schema_history` 与备份时点一致，避免版本错位。
+
+### 8.3 发布与回滚
+
+- 每次部署的镜像都带 Git 提交短 SHA 标签（`BACKEND_TAG` / `FRONTEND_TAG`），例如 `resume-backend:a1b2c3d4`。
+- 回滚到上一版本：
+
+```bash
+cd /opt/resume-generation/app/ops
+# 找到上一个部署使用的 SHA（GitHub Actions 部署日志可见，或 docker images 列出历史标签）
+export BACKEND_TAG=<上一版本SHA>
+export FRONTEND_TAG=<上一版本SHA>
+docker compose -f docker-compose.server.yml up -d --no-build
+```
+
+- 紧急回滚到已验证的 stable 快照：`git checkout stable && git push origin production`（触发 CI 重新部署），或将 stable 构建产物打成对应标签再启动。
+- 数据库迁移（Flyway）不可自动回退：若新版本包含迁移且需要回滚，按 `8.2` 从备份恢复，或人工评审迁移的向下兼容性。
+
 ---
 
 ## 9. 常用命令

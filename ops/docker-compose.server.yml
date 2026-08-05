@@ -69,6 +69,7 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
+    image: resume-backend:${BACKEND_TAG:-latest}
     container_name: resume-backend
     restart: unless-stopped
     env_file:
@@ -101,19 +102,58 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+    image: resume-frontend:${FRONTEND_TAG:-latest}
     container_name: resume-frontend
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # HTTPS 证书挂载（可选）：宿主机 /opt/resume-generation/certs/ 放置 fullchain.pem 与 privkey.pem
+      - /opt/resume-generation/certs:/etc/nginx/ssl:ro
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - resume-net
 
+  # 可选：Prometheus + Grafana 监控（G6）
+  # 取消注释并按需调整配置后启用；数据采集目标为 backend 的 /actuator/prometheus
+  # prometheus:
+  #   image: prom/prometheus:v2.53.0
+  #   container_name: resume-prometheus
+  #   restart: unless-stopped
+  #   command:
+  #     - --config.file=/etc/prometheus/prometheus.yml
+  #     - --storage.tsdb.retention.time=30d
+  #   volumes:
+  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - resume-prometheus-data:/prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   networks:
+  #     - resume-net
+  #
+  # grafana:
+  #   image: grafana/grafana:11.1.0
+  #   container_name: resume-grafana
+  #   restart: unless-stopped
+  #   environment:
+  #     GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+  #   volumes:
+  #     - resume-grafana-data:/var/lib/grafana
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - prometheus
+  #   networks:
+  #     - resume-net
+
 volumes:
   resume-mysql-data:
   resume-minio-data:
+  # resume-prometheus-data:
+  # resume-grafana-data:
 
 networks:
   resume-net:

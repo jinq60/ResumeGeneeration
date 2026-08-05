@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
+import com.resume.common.service.AuditLogService;
 import com.resume.common.service.MinioStorageService;
 import com.resume.common.service.ResumeRenderService;
 import com.resume.pdf.dto.PdfTaskResponse;
@@ -62,6 +63,7 @@ public class PdfService {
     private final ResumeRenderService resumeRenderService;
     private final MinioStorageService minioStorageService;
     private final ResumeSectionValidator resumeSectionValidator;
+    private final AuditLogService auditLogService;
     @Qualifier("pdfTaskExecutor")
     private final Executor pdfTaskExecutor;
 
@@ -94,6 +96,7 @@ public class PdfService {
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(LocalDateTime.now());
         pdfTaskMapper.insert(task);
+        auditLogService.record(userId, "pdf_export", resumeId, "templateId=" + exportTemplateId);
 
         try {
             pdfTaskExecutor.execute(() -> executeExport(task.getId(), userId, resumeId, exportTemplateId));

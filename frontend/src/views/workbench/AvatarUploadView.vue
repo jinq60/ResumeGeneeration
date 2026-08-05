@@ -34,8 +34,7 @@
           :on-change="handleFileChange"
           accept="image/*"
           drag
-        >
-          <div
+        >          <div
             v-if="!imageUrl"
             class="flex flex-col items-center gap-2 text-center"
           >
@@ -62,8 +61,14 @@
 
         <div
           v-if="imageUrl"
-          class="mt-3"
+          class="mt-3 flex gap-2"
         >
+          <button
+            class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2"
+            @click="cropVisible = true"
+          >
+            重新裁剪
+          </button>
           <button
             class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2"
             @click="handleReupload"
@@ -301,6 +306,39 @@
         </div>
       </section>
     </div>
+
+    <!-- 裁剪弹窗 -->
+    <el-dialog
+      v-model="cropVisible"
+      title="裁剪一寸照"
+      width="420px"
+      align-center
+      :close-on-click-modal="false"
+    >
+      <VueCropper
+        ref="cropperRef"
+        :img="cropImg"
+        :output-size="1"
+        :auto-crop="true"
+        :fixed="true"
+        :fixed-number="[3, 4]"
+        :center-box="true"
+        :can-move-box="true"
+        style="height: 300px"
+      />
+      <template #footer>
+        <el-button @click="cropVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="cropping"
+          @click="confirmCrop"
+        >
+          确认裁剪并上传
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -308,6 +346,8 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { VueCropper } from 'vue-cropper'
+import 'vue-cropper/dist/index.css'
 import { ArrowLeft, UploadFilled, MagicStick, Loading, Check } from '@element-plus/icons-vue'
 import { avatarApi } from '@/api/avatar'
 import type { OptimizeAvatarRequest, AvatarTask } from '@/api/avatar'
@@ -320,6 +360,12 @@ const imageUrl = ref('')
 const uploadedImageUrl = ref('')
 const optimizing = ref(false)
 const optimizeTask = ref<AvatarTask | null>(null)
+
+// 裁剪相关
+const cropVisible = ref(false)
+const cropImg = ref('')
+const cropping = ref(false)
+const cropperRef = ref<InstanceType<typeof VueCropper>>()
 
 const bgChipClass: Record<string, string> = {
   white: 'peer-checked:bg-surface-container-lowest peer-checked:text-on-surface',
@@ -371,17 +417,39 @@ async function handleFileChange(file: { raw: File }) {
   if (!file.raw) return
   const valid = beforeUpload(file.raw)
   if (!valid) return
+  // 先本地预览并进入裁剪步骤，裁剪确认后再上传
   const reader = new FileReader()
-  reader.onload = (e) => { imageUrl.value = e.target?.result as string }
+  reader.onload = (e) => {
+    imageUrl.value = e.target?.result as string
+    cropImg.value = imageUrl.value
+    cropVisible.value = true
+  }
   reader.readAsDataURL(file.raw)
+}
+
+async function confirmCrop() {
+  const cropper = cropperRef.value as any
+  if (!cropper) return
+  cropping.value = true
   try {
-    const response = await avatarApi.upload(file.raw, resumeId)
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      cropper.getCropData((data: string) => {
+        if (data) resolve(data)
+        else reject(new Error('裁剪失败'))
+      })
+    })
+    const blob = await (await fetch(dataUrl)).blob()
+    const croppedFile = new File([blob], 'avatar-cropped.png', { type: 'image/png' })
+    cropVisible.value = false
+
+    const response = await avatarApi.upload(croppedFile, resumeId)
     uploadedImageUrl.value = response.sourceImageUrl
     optimizeForm.value.sourceImageUrl = response.sourceImageUrl
     ElMessage.success('上传成功')
   } catch (e: any) {
-    ElMessage.error(e.message || '上传失败')
-    imageUrl.value = ''
+    ElMessage.error(e.message || '裁剪或上传失败')
+  } finally {
+    cropping.value = false
   }
 }
 

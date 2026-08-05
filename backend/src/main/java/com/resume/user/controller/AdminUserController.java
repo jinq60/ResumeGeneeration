@@ -83,8 +83,9 @@ public class AdminUserController {
      * 重置用户密码，返回一次性临时密码。
      */
     @PostMapping("/{id}/reset-password")
-    public R<ResetPasswordResponse> resetPassword(@PathVariable String id) {
-        return R.success(adminUserService.resetPassword(id));
+    public R<ResetPasswordResponse> resetPassword(@AuthenticationPrincipal String operatorId,
+                                                  @PathVariable String id) {
+        return R.success(adminUserService.resetPassword(id, operatorId));
     }
 
     /**

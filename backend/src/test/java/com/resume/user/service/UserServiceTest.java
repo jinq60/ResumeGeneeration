@@ -3,6 +3,7 @@ package com.resume.user.service;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
+import com.resume.common.service.AuditLogService;
 import com.resume.user.dto.*;
 import com.resume.user.entity.RefreshToken;
 import com.resume.user.entity.User;
@@ -16,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -47,11 +49,23 @@ class UserServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private ObjectProvider<VerifyCodeService> verifyCodeServiceProvider;
+
+    @Mock
+    private LoginAttemptGuard loginAttemptGuard;
+
+    @Mock
+    private AuditLogService auditLogService;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userMapper, refreshTokenMapper, jwtTokenProvider, passwordEncoder);
+        userService = new UserService(userMapper, refreshTokenMapper, jwtTokenProvider, passwordEncoder,
+                verifyCodeServiceProvider, loginAttemptGuard, auditLogService);
+        lenient().when(verifyCodeServiceProvider.getIfAvailable())
+                .thenReturn(new PlaceholderVerifyCodeService());
         lenient().when(jwtTokenProvider.generateAccessToken(anyString(), anyBoolean())).thenReturn("access_token");
         lenient().when(jwtTokenProvider.generateAccessToken(anyString(), anyBoolean(), anyString())).thenReturn("access_token");
         lenient().when(jwtTokenProvider.generateRefreshToken(anyString())).thenReturn("refresh_token");
@@ -179,7 +193,8 @@ class UserServiceTest {
         ReflectionTestUtils.setField(realProvider, "accessTokenExpiration", 3600000L);
         ReflectionTestUtils.setField(realProvider, "refreshTokenExpiration", 604800000L);
 
-        UserService service = new UserService(userMapper, refreshTokenMapper, realProvider, passwordEncoder);
+        UserService service = new UserService(userMapper, refreshTokenMapper, realProvider, passwordEncoder,
+                verifyCodeServiceProvider, loginAttemptGuard, auditLogService);
         User user = new User();
         user.setId("user_1");
         user.setStatus(BizConstant.USER_STATUS_ACTIVE);

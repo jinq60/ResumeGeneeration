@@ -62,6 +62,9 @@ jobs:
             set -e
             cd /opt/resume-generation/app/ops
             docker compose -f docker-compose.server.yml pull mysql minio || true
+            # 镜像打上提交短 SHA 标签，便于按版本回滚（docker compose up 指定旧 BACKEND_TAG/FRONTEND_TAG 即可）
+            export BACKEND_TAG="${GITHUB_SHA::8}"
+            export FRONTEND_TAG="${GITHUB_SHA::8}"
             docker compose -f docker-compose.server.yml up -d --build
             docker compose -f docker-compose.server.yml ps
-            echo "Deployment finished"
+            echo "Deployment finished, tags: backend=${BACKEND_TAG} frontend=${FRONTEND_TAG}"

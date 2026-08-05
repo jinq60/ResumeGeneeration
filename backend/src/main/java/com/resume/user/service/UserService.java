@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
+import com.resume.common.service.AuditLogService;
 import com.resume.user.dto.*;
 import com.resume.user.entity.RefreshToken;
 import com.resume.user.entity.User;
@@ -15,6 +16,7 @@ import com.resume.user.security.TokenHashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,9 @@ public class UserService {
     private final RefreshTokenMapper refreshTokenMapper;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
+    private final ObjectProvider<VerifyCodeService> verifyCodeServiceProvider;
+    private final LoginAttemptGuard loginAttemptGuard;
+    private final AuditLogService auditLogService;
 
     private static final int MIN_PASSWORD_LENGTH = 8;
     private static final int MAX_PASSWORD_LENGTH = 32;
@@ -58,9 +63,16 @@ public class UserService {
                     "密码长度应为 " + MIN_PASSWORD_LENGTH + "–" + MAX_PASSWORD_LENGTH + " 位，且需同时包含字母和数字。");
         }
 
-        // P0：验证码占位校验，任意 6 位数字均通过。
-        // 防御性校验：即使 DTO 校验被绕过，也不应在此抛 NPE（StringUtils.isBlank 已兼容 null）。
-        if (StringUtils.isBlank(request.getVerifyCode()) || !request.getVerifyCode().matches("^\\d{6}$")) {
+        // 验证码校验：优先使用配置的验证码服务；未配置任何实现时安全拒绝注册
+        VerifyCodeService verifyCodeService = verifyCodeServiceProvider.getIfAvailable();
+        if (verifyCodeService == null) {
+            log.warn("Register rejected: no VerifyCodeService configured (verify-code.mode must be placeholder in dev/test, real service in prod)");
+            throw new BusinessException(ResultCode.AUTH_VERIFY_CODE_INVALID,
+                    "验证码服务未配置，暂时无法注册，请联系管理员。");
+        }
+        if (StringUtils.isBlank(request.getVerifyCode())
+                || !verifyCodeService.verify(request.getVerifyCode(),
+                        StringUtils.defaultString(request.getPhone(), request.getEmail()))) {
             throw new BusinessException(ResultCode.AUTH_VERIFY_CODE_INVALID, "验证码不正确或已过期。");
         }
 
@@ -97,14 +109,23 @@ public class UserService {
         userMapper.insert(user);
 
         log.info("register success: userId={}, phone={}", user.getId(), maskPhone(user.getPhone()));
+        auditLogService.record(user.getId(), "register", user.getId(),
+                "phone=" + maskPhone(user.getPhone()) + ", email=" + maskEmail(user.getEmail()));
         return buildAuthResponse(user);
     }
 
     /**
      * 登录。当 loginType 未传时自动识别账号类型。
+     * <p>
+     * 连续失败达到上限后账号临时锁定（LoginAttemptGuard），防止密码爆破。
+     * </p>
      */
     public AuthResponse login(LoginRequest request) {
         log.info("login start: account={}", maskAccount(request.getAccount()));
+        if (loginAttemptGuard.isLocked(request.getAccount())) {
+            throw new BusinessException(ResultCode.AUTH_ACCOUNT_LOCKED,
+                    "登录失败次数过多，账号已临时锁定，请稍后再试。");
+        }
         String loginType = request.getLoginType();
         if (StringUtils.isBlank(loginType)) {
             loginType = detectLoginType(request.getAccount());
@@ -121,12 +142,15 @@ public class UserService {
             throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND, "账号不存在。");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            loginAttemptGuard.recordFailure(request.getAccount());
             throw new BusinessException(ResultCode.AUTH_PASSWORD_INCORRECT, "密码不正确。");
         }
         if (BizConstant.USER_STATUS_DISABLED.equals(user.getStatus())) {
             throw new BusinessException(ResultCode.AUTH_ACCOUNT_LOCKED, "账号已被锁定，请稍后再试。");
         }
 
+        loginAttemptGuard.reset(request.getAccount());
+        auditLogService.record(user.getId(), "login", user.getId(), "loginType=" + loginType);
         log.info("login success: userId={}", user.getId());
         return buildAuthResponse(user);
     }
@@ -146,6 +170,7 @@ public class UserService {
         userMapper.insert(user);
 
         log.info("guest session created: userId={}", user.getId());
+        auditLogService.record(user.getId(), "guest_create", user.getId(), null);
         return buildAuthResponse(user);
     }
 
@@ -209,6 +234,7 @@ public class UserService {
         LambdaUpdateWrapper<RefreshToken> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(RefreshToken::getTokenHash, tokenHash);
         refreshTokenMapper.delete(wrapper);
+        auditLogService.record(null, "logout", null, "refresh token revoked");
         log.info("logout: refresh token revoked");
     }
 
@@ -252,6 +278,7 @@ public class UserService {
         userMapper.updateById(user);
         // 旧会话全部失效：吊销该用户所有刷新令牌
         revokeUserRefreshTokens(userId);
+        auditLogService.record(userId, "change_password", userId, null);
         log.info("changePassword success: userId={}", userId);
     }
 

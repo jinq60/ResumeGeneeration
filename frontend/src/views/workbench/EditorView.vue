@@ -195,17 +195,27 @@
             第 1 页 / 共 1 页
           </div>
           <div class="h-6 w-px bg-outline-variant" />
-          <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors">
-              <span class="text-label-md">模板：{{ resume?.templateId || '默认' }}</span>
-              <el-icon size="12">
-                <ArrowDown />
-              </el-icon>
-            </div>
-            <el-icon class="cursor-pointer hover:text-primary">
-              <Files />
+        <div class="flex items-center gap-4">
+          <button
+            class="flex items-center gap-2 px-3 py-2 border border-outline-variant rounded-lg hover:bg-surface-container-high transition-all text-on-surface text-sm"
+            @click="sectionsDialogVisible = true"
+          >
+            <el-icon size="14"><Menu /></el-icon>
+            <span>模块管理</span>
+          </button>
+          <div
+            class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+            @click="templateDialogVisible = true"
+          >
+            <span class="text-label-md">模板：{{ templateName(resume?.templateId) }}</span>
+            <el-icon size="12">
+              <ArrowDown />
             </el-icon>
           </div>
+          <el-icon class="cursor-pointer hover:text-primary">
+            <Files />
+          </el-icon>
+        </div>
         </div>
       </div>
 
@@ -399,6 +409,84 @@
       </el-button>
     </template>
   </el-dialog>
+
+  <!-- 模块管理：排序 + 显隐 + 标题 -->
+  <el-dialog
+    v-model="sectionsDialogVisible"
+    title="模块管理"
+    width="520px"
+    align-center
+  >
+    <div
+      v-for="(sec, idx) in resume?.sections || []"
+      :key="sec.id"
+      class="flex items-center gap-2 py-2 border-b border-outline-variant/30"
+    >
+      <span class="text-xs text-outline w-5 text-center font-mono">{{ idx + 1 }}</span>
+      <el-input
+        v-model="sec.title"
+        size="small"
+        style="flex: 1"
+        @change="triggerAutoSave()"
+      />
+      <span class="text-xs text-outline w-16">
+        {{ typeLabel(sec.type) }}
+      </span>
+      <el-button
+        size="small"
+        :disabled="idx === 0"
+        title="上移"
+        @click="moveSection(idx, -1)"
+      >
+        <el-icon><ArrowUp /></el-icon>
+      </el-button>
+      <el-button
+        size="small"
+        :disabled="idx === (resume?.sections?.length || 1) - 1"
+        title="下移"
+        @click="moveSection(idx, 1)"
+      >
+        <el-icon><ArrowDown /></el-icon>
+      </el-button>
+      <el-switch
+        v-model="sec.visible"
+        size="small"
+        title="显示/隐藏"
+        @change="triggerAutoSave()"
+      />
+    </div>
+    <p class="text-xs text-outline mt-3">
+      隐藏的模块不会出现在预览与导出 PDF 中；个人信息模块不可隐藏。
+    </p>
+  </el-dialog>
+
+  <!-- 模板切换 -->
+  <el-dialog
+    v-model="templateDialogVisible"
+    title="切换简历模板"
+    width="720px"
+    align-center
+  >
+    <div class="grid grid-cols-3 gap-3">
+      <div
+        v-for="t in templates"
+        :key="t.id"
+        class="cursor-pointer rounded-xl border-2 overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md"
+        :class="resume?.templateId === t.id ? 'border-primary' : 'border-outline-variant'"
+        @click="selectTemplate(t)"
+      >
+        <img
+          :src="t.thumbnailUrl"
+          :alt="t.name"
+          class="w-full aspect-[3/4] object-cover bg-surface-container-low"
+          @error="onThumbnailError"
+        >
+        <div class="p-2 text-center text-sm font-medium">
+          {{ t.name }}
+        </div>
+      </div>
+    </div>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -420,6 +508,8 @@ import {
   Plus,
   Minus,
   ArrowDown,
+  ArrowUp,
+  Menu,
   Files,
   InfoFilled,
   ArrowRight,
@@ -433,6 +523,8 @@ import {
 } from '@element-plus/icons-vue'
 import { resumeApi } from '@/api/resume'
 import { templateApi } from '@/api/template'
+import { TEMPLATE_PLACEHOLDER } from '@/utils/placeholder'
+import type { Template } from '@/api/template'
 import type { Resume } from '@/types/resume'
 import ResumePreview from '@/components/preview/ResumePreview.vue'
 import ProfileForm from '@/components/editor/ProfileForm.vue'
@@ -454,6 +546,10 @@ const zoom = ref(100)
 const aiScore = ref(82)
 const renameVisible = ref(false)
 const renameTitle = ref('')
+const sectionsDialogVisible = ref(false)
+const templateDialogVisible = ref(false)
+const templates = ref<Template[]>([])
+const templateNameMap = ref<Record<string, string>>({})
 
 interface TabDef {
   name: string
@@ -584,6 +680,7 @@ function triggerAutoSave() {
         await resumeApi.update(resume.value!.id, {
           title: resume.value!.title,
           targetPosition: resume.value!.targetPosition,
+          templateId: resume.value!.templateId,
           sections: resume.value!.sections
         })
       } catch (e: any) {
@@ -607,8 +704,62 @@ function zoomOut() {
   if (zoom.value > 60) zoom.value -= 10
 }
 
+function typeLabel(type: string): string {
+  const map: Record<string, string> = {
+    profile: '基本信息',
+    education: '教育背景',
+    project: '项目经历',
+    work: '工作经历',
+    skill: '技能清单',
+    introduction: '个人简介',
+    custom: '补充信息'
+  }
+  return map[type] || type
+}
+
+function moveSection(index: number, delta: number) {
+  if (!resume.value) return
+  const sections = [...resume.value.sections]
+  const target = index + delta
+  if (target < 0 || target >= sections.length) return
+  const moved = sections.splice(index, 1)[0]
+  sections.splice(target, 0, moved)
+  sections.forEach((s, i) => { s.order = i })
+  handleSectionsUpdate(sections)
+}
+
+function templateName(id?: string): string {
+  if (!id) return '默认'
+  return templateNameMap.value[id] || id
+}
+
+async function loadTemplates() {
+  try {
+    templates.value = await templateApi.list()
+    templateNameMap.value = Object.fromEntries(templates.value.map(t => [t.id, t.name]))
+  } catch {
+    // 模板列表加载失败时退化为显示模板 ID
+  }
+}
+
+function selectTemplate(t: Template) {
+  if (!resume.value) return
+  resume.value.templateId = t.id
+  templateDialogVisible.value = false
+  ElMessage.success(`已切换模板：${t.name}`)
+  triggerAutoSave()
+}
+
+function onThumbnailError(event: Event) {
+  const img = event.target as HTMLImageElement
+  if (img && img.src !== TEMPLATE_PLACEHOLDER) {
+    img.src = TEMPLATE_PLACEHOLDER
+  }
+}
+
 onMounted(() => {
   loadResume()
+  loadTemplates()
 })
 </script>
 

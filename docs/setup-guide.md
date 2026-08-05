@@ -114,6 +114,20 @@ mvn spring-boot:run -Dspring-boot.run.profiles=dev
 - 健康检查：`http://localhost:8080/actuator/health`
 - API Base URL：`http://localhost:8080/api`
 
+### 3.5 首个管理员初始化（生产环境）
+
+系统不存在任何 ADMIN 角色账号时，可通过环境变量引导创建首个管理员（解决"首个管理员无法创建"的鸡生蛋问题）：
+
+```bash
+export ADMIN_BOOTSTRAP_PHONE=13800138000
+export ADMIN_BOOTSTRAP_PASSWORD=<8-32位含字母数字的强密码>
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+- 仅当系统中尚无 ADMIN 账号时生效，已有管理员则自动跳过（防覆盖/后门）。
+- 初始化完成后**建议立即移除这两个环境变量**，改为在后台修改密码或继续使用。
+- 也可直接写入服务器 `.env`（见 `ops/.env.example`）后随容器启动生效。
+
 ---
 
 ## 4. 前端启动

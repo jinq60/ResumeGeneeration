@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>${resumeTitle}</title>
+  <style>${css}
+    /* classic-double：个人信息整行，其余模块两栏排布 */
+    .resume-page {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 20mm;
+    }
+    .resume-page > .section:first-child {
+      grid-column: 1 / -1;
+    }
+    .section-title {
+      letter-spacing: 0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="resume-page">
+    ${body}
+  </div>
+</body>
+</html>

@@ -43,6 +43,29 @@ public class StaticResourceController {
         return buildResponse(objectName, data, true);
     }
 
+    /**
+     * 内置模板缩略图（classpath:static/templates/*.svg）。
+     * <p>
+     * 路径使用 /templates/thumbs/** 前缀，避免与 TemplateController 的 /templates/{id} 冲突。
+     * </p>
+     */
+    @GetMapping("/templates/thumbs/**")
+    public ResponseEntity<byte[]> serveTemplateThumb(HttpServletRequest request) {
+        String fileName = extractObjectName(request, "/templates/thumbs/");
+        validateObjectName(fileName);
+
+        org.springframework.core.io.ClassPathResource resource =
+                new org.springframework.core.io.ClassPathResource("static/templates/" + fileName);
+        if (!resource.exists()) {
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "缩略图不存在。");
+        }
+        try (java.io.InputStream in = resource.getInputStream()) {
+            return buildResponse(fileName, in.readAllBytes(), true);
+        } catch (java.io.IOException e) {
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "缩略图读取失败。");
+        }
+    }
+
     private String extractObjectName(HttpServletRequest request, String prefix) {
         String uri = request.getRequestURI();
         String contextPath = request.getContextPath();
@@ -76,6 +99,7 @@ public class StaticResourceController {
 
     private String guessContentType(String filename) {
         String lower = filename.toLowerCase();
+        if (lower.endsWith(".svg")) return "image/svg+xml";
         if (lower.endsWith(".png")) return "image/png";
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
         if (lower.endsWith(".webp")) return "image/webp";

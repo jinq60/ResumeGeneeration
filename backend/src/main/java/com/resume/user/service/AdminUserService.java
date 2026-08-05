@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
+import com.resume.common.service.AuditLogService;
 import com.resume.user.dto.AdminUserDetailResponse;
 import com.resume.user.dto.AdminUserListItemResponse;
 import com.resume.user.dto.ResetPasswordResponse;
@@ -40,6 +41,7 @@ public class AdminUserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenMapper refreshTokenMapper;
+    private final AuditLogService auditLogService;
 
     /**
      * 默认临时密码长度，可在配置中覆盖。
@@ -154,6 +156,7 @@ public class AdminUserService {
         if (BizConstant.USER_STATUS_DISABLED.equals(status)) {
             revokeUserRefreshTokens(userId);
         }
+        auditLogService.record(operatorId, "admin_update_status", userId, "status=" + status);
     }
 
     /**
@@ -177,13 +180,14 @@ public class AdminUserService {
         if (BizConstant.USER_ROLE_USER.equals(role)) {
             revokeUserRefreshTokens(userId);
         }
+        auditLogService.record(operatorId, "admin_update_role", userId, "role=" + role);
     }
 
     /**
      * 管理员重置用户密码：生成一次性临时密码，BCrypt 哈希入库，并吊销该用户全部刷新令牌。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResetPasswordResponse resetPassword(String userId) {
+    public ResetPasswordResponse resetPassword(String userId, String operatorId) {
         User user = findUserById(userId);
         if (BizConstant.IS_GUEST.equals(user.getIsGuest())) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "游客账号无需重置密码。");
@@ -195,6 +199,7 @@ public class AdminUserService {
         userMapper.updateById(user);
         // 旧会话全部失效：吊销该用户所有刷新令牌
         revokeUserRefreshTokens(userId);
+        auditLogService.record(operatorId, "admin_reset_password", userId, null);
 
         log.info("Admin reset password for userId={}", userId);
 
@@ -223,6 +228,7 @@ public class AdminUserService {
         wrapper.eq(User::getId, userId);
         userMapper.update(update, wrapper);
         revokeUserRefreshTokens(userId);
+        auditLogService.record(operatorId, "admin_delete_user", userId, null);
     }
 
     /**

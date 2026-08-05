@@ -136,6 +136,12 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Prometheus 指标（/actuator/prometheus，供监控采集） -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

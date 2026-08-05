@@ -7,6 +7,7 @@ import com.resume.user.dto.AuthResponse;
 import com.resume.user.security.JwtTokenProvider;
 import com.resume.user.dto.LoginRequest;
 import com.resume.user.dto.RegisterRequest;
+import com.resume.user.service.GuestAccountGuard;
 import com.resume.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,9 @@ class AuthControllerTest {
 
     @MockBean
     private UserService userService;
+
+    @MockBean
+    private GuestAccountGuard guestAccountGuard;
 
     @MockBean
     private IdempotencyRecordMapper idempotencyRecordMapper;
@@ -110,6 +114,7 @@ class AuthControllerTest {
         response.setIsGuest(true);
 
         when(userService.createGuest()).thenReturn(response);
+        when(guestAccountGuard.tryAcquire(any())).thenReturn(true);
 
         mockMvc.perform(post("/auth/guest"))
                 .andExpect(status().isOk())

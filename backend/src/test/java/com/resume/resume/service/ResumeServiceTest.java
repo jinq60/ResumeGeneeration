@@ -39,6 +39,9 @@ class ResumeServiceTest {
     @Mock
     private AvatarService avatarService;
 
+    @Mock
+    private com.resume.common.service.AuditLogService auditLogService;
+
     private ResumeSectionValidator resumeSectionValidator;
 
     private ResumeService resumeService;
@@ -47,7 +50,7 @@ class ResumeServiceTest {
     void setUp() {
         resumeSectionValidator = new ResumeSectionValidator();
         resumeService = new ResumeService(resumeMapper, templateService,
-                pdfService, avatarService, resumeSectionValidator);
+                pdfService, avatarService, resumeSectionValidator, auditLogService);
     }
 
     @Test

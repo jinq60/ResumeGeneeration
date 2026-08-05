@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Collections;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -97,7 +98,7 @@ class AdminUserControllerTest {
         response.setUserId("user1");
         response.setTemporaryPassword("abc123XYZ");
 
-        when(adminUserService.resetPassword("user1")).thenReturn(response);
+        when(adminUserService.resetPassword(eq("user1"), any())).thenReturn(response);
 
         mockMvc.perform(post("/admin/users/user1/reset-password")
                 .with(csrf())

@@ -7,6 +7,7 @@ import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.common.enums.SectionType;
+import com.resume.common.service.AuditLogService;
 import com.resume.pdf.service.PdfService;
 import com.resume.resume.dto.*;
 import com.resume.resume.dto.AdminResumeListItemResponse;
@@ -35,17 +36,20 @@ private final ResumeMapper resumeMapper;
     private final PdfService pdfService;
     private final AvatarService avatarService;
     private final ResumeSectionValidator resumeSectionValidator;
+    private final AuditLogService auditLogService;
 
     public ResumeService(ResumeMapper resumeMapper,
                           TemplateService templateService,
                           @Lazy PdfService pdfService,
                           @Lazy AvatarService avatarService,
-                          ResumeSectionValidator resumeSectionValidator) {
+                          ResumeSectionValidator resumeSectionValidator,
+                          AuditLogService auditLogService) {
         this.resumeMapper = resumeMapper;
         this.templateService = templateService;
         this.pdfService = pdfService;
         this.avatarService = avatarService;
         this.resumeSectionValidator = resumeSectionValidator;
+        this.auditLogService = auditLogService;
     }
 
     private static final int MAX_TITLE_LENGTH = 128;
@@ -236,6 +240,7 @@ private final ResumeMapper resumeMapper;
         avatarService.cleanupTasksByResume(userId, resumeId);
 
         resumeMapper.deleteById(resumeId);
+        auditLogService.record(userId, "delete_resume", resumeId, "title=" + resume.getTitle());
     }
 
     /**
@@ -259,6 +264,8 @@ private final ResumeMapper resumeMapper;
         copy.setCreatedAt(LocalDateTime.now());
         copy.setUpdatedAt(LocalDateTime.now());
         resumeMapper.insert(copy);
+
+        auditLogService.record(userId, "duplicate_resume", source.getId(), "newResumeId=" + copy.getId());
 
         DuplicateResumeResponse response = new DuplicateResumeResponse();
         response.setId(copy.getId());

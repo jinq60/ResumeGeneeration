@@ -48,4 +48,18 @@ class StaticResourceControllerTest {
         mockMvc.perform(get("/api/uploads/avatars/../secret.png").contextPath("/api"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void shouldServeBuiltinTemplateThumbnailFromClasspath() throws Exception {
+        mockMvc.perform(get("/api/templates/thumbs/classic-single-thumb.svg").contextPath("/api"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/svg+xml"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<svg")));
+    }
+
+    @Test
+    void shouldReturn404ForMissingThumbnail() throws Exception {
+        mockMvc.perform(get("/api/templates/thumbs/nonexistent.svg").contextPath("/api"))
+                .andExpect(status().isNotFound());
+    }
 }

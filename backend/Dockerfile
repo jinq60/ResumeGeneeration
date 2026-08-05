@@ -31,6 +31,11 @@ COPY src ./src
 ENV PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright
 ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 
+# 安装 CJK 中文字体，否则 Playwright 导出的 PDF 中文会显示为方块（豆腐块）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends fonts-noto-cjk && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN mvn -B clean package -DskipTests && \
     mvn -B exec:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps chromium" && \
     rm -rf /root/.m2/repository /app/src /app/pom.xml /app/target/*.original

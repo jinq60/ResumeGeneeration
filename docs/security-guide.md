@@ -92,9 +92,27 @@
 - 定期轮换 JWT Secret 和数据库密码。
 - 上线前进行安全扫描（依赖漏洞、越权测试、文件上传测试）。
 
+### 6.1 审计日志（已实现）
+
+- `audit_log` 表记录敏感操作（V7 迁移）：login / register / guest_create / logout / change_password / delete_resume / duplicate_resume / pdf_export / admin_update_role / admin_update_status / admin_reset_password / admin_delete_user。
+- 写入失败不影响主业务流程（AuditLogService 内部 try/catch）。
+
+### 6.2 登录防爆破与游客风控（已实现）
+
+- 连续登录失败达到 `LOGIN_MAX_FAILURES`（默认 5）次后，账号临时锁定 `LOGIN_LOCKOUT_MINUTES`（默认 15）分钟（LoginAttemptGuard）。
+- 每 IP 每日游客会话上限 `GUEST_MAX_PER_IP_PER_DAY`（默认 50），防止 /auth/guest 刷号（GuestAccountGuard）。
+
 ---
 
-## 7. 参考文档
+## 7. 已知待办（P1 排期）
+
+- **对象存储访问控制**：`/uploads/avatars/**` 目前为公开可访问（URL 可预测）。生产建议迁移为 MinIO 预签名 URL（短时效）或 CDN + 鉴权后公开缓存；前端需相应改造头像加载方式。
+- **用户数据物理删除**：当前仅逻辑删除，数据永久保留。GDPR /《个人信息保护法》合规需要提供"注销账号 + 彻底删除"流程（含 MinIO 对象清理），需产品与法务确认删除范围后实现。
+- **真实验证码服务**：`VERIFY_CODE_MODE=strict` 下注册被安全拒绝；接入短信/邮件服务实现 `VerifyCodeService` 后开放注册。
+
+---
+
+## 8. 参考文档
 
 - `docs/需求PRD-v1.md` §13
 - `docs/superpowers/specs/2026-07-03-api-spec.md` §3、§4

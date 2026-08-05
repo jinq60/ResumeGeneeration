@@ -32,10 +32,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never
+  metrics:
+    tags:
+      application: resume-generation
 
 app:
   cors:
@@ -49,6 +52,23 @@ app:
   render:
     # PDF/独立页面渲染时 /uploads/** 相对路径的外部前缀（如 http://your-domain），留空则保持相对路径
     public-base-url: ${APP_PUBLIC_BASE_URL:}
+  admin:
+    bootstrap:
+      # 首个管理员初始化：仅当系统尚无任何 ADMIN 角色用户时生效（详见 AdminBootstrapRunner）
+      phone: ${ADMIN_BOOTSTRAP_PHONE:}
+      password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+      nickname: ${ADMIN_BOOTSTRAP_NICKNAME:管理员}
+  auth:
+    verify-code:
+      # 验证码模式：placeholder=任意 6 位数字（仅限开发/测试）；strict=未配置真实验证码服务时拒绝注册
+      mode: ${VERIFY_CODE_MODE:placeholder}
+    guest:
+      # 每 IP 每天可创建的游客会话上限（防刷号）
+      max-per-ip-per-day: ${GUEST_MAX_PER_IP_PER_DAY:50}
+    login:
+      # 连续登录失败锁定
+      max-failures: ${LOGIN_MAX_FAILURES:5}
+      lockout-minutes: ${LOGIN_LOCKOUT_MINUTES:15}
   rate-limit:
     max-requests: 60
     window-seconds: 60
