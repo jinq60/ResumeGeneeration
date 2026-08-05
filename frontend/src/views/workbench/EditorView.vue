@@ -50,52 +50,29 @@
 
     <!-- Main Workspace -->
     <main class="editor-workspace">
-      <!-- Left Sidebar Navigation -->
-      <aside class="editor-sidebar">
-        <div class="flex-1 flex flex-col gap-1">
+      <!-- Left Edit Panel -->
+      <section class="editor-form-panel">
+        <div class="editor-tabs custom-scrollbar">
           <button
             v-for="tab in tabs"
             :key="tab.name"
             :class="[
-              'flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-colors text-left',
+              'editor-tab flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors text-sm whitespace-nowrap',
               activeTab === tab.name
-                ? 'bg-primary-container text-on-primary-container'
-                : 'text-surface-variant hover:bg-white/10'
+                ? 'bg-primary/10 text-primary font-semibold'
+                : 'text-on-surface-variant hover:bg-surface-container-low'
             ]"
             @click="activeTab = tab.name"
           >
-            <el-icon><component :is="tab.icon" /></el-icon>
-            <span class="text-label-md">{{ tab.label }}</span>
+            <el-icon :size="14"><component :is="tab.icon" /></el-icon>
+            <span>{{ tab.label }}</span>
           </button>
-        </div>
-        <div class="px-4 py-4 mt-auto border-t border-white/10">
-          <button class="flex items-center gap-3 text-surface-variant hover:text-white transition-colors">
-            <el-icon><Setting /></el-icon>
-            <span class="text-label-md">编辑器设置</span>
-          </button>
-        </div>
-      </aside>
-
-      <!-- Left Edit Panel -->
-      <section class="editor-form-panel">
-        <div class="p-6 border-b border-outline-variant flex justify-between items-center">
-          <div class="flex items-center gap-2">
-            <el-icon class="text-primary">
-              <component :is="currentTab?.icon" />
-            </el-icon>
-            <h2 class="text-title-md">
-              {{ currentTab?.label }}
-            </h2>
-          </div>
           <button
-            v-if="currentTab && !['profile', 'introduction', 'custom'].includes(currentTab.name)"
-            class="text-primary flex items-center gap-1 font-semibold text-label-md hover:bg-primary/5 px-2 py-1 rounded"
-            @click="addSectionItem"
+            class="editor-tab flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors text-sm whitespace-nowrap text-on-surface-variant hover:bg-surface-container-low"
+            @click="sectionsDialogVisible = true"
           >
-            <el-icon size="12">
-              <Plus />
-            </el-icon>
-            添加
+            <el-icon :size="14"><Menu /></el-icon>
+            <span>模块</span>
           </button>
         </div>
         <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
@@ -199,14 +176,13 @@
             第 1 页 / 共 1 页
           </div>
           <div class="h-6 w-px bg-outline-variant" />
-        <div class="flex items-center gap-4">
-          <button
-            class="flex items-center gap-2 px-3 py-2 border border-outline-variant rounded-lg hover:bg-surface-container-high transition-all text-on-surface text-sm"
-            @click="sectionsDialogVisible = true"
+          <div
+            class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+            @click="aiDrawerVisible = true"
           >
-            <el-icon size="14"><Menu /></el-icon>
-            <span>模块管理</span>
-          </button>
+            <el-icon size="14"><MagicStick /></el-icon>
+            <span class="text-label-md">AI 评估</span>
+          </div>
           <div
             class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
             @click="templateDialogVisible = true"
@@ -216,177 +192,8 @@
               <ArrowDown />
             </el-icon>
           </div>
-          <el-icon class="cursor-pointer hover:text-primary">
-            <Files />
-          </el-icon>
-        </div>
         </div>
       </div>
-
-      <!-- Right Inspector Sidebar -->
-      <aside class="editor-inspector custom-scrollbar">
-        <div class="flex justify-between items-center mb-6">
-          <div class="flex items-center gap-2">
-            <h3 class="text-title-md">
-              AI 简历评估
-            </h3>
-            <el-tooltip
-              content="基于当前简历内容给出的优化建议"
-              placement="top"
-            >
-              <el-icon class="text-outline text-sm cursor-help">
-                <InfoFilled />
-              </el-icon>
-            </el-tooltip>
-          </div>
-          <button
-            class="text-primary text-label-md flex items-center gap-1 hover:underline"
-            @click="goAiReview"
-          >
-            查看详情 <el-icon size="12">
-              <ArrowRight />
-            </el-icon>
-          </button>
-        </div>
-
-        <div class="flex items-baseline gap-1 mb-2">
-          <span class="text-4xl font-bold text-primary">{{ aiScore }}</span>
-          <span class="text-outline text-xl">/ 100</span>
-        </div>
-        <p class="text-label-md text-on-surface-variant mb-4">
-          整体不错，继续优化可显著提升竞争力
-        </p>
-        <div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden mb-8">
-          <div
-            class="h-full bg-primary"
-            :style="{ width: aiScore + '%' }"
-          />
-        </div>
-
-        <div class="space-y-6">
-          <!-- Critical Updates -->
-          <div class="bg-error/5 border border-error/20 rounded-xl p-4 cursor-pointer hover:bg-error/10 transition-colors group">
-            <div class="flex justify-between items-center mb-3">
-              <div class="flex items-center gap-2 text-error font-bold">
-                <el-icon size="14">
-                  <WarningFilled />
-                </el-icon>
-                <span>最值得修改 (2)</span>
-              </div>
-              <el-icon
-                size="14"
-                class="text-error group-hover:translate-x-1 transition-transform"
-              >
-                <ArrowRight />
-              </el-icon>
-            </div>
-            <ul class="text-xs space-y-3 text-on-surface">
-              <li class="relative pl-4 before:content-[''] before:absolute before:left-0 before:top-1.5 before:w-1.5 before:h-1.5 before:bg-error before:rounded-full">
-                <span class="font-semibold block mb-0.5">在项目经历中补充量化结果</span>
-                <p class="text-outline">
-                  用数据展示你的影响力。
-                </p>
-              </li>
-              <li class="relative pl-4 before:content-[''] before:absolute before:left-0 before:top-1.5 before:w-1.5 before:h-1.5 before:bg-error before:rounded-full">
-                <span class="font-semibold block mb-0.5">把“会员管理”改为具体成果表述</span>
-                <p class="text-outline">
-                  突出你带来的业务成效与价值。
-                </p>
-              </li>
-            </ul>
-          </div>
-
-          <!-- Potential Improvements -->
-          <div class="bg-secondary-container/5 border border-secondary-container/20 rounded-xl p-4 cursor-pointer hover:bg-secondary-container/10 transition-colors group">
-            <div class="flex justify-between items-center mb-3 text-secondary">
-              <div class="flex items-center gap-2 font-bold">
-                <el-icon size="14">
-                  <Opportunity />
-                </el-icon>
-                <span>可增强 (3)</span>
-              </div>
-              <el-icon
-                size="14"
-                class="group-hover:translate-x-1 transition-transform"
-              >
-                <ArrowRight />
-              </el-icon>
-            </div>
-            <ul class="text-xs space-y-3 text-on-surface">
-              <li class="relative pl-4 before:content-[''] before:absolute before:left-0 before:top-1.5 before:w-1.5 before:h-1.5 before:bg-secondary before:rounded-full">
-                <span class="font-semibold block mb-0.5">在个人简介中加入技术优势关键词</span>
-                <p class="text-outline">
-                  例如：性能优化、工程化、可视化等。
-                </p>
-              </li>
-              <li class="relative pl-4 before:content-[''] before:absolute before:left-0 before:top-1.5 before:w-1.5 before:h-1.5 before:bg-secondary before:rounded-full">
-                <span class="font-semibold block mb-0.5">补充一个代表性 GitHub 链接或技术作品</span>
-                <p class="text-outline">
-                  增加技术影响力和可信度。
-                </p>
-              </li>
-            </ul>
-          </div>
-
-          <!-- Good Practices -->
-          <div class="bg-primary/5 border border-primary/20 rounded-xl p-4">
-            <div class="flex justify-between items-center mb-3 text-primary">
-              <div class="flex items-center gap-2 font-bold">
-                <el-icon size="14">
-                  <CircleCheckFilled />
-                </el-icon>
-                <span>已做得好 (3)</span>
-              </div>
-            </div>
-            <ul class="text-xs space-y-2 text-on-surface-variant">
-              <li class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 bg-primary rounded-full" /> 结构清晰，模块完整，重点突出
-              </li>
-              <li class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 bg-primary rounded-full" /> 项目经历有量化结果
-              </li>
-              <li class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 bg-primary rounded-full" /> 技能区已覆盖主流技术栈
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="mt-8 pt-6 border-t border-outline-variant">
-          <h4 class="text-label-md font-bold mb-4 text-on-surface-variant uppercase tracking-wider">
-            快速操作
-          </h4>
-          <div class="grid grid-cols-3 gap-3">
-            <button
-              class="flex flex-col items-center justify-center p-3 rounded-xl border border-outline-variant hover:border-primary hover:bg-primary/5 transition-all group"
-              @click="goAiReview"
-            >
-              <el-icon class="text-primary mb-2 group-hover:scale-110 transition-transform">
-                <MagicStick />
-              </el-icon>
-              <span class="text-[10px] whitespace-nowrap">AI 优化</span>
-            </button>
-            <button
-              class="flex flex-col items-center justify-center p-3 rounded-xl border border-outline-variant hover:border-primary hover:bg-primary/5 transition-all group"
-              @click="activeTab = 'project'"
-            >
-              <el-icon class="text-primary mb-2 group-hover:scale-110 transition-transform">
-                <Reading />
-              </el-icon>
-              <span class="text-[10px] whitespace-nowrap">改项目</span>
-            </button>
-            <button
-              class="flex flex-col items-center justify-center p-3 rounded-xl border border-outline-variant hover:border-primary hover:bg-primary/5 transition-all group"
-              @click="ElMessage.info('优秀案例即将上线')"
-            >
-              <el-icon class="text-primary mb-2 group-hover:scale-110 transition-transform">
-                <Trophy />
-              </el-icon>
-              <span class="text-[10px] whitespace-nowrap">优秀案例</span>
-            </button>
-          </div>
-        </div>
-      </aside>
     </main>
   </div>
 
@@ -491,12 +298,64 @@
       </div>
     </div>
   </el-dialog>
+
+  <!-- AI 评估抽屉 -->
+  <el-drawer
+    v-model="aiDrawerVisible"
+    title="AI 简历评估"
+    size="380px"
+  >
+    <div class="flex items-baseline gap-1 mb-2">
+      <span class="text-4xl font-bold text-primary">{{ aiScore }}</span>
+      <span class="text-outline text-xl">/ 100</span>
+    </div>
+    <p class="text-label-md text-on-surface-variant mb-4">
+      整体不错，继续优化可显著提升竞争力
+    </p>
+    <div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden mb-6">
+      <div
+        class="h-full bg-primary"
+        :style="{ width: aiScore + '%' }"
+      />
+    </div>
+    <div class="space-y-4">
+      <div class="p-4 border border-outline-variant rounded-lg">
+        <div class="flex items-center gap-2 text-sm font-semibold mb-2 text-error">
+          <el-icon size="14"><WarningFilled /></el-icon>
+          <span>最值得修改</span>
+        </div>
+        <ul class="text-xs space-y-2 text-on-surface-variant">
+          <li>在项目经历中补充量化结果，用数据展示影响力。</li>
+          <li>把"会员管理"改为具体成果表述。</li>
+        </ul>
+      </div>
+      <div class="p-4 border border-outline-variant rounded-lg">
+        <div class="flex items-center gap-2 text-sm font-semibold mb-2 text-secondary">
+          <el-icon size="14"><Opportunity /></el-icon>
+          <span>可增强</span>
+        </div>
+        <ul class="text-xs space-y-2 text-on-surface-variant">
+          <li>在个人简介中加入技术优势关键词。</li>
+          <li>补充一个代表性 GitHub 链接或技术作品。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-6">
+      <el-button
+        type="primary"
+        class="w-full"
+        @click="goAiReview"
+      >
+        查看 AI 点评详情
+      </el-button>
+    </div>
+  </el-drawer>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage, ElTooltip } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import {
   ArrowLeft,
   Edit,
@@ -508,21 +367,14 @@ import {
   Briefcase,
   CollectionTag,
   CirclePlus,
-  Setting,
   Plus,
   Minus,
   ArrowDown,
   ArrowUp,
   Menu,
-  Files,
-  InfoFilled,
-  ArrowRight,
   WarningFilled,
   Opportunity,
-  CircleCheckFilled,
   MagicStick,
-  Reading,
-  Trophy,
   Loading
 } from '@element-plus/icons-vue'
 import { resumeApi } from '@/api/resume'
@@ -552,6 +404,7 @@ const renameVisible = ref(false)
 const renameTitle = ref('')
 const sectionsDialogVisible = ref(false)
 const templateDialogVisible = ref(false)
+const aiDrawerVisible = ref(false)
 const templates = ref<Template[]>([])
 const templateNameMap = ref<Record<string, string>>({})
 
@@ -696,8 +549,7 @@ function triggerAutoSave() {
 }
 
 function addSectionItem() {
-  // Form components handle add internally; this button can focus the panel.
-  ElMessage.info('请在下方表单中添加条目')
+  // Form components handle add internally
 }
 
 function zoomIn() {
@@ -796,22 +648,21 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.editor-sidebar {
-  width: var(--st-sidebar-width);
-  background: var(--st-on-primary-fixed);
-  border-right: 1px solid var(--st-outline-variant);
+.editor-tabs {
   display: flex;
-  flex-direction: column;
-  padding: var(--st-stack-sm) 0;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--st-outline-variant);
+  overflow-x: auto;
   flex-shrink: 0;
+}
 
-  .text-surface-variant {
-    color: rgba(255, 255, 255, 0.72);
-  }
+.editor-tab {
+  flex-shrink: 0;
 }
 
 .editor-form-panel {
-  width: 480px;
+  width: 400px;
   border-right: 1px solid var(--st-outline-variant);
   background: var(--st-surface-container-lowest);
   display: flex;
@@ -875,26 +726,15 @@ onMounted(() => {
   left: 50%;
   transform: translateX(-50%);
   backdrop-filter: blur(8px);
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--st-outline-variant);
   padding: 12px 24px;
   border-radius: 9999px;
   box-shadow: var(--st-shadow-md);
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 20px;
   z-index: 40;
-}
-
-.editor-inspector {
-  width: 360px;
-  background: var(--st-surface-container-lowest);
-  border-left: 1px solid var(--st-outline-variant);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  padding: var(--st-margin-page);
-  overflow-y: auto;
 }
 
 .is-spin {
@@ -906,10 +746,6 @@ onMounted(() => {
 }
 
 @media (max-width: 1280px) {
-  .editor-sidebar,
-  .editor-inspector {
-    display: none;
-  }
   .editor-form-panel {
     width: 360px;
   }
