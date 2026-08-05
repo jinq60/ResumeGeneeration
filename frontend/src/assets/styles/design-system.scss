@@ -1,69 +1,68 @@
 /* ==========================================================================
-   Stitch 设计系统令牌 — 由 Google Stitch 项目智能简历设计稿导出
-   范围：颜色、字体、间距、圆角、阴影
+   Stitch 设计系统令牌（简洁化版）
+   原则：单一强调色 + 中性灰阶、细边框、少阴影（对齐 magic-resume 视觉风格）
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
-
 :root {
-  /* —— 主色 —— */
+  /* —— 主色（唯一强调色） —— */
   --st-primary: #0057c2;
-  --st-primary-container: #006ef2;
+  --st-primary-container: #e8f0fe;
   --st-on-primary: #ffffff;
-  --st-on-primary-container: #fefcff;
-  --st-primary-fixed: #d9e2ff;
-  --st-primary-fixed-dim: #afc6ff;
-  --st-inverse-primary: #afc6ff;
-  --st-surface-tint: #0059c7;
+  --st-on-primary-container: #0b3d91;
+  --st-primary-fixed: #e8f0fe;
+  --st-primary-fixed-dim: #cfe0fb;
+  --st-inverse-primary: #a9c8f8;
+  --st-surface-tint: #0057c2;
 
-  /* —— 次色 / 强调色 —— */
-  --st-secondary: #266d00;
-  --st-secondary-container: #85fa51;
-  --st-secondary-fixed: #88fd54;
-  --st-secondary-fixed-dim: #6de039;
+  /* —— 次色（仅成功语义，收敛为中性绿） —— */
+  --st-secondary: #2e7d32;
+  --st-secondary-container: #d9f0dc;
+  --st-secondary-fixed: #d9f0dc;
+  --st-secondary-fixed-dim: #b4dfba;
   --st-on-secondary: #ffffff;
-  --st-on-secondary-container: #287100;
+  --st-on-secondary-container: #1b5e20;
 
-  --st-tertiary: #7431d3;
-  --st-tertiary-container: #8e4fee;
-  --st-tertiary-fixed: #ecdcff;
-  --st-tertiary-fixed-dim: #d5baff;
+  /* —— 第三色（收敛为主色映射，不再独立成系） —— */
+  --st-tertiary: #0057c2;
+  --st-tertiary-container: #e8f0fe;
+  --st-tertiary-fixed: #e8f0fe;
+  --st-tertiary-fixed-dim: #cfe0fb;
   --st-on-tertiary: #ffffff;
-  --st-on-tertiary-container: #fffbff;
+  --st-on-tertiary-container: #0b3d91;
 
-  /* —— 中性/表面 —— */
-  --st-background: #f7f9fc;
-  --st-surface: #f7f9fc;
-  --st-surface-bright: #f7f9fc;
-  --st-surface-dim: #d8dadd;
-  --st-surface-variant: #e0e3e6;
+  /* —— 中性/表面（收敛为 4 级中性灰阶） —— */
+  --st-background: #fafbfc;
+  --st-surface: #fafbfc;
+  --st-surface-bright: #ffffff;
+  --st-surface-dim: #eef0f2;
+  --st-surface-variant: #eef0f2;
   --st-surface-container-lowest: #ffffff;
-  --st-surface-container-low: #f2f4f7;
-  --st-surface-container: #eceef1;
-  --st-surface-container-high: #e6e8eb;
-  --st-surface-container-highest: #e0e3e6;
-  --st-inverse-surface: #2d3133;
-  --st-inverse-on-surface: #eff1f4;
+  --st-surface-container-low: #f4f5f7;
+  --st-surface-container: #eef0f2;
+  --st-surface-container-high: #e7e9ec;
+  --st-surface-container-highest: #dfe2e6;
+  --st-inverse-surface: #2b2f33;
+  --st-inverse-on-surface: #f2f4f6;
 
   /* —— 文字 —— */
-  --st-on-background: #191c1e;
-  --st-on-surface: #191c1e;
-  --st-on-surface-variant: #414755;
+  --st-on-background: #1a1d21;
+  --st-on-surface: #1a1d21;
+  --st-on-surface-variant: #4b5563;
 
   /* —— 描边 —— */
-  --st-outline: #727786;
-  --st-outline-variant: #c1c6d7;
+  --st-outline: #6b7280;
+  --st-outline-variant: #d1d5db;
 
   /* —— 错误 —— */
-  --st-error: #ba1a1a;
-  --st-error-container: #ffdad6;
+  --st-error: #d92d20;
+  --st-error-container: #fee4e2;
   --st-on-error: #ffffff;
-  --st-on-error-container: #93000a;
+  --st-on-error-container: #912018;
 
-  /* —— 字体 —— */
-  --st-font-sans: 'Inter', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
-  --st-font-headline: 'Plus Jakarta Sans', 'Inter', 'Noto Sans SC', sans-serif;
-  --st-font-mono: 'DM Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  /* —— 字体（系统栈，移除在线字体依赖） —— */
+  --st-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+  --st-font-headline: var(--st-font-sans);
+  --st-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
 
   --st-headline-lg: 700 30px/38px var(--st-font-headline);
   --st-headline-md: 600 24px/32px var(--st-font-headline);
@@ -83,18 +82,18 @@
   --st-stack-lg: 24px;
 
   /* —— 圆角 —— */
-  --st-radius-sm: 0.25rem;
+  --st-radius-sm: 0.375rem;
   --st-radius-md: 0.5rem;
-  --st-radius-lg: 0.75rem;
-  --st-radius-xl: 1rem;
+  --st-radius-lg: 0.625rem;
+  --st-radius-xl: 0.75rem;
   --st-radius-full: 9999px;
 
-  /* —— 阴影 —— */
-  --st-shadow-xs: 0 1px 2px rgba(25, 28, 30, 0.04);
-  --st-shadow-sm: 0 2px 6px rgba(25, 28, 30, 0.05);
-  --st-shadow-md: 0 4px 12px rgba(25, 28, 30, 0.08);
-  --st-shadow-lg: 0 8px 24px rgba(25, 28, 30, 0.10);
-  --st-shadow-card: 0 12px 24px -10px rgba(0, 87, 194, 0.15);
+  /* —— 阴影（收敛为 2 级） —— */
+  --st-shadow-xs: none;
+  --st-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --st-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --st-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --st-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.05);
 
   /* —— Element Plus 主题桥接 —— */
   --el-color-primary: var(--st-primary);
@@ -105,11 +104,11 @@
   --el-color-primary-light-9: rgba(0, 87, 194, 0.06);
   --el-color-primary-dark-2: #004398;
   --el-color-success: var(--st-secondary);
-  --el-color-success-light-9: rgba(38, 109, 0, 0.08);
+  --el-color-success-light-9: rgba(46, 125, 50, 0.08);
   --el-color-warning: #d9892b;
   --el-color-danger: var(--st-error);
   --el-color-error: var(--st-error);
-  --el-color-error-light-9: rgba(186, 26, 26, 0.08);
+  --el-color-error-light-9: rgba(217, 45, 32, 0.08);
 
   --el-text-color-primary: var(--st-on-background);
   --el-text-color-regular: var(--st-on-surface);
@@ -163,11 +162,10 @@ body {
   background: var(--st-outline);
 }
 
-/* 通用卡片玻璃感 */
+/* 通用卡片（简洁化：去玻璃感，细边框） */
 .st-glass-card {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(193, 198, 215, 0.3);
+  background: #ffffff;
+  border: 1px solid var(--st-outline-variant);
 }
 
 /* 进度环 */

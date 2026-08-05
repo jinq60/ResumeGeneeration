@@ -120,16 +120,19 @@
             <EducationForm
               v-show="activeTab === 'education'"
               :sections="resume.sections"
+              :resume-id="resume.id"
               @update="handleSectionsUpdate"
             />
             <ProjectForm
               v-show="activeTab === 'project'"
               :sections="resume.sections"
+              :resume-id="resume.id"
               @update="handleSectionsUpdate"
             />
             <WorkForm
               v-show="activeTab === 'work'"
               :sections="resume.sections"
+              :resume-id="resume.id"
               @update="handleSectionsUpdate"
             />
             <SkillForm
@@ -140,6 +143,7 @@
             <IntroductionForm
               v-show="activeTab === 'introduction'"
               :sections="resume.sections"
+              :resume-id="resume.id"
               @update="handleSectionsUpdate"
             />
             <CustomForm

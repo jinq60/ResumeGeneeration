@@ -55,5 +55,16 @@ export const resumeApi = {
   },
   getLatestReview(id: string): Promise<any> {
     return request.get(`/resumes/${id}/reviews/latest`) as Promise<any>
+  },
+  aiWrite(id: string, payload: AiWritePayload): Promise<{ content: string }> {
+    return request.post(`/resumes/${id}/ai/write`, payload) as Promise<{ content: string }>
   }
+}
+
+export interface AiWritePayload {
+  sectionType: string
+  field: string
+  action: 'generate' | 'polish' | 'shorten' | 'expand' | 'translate'
+  originalText?: string
+  targetLang?: string
 }

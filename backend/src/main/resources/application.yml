@@ -89,6 +89,11 @@ app:
         model: gpt-4o
         timeout: 120s
         retry: 1
+      resume-writing:
+        provider: qwen
+        model: qwen-turbo
+        timeout: 60s
+        retry: 2
     openai:
       api-key: ${OPENAI_API_KEY:}
       base-url: https://api.openai.com
@@ -172,3 +177,23 @@ app:
 
         目标背景色：{backgroundType}
         风格要求：{style}
+      resume-writing: |
+        你是一位资深简历写作专家。请根据要求对简历内容进行写作或改写。
+
+        简历整体内容：
+        {resumeContent}
+
+        目标岗位：{jobDescription}
+
+        当前模块：{sectionType} / 字段：{field}
+        操作要求：
+        - generate：根据简历上下文与目标岗位，为该字段生成合适的内容
+        - polish：润色原文，保持事实与要点不变，表达更专业
+        - shorten：精简原文，保留关键信息，去除冗余
+        - expand：扩写原文，补充量化数据与细节，提升说服力
+        - translate：将原文翻译为 {targetLang} 语言
+
+        待处理原文：
+        {originalText}
+
+        要求：只输出最终文本本身，不要任何解释、标题、引号或前后缀。

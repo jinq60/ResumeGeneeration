@@ -62,14 +62,26 @@
         label="自我介绍"
         required
       >
-        <el-input
-          v-model="formData.content"
-          type="textarea"
-          :rows="8"
-          placeholder="请输入自我介绍内容"
-          show-word-limit
-          :maxlength="formData.maxWords || 500"
-        />
+        <div class="w-full flex flex-col gap-1">
+          <div class="flex justify-end">
+            <AiWriterButton
+              v-if="resumeId"
+              :resume-id="resumeId"
+              section-type="introduction"
+              field="content"
+              :get-original-text="() => formData.content"
+              @apply="(content: string) => { formData.content = content }"
+            />
+          </div>
+          <el-input
+            v-model="formData.content"
+            type="textarea"
+            :rows="8"
+            placeholder="请输入自我介绍内容"
+            show-word-limit
+            :maxlength="formData.maxWords || 500"
+          />
+        </div>
       </el-form-item>
 
       <el-form-item label="字数统计">
@@ -112,9 +124,11 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSectionSync } from '@/composables/useSectionSync'
+import AiWriterButton from './AiWriterButton.vue'
 
 interface Props {
   sections: any[]
+  resumeId?: string
 }
 
 const props = defineProps<Props>()

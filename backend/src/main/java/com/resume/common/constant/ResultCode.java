@@ -84,4 +84,6 @@ public final class ResultCode {
     public static final int AI_CONCURRENT_LIMIT_EXCEEDED = 6004;
     public static final int AI_RESPONSE_PARSE_FAILED = 6005;
     public static final int AI_CONTENT_TOO_LONG = 6006;
+    public static final int AI_WRITING_FIELD_INVALID = 6007;
+    public static final int AI_WRITING_CONTENT_TOO_LONG = 6008;
 }

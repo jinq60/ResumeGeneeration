@@ -119,12 +119,24 @@
         </el-form-item>
 
         <el-form-item label="项目描述">
-          <el-input
-            v-model="item.descriptionText"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入项目描述，用换行分隔多个要点"
-          />
+          <div class="w-full flex flex-col gap-1">
+            <div class="flex justify-end">
+              <AiWriterButton
+                v-if="resumeId"
+                :resume-id="resumeId"
+                section-type="project"
+                field="description"
+                :get-original-text="() => item.descriptionText"
+                @apply="(content: string) => { item.descriptionText = content }"
+              />
+            </div>
+            <el-input
+              v-model="item.descriptionText"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入项目描述，用换行分隔多个要点"
+            />
+          </div>
         </el-form-item>
 
         <el-form-item label="项目成就">
@@ -168,9 +180,11 @@
 import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { useSectionSync } from '@/composables/useSectionSync'
+import AiWriterButton from './AiWriterButton.vue'
 
 interface Props {
   sections: any[]
+  resumeId?: string
 }
 
 const props = defineProps<Props>()
