@@ -7,14 +7,9 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import { useUserStore } from './stores/user'
-import { initTheme } from './composables/useTheme'
 import 'element-plus/dist/index.css'
-import 'element-plus/theme-chalk/dark/css-vars.css'
 import './assets/styles/tailwind.css'
 import './assets/styles/design-system.scss'
-
-// 渲染前应用主题，避免暗色模式首屏闪烁
-initTheme()
 
 const app = createApp(App)
 const pinia = createPinia()

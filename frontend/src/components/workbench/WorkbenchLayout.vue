@@ -17,18 +17,6 @@
       @close-mobile="sidebarOpen = false"
     />
     <main class="workbench-main">
-      <button
-        class="theme-toggle"
-        type="button"
-        :aria-label="themeIsDark ? '切换到浅色模式' : '切换到深色模式'"
-        :title="themeIsDark ? '切换到浅色模式' : '切换到深色模式'"
-        @click="toggleTheme"
-      >
-        <el-icon size="16">
-          <Moon v-if="!themeIsDark" />
-          <Sunny v-else />
-        </el-icon>
-      </button>
       <div class="workbench-content">
         <router-view />
       </div>
@@ -37,20 +25,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { Menu, Moon, Sunny } from '@element-plus/icons-vue'
+import { ref } from 'vue'
+import { Menu } from '@element-plus/icons-vue'
 import WorkbenchSidebar from './WorkbenchSidebar.vue'
-import { useTheme } from '@/composables/useTheme'
 
 const sidebarOpen = ref(false)
-const { preference, toggleTheme } = useTheme()
-const themeIsDark = computed(() =>
-  preference.value === 'dark'
-    || (preference.value === 'system'
-      && typeof window !== 'undefined'
-      && typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-color-scheme: dark)').matches)
-)
 </script>
 
 <style scoped lang="scss">
@@ -66,36 +45,6 @@ const themeIsDark = computed(() =>
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-.theme-toggle {
-  position: fixed;
-  top: 16px;
-  right: 20px;
-  z-index: 40;
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--st-outline-variant);
-  border-radius: var(--st-radius-md);
-  color: var(--st-on-surface-variant);
-  background: var(--st-surface-bright);
-  box-shadow: var(--st-shadow-sm);
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.theme-toggle:hover {
-  color: var(--st-primary);
-}
-
-@media (max-width: 768px) {
-  .theme-toggle {
-    top: 12px;
-    right: 12px;
-  }
 }
 
 .workbench-content {

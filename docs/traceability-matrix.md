@@ -142,7 +142,6 @@
 | 通知中心 | 设计系统 | `frontend/src/views/workbench/NotificationCenterView.vue` |
 | 简历详情/预览页 | 设计系统 | `frontend/src/views/workbench/ResumeDetailView.vue` |
 | 简历分享页 | 业务线 v1.1 Phase 2 | `frontend/src/views/ShareView.vue` |
-| 暗色模式 | 业务线 v1.1 §7.4 P1 | `useTheme.ts`, `design-system.scss`（html.dark 令牌覆盖）, `SettingsView.vue`, `WorkbenchLayout.vue` |
 | 路由与鉴权守卫 | `security-guide.md` | `frontend/src/router/index.ts` |
 | 导出/头像任务本地存储 | 设计系统 | `frontend/src/utils/download.ts` |
 

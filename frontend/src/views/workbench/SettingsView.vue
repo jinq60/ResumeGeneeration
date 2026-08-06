@@ -200,28 +200,6 @@
               自定义通知和默认行为
             </p>
 
-            <div class="flex items-center justify-between gap-4 py-4 border-b border-outline-variant/30">
-              <div>
-                <div class="text-body-md font-label-md text-on-surface">
-                  外观主题
-                </div>
-                <div class="text-label-md text-on-surface-variant mt-0.5">
-                  选择界面配色方案
-                </div>
-              </div>
-              <el-radio-group v-model="themePreference">
-                <el-radio-button value="light">
-                  浅色
-                </el-radio-button>
-                <el-radio-button value="dark">
-                  深色
-                </el-radio-button>
-                <el-radio-button value="system">
-                  跟随系统
-                </el-radio-button>
-              </el-radio-group>
-            </div>
-
             <div
               v-for="(item, idx) in preferenceList"
               :key="item.key"
@@ -285,7 +263,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { useTheme } from '@/composables/useTheme'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
@@ -299,7 +276,6 @@ import {
 
 const router = useRouter()
 const userStore = useUserStore()
-const { preference: themePreference, setTheme } = useTheme()
 
 const activeTab = ref<'profile' | 'security' | 'preference'>('profile')
 const saving = ref(false)
@@ -412,7 +388,6 @@ async function savePassword() {
 }
 
 async function savePreference() {
-  setTheme(themePreference.value)
   saving.value = true
   try {
     await new Promise(resolve => setTimeout(resolve, 400))
