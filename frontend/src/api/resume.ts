@@ -30,6 +30,15 @@ export interface UpdateResumeResponse {
   updatedAt: string
 }
 
+export interface ImportResumeRequest {
+  title?: string
+  scene?: string
+  targetPosition?: string
+  templateId?: string
+  format: 'json' | 'markdown'
+  content: string
+}
+
 export interface GrammarIssue {
   sectionType: string
   field: string
@@ -51,6 +60,9 @@ export interface GrammarCheckResponse {
 export const resumeApi = {
   create(data: CreateResumeRequest): Promise<Resume> {
     return request.post('/resumes', data) as Promise<Resume>
+  },
+  importResume(data: ImportResumeRequest): Promise<Resume> {
+    return request.post('/resumes/import', data) as Promise<Resume>
   },
   list(page = 1, size = 20): Promise<Page<Resume>> {
     return request.get('/resumes', { params: { page, size } }) as Promise<Page<Resume>>

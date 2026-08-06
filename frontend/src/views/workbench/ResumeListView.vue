@@ -7,16 +7,85 @@
         <h1 class="font-headline-md text-headline-md text-on-surface">
           我的简历
         </h1>
-        <button
-          class="bg-primary text-on-primary px-6 py-2.5 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform"
-          @click="goCreate"
-        >
-          <el-icon size="18">
-            <Plus />
-          </el-icon>
-          新建简历
-        </button>
+        <div class="flex items-center gap-3">
+          <button
+            class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-6 py-2.5 font-label-md transition-colors"
+            @click="openImportDialog"
+          >
+            <el-icon
+              class="mr-1"
+              size="16"
+            >
+              <Upload />
+            </el-icon>
+            导入简历
+          </button>
+          <button
+            class="bg-primary text-on-primary px-6 py-2.5 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform"
+            @click="goCreate"
+          >
+            <el-icon size="18">
+              <Plus />
+            </el-icon>
+            新建简历
+          </button>
+        </div>
       </div>
+
+      <!-- 导入对话框 -->
+      <el-dialog
+        v-model="importDialogVisible"
+        title="导入简历"
+        width="560px"
+        align-center
+      >
+        <div class="flex flex-col gap-4">
+          <div class="flex items-center gap-4">
+            <el-select
+              v-model="importForm.format"
+              class="w-36"
+            >
+              <el-option
+                label="Markdown"
+                value="markdown"
+              />
+              <el-option
+                label="JSON"
+                value="json"
+              />
+            </el-select>
+            <el-input
+              v-model="importForm.title"
+              placeholder="简历标题（可选，默认取首个模块标题）"
+              maxlength="128"
+            />
+          </div>
+          <el-input
+            v-model="importForm.content"
+            type="textarea"
+            :rows="10"
+            :placeholder="importForm.format === 'markdown'
+              ? '粘贴 Markdown 内容：# 姓名\n## 工作经历\n公司 · 岗位\n- 工作描述\n## 自我介绍\n...'
+              : '粘贴 JSON：模块数组或 {sections: [...]}'"
+          />
+          <div class="text-xs text-on-surface-variant">
+            Markdown 按「## 模块标题」自动识别教育 / 工作 / 项目 / 技能 / 自我介绍等模块，导入后可在编辑器中继续精修。
+          </div>
+        </div>
+        <template #footer>
+          <el-button @click="importDialogVisible = false">
+            取消
+          </el-button>
+          <el-button
+            type="primary"
+            :loading="importing"
+            :disabled="!importForm.content.trim()"
+            @click="handleImport"
+          >
+            导入并打开
+          </el-button>
+        </template>
+      </el-dialog>
 
       <!-- Tabs & Search -->
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-stack-lg bg-surface-container-lowest p-2 rounded-xl border border-outline-variant/30">
@@ -418,7 +487,8 @@ import {
   InfoFilled,
   ArrowRight,
   Check,
-  MagicStick
+  MagicStick,
+  Upload
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -432,6 +502,41 @@ const renameVisible = ref(false)
 const renameTitle = ref('')
 const renameTarget = ref<Resume | null>(null)
 const templateNameMap = ref<Record<string, string>>({})
+const importDialogVisible = ref(false)
+const importing = ref(false)
+const importForm = ref<{ format: 'json' | 'markdown'; title: string; content: string }>({
+  format: 'markdown',
+  title: '',
+  content: ''
+})
+
+function openImportDialog() {
+  importForm.value = { format: 'markdown', title: '', content: '' }
+  importDialogVisible.value = true
+}
+
+async function handleImport() {
+  const content = importForm.value.content.trim()
+  if (!content) {
+    ElMessage.warning('请粘贴导入内容')
+    return
+  }
+  importing.value = true
+  try {
+    const resume = await resumeApi.importResume({
+      title: importForm.value.title.trim() || undefined,
+      format: importForm.value.format,
+      content
+    })
+    importDialogVisible.value = false
+    ElMessage.success('导入成功')
+    router.push(`/workbench/editor/${resume.id}`)
+  } catch (e: any) {
+    ElMessage.error(e.message || '导入失败')
+  } finally {
+    importing.value = false
+  }
+}
 
 const tabs = [
   { label: '最近编辑', value: 'recent' as const },

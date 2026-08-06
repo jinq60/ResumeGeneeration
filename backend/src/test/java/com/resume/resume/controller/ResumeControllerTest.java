@@ -48,6 +48,9 @@ class ResumeControllerTest {
     private ResumeReviewService resumeReviewService;
 
     @MockBean
+    private com.resume.resume.service.ResumeImportService resumeImportService;
+
+    @MockBean
     private IdempotencyRecordMapper idempotencyRecordMapper;
 
     @MockBean
@@ -139,6 +142,39 @@ class ResumeControllerTest {
         mockMvc.perform(delete("/resumes/resume123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
+    @WithMockJwt(userId = "user123")
+    void testImportResume_Success() throws Exception {
+        ResumeDetailResponse response = new ResumeDetailResponse();
+        response.setId("resume_import_1");
+        response.setTitle("导入的简历");
+
+        when(resumeImportService.importResume(eq("user123"), any(com.resume.resume.dto.ResumeImportRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/resumes/import")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"title":"导入的简历","templateId":"template_1","format":"markdown",
+                         "content":"## 自我介绍\\n你好"}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value("resume_import_1"));
+    }
+
+    @Test
+    @WithMockJwt(userId = "user123")
+    void testImportResume_RejectMissingFormat() throws Exception {
+        mockMvc.perform(post("/resumes/import")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"templateId":"template_1","content":"## 自我介绍\\n你好"}
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
     }
 
     private UpdateResumeResponse buildUpdateResponse() {

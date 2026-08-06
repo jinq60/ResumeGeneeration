@@ -91,6 +91,7 @@
 | AI 写作按日配额 | 业务线 v1.1 §5 P1 | `ai_daily_quota` 表（V10） | `api-changelog.md` v1.6 | 游客 3/天、登录 30/天 | `AiDailyQuotaServiceTest`, `AiWritingServiceTest`, `AiWritingControllerTest` | `AiDailyQuotaService`, `AiWritingService`, `AiWritingController` |
 | AI 流式写作 | 编辑器体验 2.0 | `ai_call_log` 表 | `api-changelog.md` v1.4 | SSE delta/done/error 事件 | `AiWritingServiceTest`, `AiWritingControllerTest`, `resumeApiStream.test.ts` | `AiWritingController`, `LlmProvider.stream`, `frontend/src/api/resume.ts` |
 | AI 语法检查 | 编辑器体验 2.0 | `ai_call_log` 表 | `api-spec.md` §7.13 | status、severity、字段定位 | `AiGrammarServiceTest`, `AiGrammarControllerTest` | `AiGrammarService`, `AiGrammarController`, `EditorView.vue` 语法检查抽屉 |
+| 简历导入 | 业务线 v1.1 §5 后续迭代 | `resume` 表（创建） | `api-spec.md` §7.14 | JSON/Markdown 解析、模块校验 | `ResumeImportServiceTest`, `ResumeControllerTest` | `ResumeImportService`, `ResumeMarkdownParser`, `ResumeController`, `frontend/src/views/workbench/ResumeListView.vue` |
 | 富文本字段 | 编辑器体验 2.0 | `contentHtml` / `descriptionHtml` JSON 字段 | `api-spec.md` §7.10 | 前后端 HTML 白名单清洗 | `RichTextSanitizerTest`, `richText.test.ts`, `RichTextEditor.test.ts` | `RichTextSanitizer`, `ResumeRenderService`, `ResumeExportService`, `RichTextEditor.vue` |
 
 ## 9. 分享与多格式导出

@@ -2,6 +2,15 @@
 
 > 记录 `docs/superpowers/specs/2026-07-03-api-spec.md` 的所有变更，便于前后端联调与版本管理。
 
+## v1.8（2026-08-06）
+
+### 新增
+
+- `POST /resumes/import`：导入简历并直接创建。支持 `format=json`（模块数组或 `{sections:[...]}`）与 `format=markdown`（按 `##` 模块标题自动识别教育/工作/项目/技能/自我介绍等类型，未知标题映射为自定义模块）。
+- 错误码：`RESUME_IMPORT_INVALID`(2011)。
+
+---
+
 ## v1.7（2026-08-06）
 
 ### 新增

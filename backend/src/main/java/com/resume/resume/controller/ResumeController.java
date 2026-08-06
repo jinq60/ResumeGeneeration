@@ -24,11 +24,18 @@ public class ResumeController {
 
     private final ResumeService resumeService;
     private final ResumeReviewService resumeReviewService;
+    private final com.resume.resume.service.ResumeImportService resumeImportService;
 
     @PostMapping
     public R<ResumeDetailResponse> create(@AuthenticationPrincipal String userId,
                                           @Valid @RequestBody CreateResumeRequest request) {
         return R.success(resumeService.createResume(userId, request));
+    }
+
+    @PostMapping("/import")
+    public R<ResumeDetailResponse> importResume(@AuthenticationPrincipal String userId,
+                                                @Valid @RequestBody com.resume.resume.dto.ResumeImportRequest request) {
+        return R.success(resumeImportService.importResume(userId, request));
     }
 
     @GetMapping

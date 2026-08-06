@@ -42,6 +42,7 @@ public final class ResultCode {
     public static final int RESUME_PROFILE_EMAIL_INVALID = 2008;
     public static final int RESUME_PROFILE_URL_INVALID = 2009;
     public static final int RESUME_CONTENT_TOO_LONG = 2010;
+    public static final int RESUME_IMPORT_INVALID = 2011;
 
     /**
      * 模板模块错误码：3000-3099
