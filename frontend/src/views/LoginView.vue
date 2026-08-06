@@ -67,9 +67,6 @@
             <h2 class="text-headline-md font-headline-md text-on-surface">
               欢迎回来
             </h2>
-            <p class="text-body-md text-on-surface-variant mt-2">
-              邮箱账号首次登录将自动创建
-            </p>
           </header>
 
           <div
@@ -198,44 +195,49 @@
               <div class="flex-1 h-px bg-outline-variant" />
             </div>
 
-            <div class="grid grid-cols-4 gap-2">
+            <div class="flex items-center justify-center gap-4">
               <button
                 type="button"
-                class="flex flex-col items-center gap-1.5 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-low text-on-surface-variant transition-colors"
+                class="w-11 h-11 flex items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low hover:scale-105 transition-all"
                 title="使用 Google 账号登录"
                 @click="handleOAuth('google')"
               >
-                <BrandIcon name="google" />
-                <span class="text-label-md">Google</span>
+                <BrandIcon
+                  name="google"
+                  :size="20"
+                />
               </button>
               <button
                 type="button"
-                class="flex flex-col items-center gap-1.5 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-low text-on-surface-variant transition-colors"
+                class="w-11 h-11 flex items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low hover:scale-105 transition-all"
                 title="使用 GitHub 账号登录"
                 @click="handleOAuth('github')"
               >
-                <BrandIcon name="github" />
-                <span class="text-label-md">GitHub</span>
+                <BrandIcon
+                  name="github"
+                  :size="20"
+                />
               </button>
               <button
                 type="button"
-                class="flex flex-col items-center gap-1.5 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-low text-on-surface-variant transition-colors"
+                class="w-11 h-11 flex items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low hover:scale-105 transition-all"
                 title="使用 QQ 扫码登录"
                 @click="handleOAuth('qq')"
               >
-                <BrandIcon name="qq" />
-                <span class="text-label-md">QQ</span>
+                <BrandIcon
+                  name="qq"
+                  :size="20"
+                />
               </button>
               <button
                 type="button"
                 disabled
-                class="flex flex-col items-center gap-1.5 py-2.5 rounded-lg border border-outline-variant text-outline opacity-60 cursor-not-allowed"
+                class="w-11 h-11 flex items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-outline opacity-60 cursor-not-allowed"
                 title="手机验证码登录即将上线"
               >
-                <el-icon :size="18">
+                <el-icon :size="20">
                   <Iphone />
                 </el-icon>
-                <span class="text-label-md">短信</span>
               </button>
             </div>
 
