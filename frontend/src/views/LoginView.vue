@@ -220,7 +220,7 @@
               </button>
               <button
                 type="button"
-                class="w-11 h-11 flex items-center justify-center rounded-full border border-[#12B7F5]/30 bg-[#e8f8fe] hover:bg-[#d6f2fd] hover:scale-105 transition-all"
+                class="w-11 h-11 flex items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low hover:scale-105 transition-all"
                 title="使用 QQ 扫码登录"
                 @click="handleOAuth('qq')"
               >
