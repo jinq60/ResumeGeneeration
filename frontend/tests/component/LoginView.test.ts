@@ -23,7 +23,6 @@ vi.mock('vue-router', () => ({
 vi.mock('@/api/auth', () => ({
   authApi: {
     login: vi.fn(),
-    register: vi.fn(),
     guest: vi.fn(),
     emailCodeSend: vi.fn(),
     emailCodeLogin: vi.fn()
@@ -56,7 +55,6 @@ describe('LoginView', () => {
     mockQuery = {}
     ;(authApi.guest as any).mockReset()
     ;(authApi.login as any).mockReset()
-    ;(authApi.register as any).mockReset()
     ;(authApi.emailCodeSend as any).mockReset()
     ;(authApi.emailCodeLogin as any).mockReset()
   })

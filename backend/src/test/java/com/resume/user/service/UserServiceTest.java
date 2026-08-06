@@ -17,7 +17,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -50,9 +49,6 @@ class UserServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private ObjectProvider<VerifyCodeService> verifyCodeServiceProvider;
-
-    @Mock
     private LoginAttemptGuard loginAttemptGuard;
 
     @Mock
@@ -63,9 +59,7 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         userService = new UserService(userMapper, refreshTokenMapper, jwtTokenProvider, passwordEncoder,
-                verifyCodeServiceProvider, loginAttemptGuard, auditLogService);
-        lenient().when(verifyCodeServiceProvider.getIfAvailable())
-                .thenReturn(new PlaceholderVerifyCodeService());
+                loginAttemptGuard, auditLogService);
         lenient().when(jwtTokenProvider.generateAccessToken(anyString(), anyBoolean())).thenReturn("access_token");
         lenient().when(jwtTokenProvider.generateAccessToken(anyString(), anyBoolean(), anyString())).thenReturn("access_token");
         lenient().when(jwtTokenProvider.generateRefreshToken(anyString())).thenReturn("refresh_token");
@@ -76,54 +70,53 @@ class UserServiceTest {
     }
 
     @Test
-    void register_shouldSucceedWithPhone() {
-        RegisterRequest request = new RegisterRequest();
-        request.setPhone("13800000000");
-        request.setVerifyCode("123456");
-        request.setPassword("Password123");
+    void login_shouldAutoCreateEmailAccountWhenMissing() {
+        LoginRequest request = new LoginRequest();
+        request.setAccount("newbie@example.com");
+        request.setPassword("Passw0rd123");
+        request.setLoginType("email");
 
         when(userMapper.selectOne(any())).thenReturn(null);
-        when(passwordEncoder.encode("Password123")).thenReturn("hashed");
+        when(passwordEncoder.encode("Passw0rd123")).thenReturn("hashed_new");
+        when(passwordEncoder.matches("Passw0rd123", "hashed_new")).thenReturn(true);
         when(userMapper.insert(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
-            u.setId("user_1");
+            u.setId("user_new");
             return 1;
         });
 
-        AuthResponse response = userService.register(request);
+        AuthResponse response = userService.login(request);
 
-        assertEquals("user_1", response.getUserId());
-        assertEquals("access_token", response.getAccessToken());
-        assertFalse(response.getIsGuest());
-        verify(userMapper).insert(any(User.class));
+        assertEquals("user_new", response.getUserId());
+        verify(userMapper).insert(argThat(u -> "newbie@example.com".equals(((User) u).getEmail())));
     }
 
     @Test
-    void register_shouldRejectWeakPassword() {
-        RegisterRequest request = new RegisterRequest();
-        request.setPhone("13800000000");
-        request.setVerifyCode("123456");
+    void login_shouldRejectWeakPasswordWhenAutoCreating() {
+        LoginRequest request = new LoginRequest();
+        request.setAccount("newbie@example.com");
         request.setPassword("12");
+        request.setLoginType("email");
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> userService.register(request));
+        when(userMapper.selectOne(any())).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> userService.login(request));
         assertEquals(ResultCode.AUTH_PASSWORD_TOO_WEAK, ex.getErrorCode());
         verify(userMapper, never()).insert(any(User.class));
     }
 
     @Test
-    void register_shouldRejectDuplicatePhone() {
-        RegisterRequest request = new RegisterRequest();
-        request.setPhone("13800000000");
-        request.setVerifyCode("123456");
-        request.setPassword("Password123");
+    void login_shouldKeepRejectingUnknownPhone() {
+        LoginRequest request = new LoginRequest();
+        request.setAccount("13800000000");
+        request.setPassword("Passw0rd123");
+        request.setLoginType("phone");
 
-        User exist = new User();
-        exist.setId("user_old");
-        exist.setDeleted(BizConstant.NOT_DELETED);
-        when(userMapper.selectOne(argThat(wrapper -> true))).thenReturn(exist);
+        when(userMapper.selectOne(any())).thenReturn(null);
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> userService.register(request));
-        assertEquals(ResultCode.AUTH_PHONE_REGISTERED, ex.getErrorCode());
+        BusinessException ex = assertThrows(BusinessException.class, () -> userService.login(request));
+        assertEquals(ResultCode.AUTH_ACCOUNT_NOT_FOUND, ex.getErrorCode());
+        verify(userMapper, never()).insert(any(User.class));
     }
 
     @Test
@@ -194,7 +187,7 @@ class UserServiceTest {
         ReflectionTestUtils.setField(realProvider, "refreshTokenExpiration", 604800000L);
 
         UserService service = new UserService(userMapper, refreshTokenMapper, realProvider, passwordEncoder,
-                verifyCodeServiceProvider, loginAttemptGuard, auditLogService);
+                loginAttemptGuard, auditLogService);
         User user = new User();
         user.setId("user_1");
         user.setStatus(BizConstant.USER_STATUS_ACTIVE);

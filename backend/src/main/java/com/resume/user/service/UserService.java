@@ -16,13 +16,13 @@ import com.resume.user.security.TokenHashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.regex.Pattern;
 
 /**
  * 用户与认证业务服务。
@@ -36,87 +36,20 @@ public class UserService {
     private final RefreshTokenMapper refreshTokenMapper;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
-    private final ObjectProvider<VerifyCodeService> verifyCodeServiceProvider;
     private final LoginAttemptGuard loginAttemptGuard;
     private final AuditLogService auditLogService;
 
     private static final int MIN_PASSWORD_LENGTH = 8;
     private static final int MAX_PASSWORD_LENGTH = 32;
-    private static final java.util.regex.Pattern PASSWORD_COMPLEXITY =
-            java.util.regex.Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).+$");
-
-    /**
-     * 注册账号。
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public AuthResponse register(RegisterRequest request) {
-        log.info("register start: phone={}, email={}", request.getPhone(),
-                maskEmail(request.getEmail()));
-        if (StringUtils.isBlank(request.getPhone()) && StringUtils.isBlank(request.getEmail())) {
-            throw new BusinessException(ResultCode.PARAM_INVALID, "手机号与邮箱至少填写一个。");
-        }
-        if (StringUtils.isBlank(request.getPassword())
-                || request.getPassword().length() < MIN_PASSWORD_LENGTH
-                || request.getPassword().length() > MAX_PASSWORD_LENGTH
-                || !PASSWORD_COMPLEXITY.matcher(request.getPassword()).matches()) {
-            throw new BusinessException(ResultCode.AUTH_PASSWORD_TOO_WEAK,
-                    "密码长度应为 " + MIN_PASSWORD_LENGTH + "–" + MAX_PASSWORD_LENGTH + " 位，且需同时包含字母和数字。");
-        }
-
-        // 验证码校验：优先使用配置的验证码服务；未配置任何实现时安全拒绝注册
-        VerifyCodeService verifyCodeService = verifyCodeServiceProvider.getIfAvailable();
-        if (verifyCodeService == null) {
-            log.warn("Register rejected: no VerifyCodeService configured (verify-code.mode must be placeholder in dev/test, real service in prod)");
-            throw new BusinessException(ResultCode.AUTH_VERIFY_CODE_INVALID,
-                    "验证码服务未配置，暂时无法注册，请联系管理员。");
-        }
-        if (StringUtils.isBlank(request.getVerifyCode())
-                || !verifyCodeService.verify(request.getVerifyCode(),
-                        StringUtils.defaultString(request.getPhone(), request.getEmail()))) {
-            throw new BusinessException(ResultCode.AUTH_VERIFY_CODE_INVALID, "验证码不正确或已过期。");
-        }
-
-        if (StringUtils.isNotBlank(request.getPhone())) {
-            User exist = findByPhoneIncludingDeleted(request.getPhone());
-            if (exist != null && BizConstant.NOT_DELETED.equals(exist.getDeleted())) {
-                throw new BusinessException(ResultCode.AUTH_PHONE_REGISTERED, "该手机号已注册。");
-            }
-            if (exist != null) {
-                // 回收被逻辑删除账号占用的唯一索引，允许重新注册
-                releaseUserIdentity(exist.getId(), request.getPhone(), null);
-            }
-        }
-        if (StringUtils.isNotBlank(request.getEmail())) {
-            User exist = findByEmailIncludingDeleted(request.getEmail());
-            if (exist != null && BizConstant.NOT_DELETED.equals(exist.getDeleted())) {
-                throw new BusinessException(ResultCode.AUTH_EMAIL_REGISTERED, "该邮箱已注册。");
-            }
-            if (exist != null) {
-                releaseUserIdentity(exist.getId(), null, request.getEmail());
-            }
-        }
-
-        User user = new User();
-        user.setPhone(request.getPhone());
-        user.setEmail(request.getEmail());
-        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        user.setIsGuest(BizConstant.IS_NOT_GUEST);
-        user.setRole(BizConstant.USER_ROLE_USER);
-        user.setStatus(BizConstant.USER_STATUS_ACTIVE);
-        user.setDeleted(BizConstant.NOT_DELETED);
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(LocalDateTime.now());
-        userMapper.insert(user);
-
-        log.info("register success: userId={}, phone={}", user.getId(), maskPhone(user.getPhone()));
-        auditLogService.record(user.getId(), "register", user.getId(),
-                "phone=" + maskPhone(user.getPhone()) + ", email=" + maskEmail(user.getEmail()));
-        return buildAuthResponse(user);
-    }
+    private static final Pattern PASSWORD_COMPLEXITY =
+            Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).+$");
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     /**
      * 登录。当 loginType 未传时自动识别账号类型。
      * <p>
+     * 邮箱账号不存在时自动创建（登录即注册）；手机号不存在时保持报错。
      * 连续失败达到上限后账号临时锁定（LoginAttemptGuard），防止密码爆破。
      * </p>
      */
@@ -138,9 +71,18 @@ public class UserService {
             user = findByEmail(request.getAccount());
         }
 
-        if (user == null || BizConstant.IS_GUEST.equals(user.getIsGuest())) {
+        if (user == null) {
+            // 登录即注册：邮箱账号不存在时自动创建（含密码校验）
+            if (!"email".equals(loginType)) {
+                throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND, "账号不存在。");
+            }
+            user = createEmailAccount(request.getAccount(), request.getPassword());
+            log.info("login auto-created account: userId={}, email={}", user.getId(),
+                    maskEmail(user.getEmail()));
+        } else if (BizConstant.IS_GUEST.equals(user.getIsGuest())) {
             throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND, "账号不存在。");
         }
+
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             loginAttemptGuard.recordFailure(request.getAccount());
             throw new BusinessException(ResultCode.AUTH_PASSWORD_INCORRECT, "密码不正确。");
@@ -359,34 +301,33 @@ public class UserService {
     }
 
     /**
-     * 查询含逻辑删除记录（唯一索引不区分 deleted，注册查重需包含已删记录）。
+     * 登录即注册：邮箱不存在时创建正式账号（密码作为初始密码）。
      */
-    private User findByPhoneIncludingDeleted(String phone) {
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getPhone, phone);
-        return userMapper.selectOne(wrapper);
-    }
-
-    private User findByEmailIncludingDeleted(String email) {
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getEmail, email);
-        return userMapper.selectOne(wrapper);
-    }
-
-    /**
-     * 释放逻辑删除账号占用的唯一键（phone/email 置 NULL，MySQL 唯一索引允许多个 NULL）。
-     */
-    private void releaseUserIdentity(String userId, String phone, String email) {
-        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(User::getId, userId);
-        if (phone != null) {
-            wrapper.set(User::getPhone, null);
+    private User createEmailAccount(String account, String password) {
+        String email = StringUtils.trim(account).toLowerCase();
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND, "账号不存在。");
         }
-        if (email != null) {
-            wrapper.set(User::getEmail, null);
+        if (StringUtils.isBlank(password)
+                || password.length() < MIN_PASSWORD_LENGTH
+                || password.length() > MAX_PASSWORD_LENGTH
+                || !PASSWORD_COMPLEXITY.matcher(password).matches()) {
+            throw new BusinessException(ResultCode.AUTH_PASSWORD_TOO_WEAK,
+                    "密码长度应为 " + MIN_PASSWORD_LENGTH + "–" + MAX_PASSWORD_LENGTH + " 位，且需同时包含字母和数字。");
         }
-        wrapper.set(User::getUpdatedAt, LocalDateTime.now());
-        userMapper.update(null, wrapper);
+        User user = new User();
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(password));
+        user.setIsGuest(BizConstant.IS_NOT_GUEST);
+        user.setRole(BizConstant.USER_ROLE_USER);
+        user.setStatus(BizConstant.USER_STATUS_ACTIVE);
+        user.setDeleted(BizConstant.NOT_DELETED);
+        user.setCreatedAt(LocalDateTime.now());
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.insert(user);
+        auditLogService.record(user.getId(), "auto_create", user.getId(),
+                "email=" + maskEmail(email));
+        return user;
     }
 
     private String maskPhone(String phone) {

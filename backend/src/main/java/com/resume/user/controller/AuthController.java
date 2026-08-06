@@ -46,14 +46,6 @@ public class AuthController {
     private final UserAuthService userAuthService;
     private final AuthProperties authProperties;
 
-    @PostMapping("/register")
-    public R<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return R.success(userService.register(request));
-    }
-
-    /**
-     * 账号密码登录（兼容旧客户端）。
-     */
     @PostMapping("/login")
     public R<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return R.success(userService.login(request));

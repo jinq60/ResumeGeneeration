@@ -1,12 +1,5 @@
 import request from '@/utils/request'
 
-export interface RegisterRequest {
-  phone?: string
-  email?: string
-  verifyCode: string
-  password: string
-}
-
 export interface LoginRequest {
   account: string
   password: string
@@ -27,9 +20,6 @@ export interface EmailCodeLoginRequest {
 }
 
 export const authApi = {
-  register(data: RegisterRequest): Promise<AuthResponse> {
-    return request.post('/auth/register', data) as Promise<AuthResponse>
-  },
   login(data: LoginRequest): Promise<AuthResponse> {
     return request.post('/auth/login', data) as Promise<AuthResponse>
   },

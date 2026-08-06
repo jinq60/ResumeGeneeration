@@ -62,34 +62,14 @@
 
       <!-- 右：纸白登录面 -->
       <section class="flex flex-col justify-between p-8 bg-surface-container-lowest">
-        <div class="border-b border-outline-variant/30 flex justify-end gap-6 pb-3">
-          <button
-            :class="['text-body-md font-medium py-1.5 px-0 relative transition-colors', activeTab === 'login' ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface']"
-            @click="activeTab = 'login'"
-          >
-            登录
-            <span
-              v-if="activeTab === 'login'"
-              class="absolute left-0 right-0 -bottom-[13px] h-0.5 bg-primary rounded-full"
-            />
-          </button>
-          <button
-            :class="['text-body-md font-medium py-1.5 px-0 relative transition-colors', activeTab === 'register' ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface']"
-            @click="activeTab = 'register'"
-          >
-            注册
-            <span
-              v-if="activeTab === 'register'"
-              class="absolute left-0 right-0 -bottom-[13px] h-0.5 bg-primary rounded-full"
-            />
-          </button>
-        </div>
-
         <div class="max-w-sm mx-auto my-auto w-full">
           <header class="mb-6">
             <h2 class="text-headline-md font-headline-md text-on-surface">
-              {{ activeTab === 'login' ? '欢迎回来' : '创建账号' }}
+              欢迎回来
             </h2>
+            <p class="text-body-md text-on-surface-variant mt-2">
+              邮箱账号首次登录将自动创建
+            </p>
           </header>
 
           <div
@@ -102,7 +82,6 @@
 
           <!-- 登录表单 -->
           <form
-            v-if="activeTab === 'login'"
             class="mt-6 flex flex-col gap-3"
             @submit.prevent="handleLogin"
           >
@@ -272,69 +251,6 @@
               <span>以游客身份体验</span>
             </button>
           </form>
-
-          <!-- 注册表单 -->
-          <form
-            v-else
-            class="mt-6 flex flex-col gap-3"
-            @submit.prevent="handleRegister"
-          >
-            <label class="text-label-md font-label-md text-on-surface-variant">手机号</label>
-            <div class="relative flex items-center">
-              <span class="absolute left-3 text-outline pointer-events-none">
-                <el-icon size="16"><Iphone /></el-icon>
-              </span>
-              <input
-                v-model="registerForm.phone"
-                type="tel"
-                required
-                placeholder="请输入手机号"
-                class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-3 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
-              >
-            </div>
-
-            <label class="text-label-md font-label-md text-on-surface-variant">验证码</label>
-            <div class="flex gap-2">
-              <input
-                v-model="registerForm.verifyCode"
-                type="text"
-                required
-                maxlength="6"
-                placeholder="6 位验证码"
-                class="flex-1 bg-surface-container-low border-none rounded-lg px-3 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
-              >
-              <button
-                type="button"
-                class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2 font-label-md transition-colors whitespace-nowrap"
-              >
-                获取验证码
-              </button>
-            </div>
-
-            <label class="text-label-md font-label-md text-on-surface-variant">密码</label>
-            <input
-              v-model="registerForm.password"
-              type="password"
-              required
-              placeholder="8-32 位，需包含字母和数字"
-              class="w-full bg-surface-container-low border-none rounded-lg px-3 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
-            >
-
-            <button
-              type="submit"
-              class="mt-4 w-full bg-primary text-on-primary px-4 py-2.5 rounded-lg font-label-md flex items-center justify-center gap-2 shadow-sm hover:scale-[0.98] transition-transform disabled:opacity-55 disabled:cursor-not-allowed"
-              :disabled="loading"
-            >
-              <el-icon
-                v-if="loading"
-                class="animate-spin"
-                size="16"
-              >
-                <Loading />
-              </el-icon>
-              <span>{{ loading ? '注册中...' : '注册' }}</span>
-            </button>
-          </form>
         </div>
       </section>
     </div>
@@ -353,7 +269,6 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
-const activeTab = ref<'login' | 'register'>('login')
 const loginMode = ref<'password' | 'email_code'>('password')
 const showPassword = ref(false)
 const loading = ref(false)
@@ -363,7 +278,6 @@ const countdown = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 const loginForm = reactive({ account: '', password: '' })
-const registerForm = reactive({ phone: '', verifyCode: '', password: '' })
 const emailCodeForm = reactive({ email: '', code: '' })
 
 const skills = ['需求分析', '产品设计', '数据分析', 'Axure', 'SQL']
@@ -446,19 +360,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (countdownTimer) clearInterval(countdownTimer)
 })
-
-async function handleRegister() {
-  errorMsg.value = ''
-  loading.value = true
-  try {
-    const res = await authApi.register({ phone: registerForm.phone, verifyCode: registerForm.verifyCode, password: registerForm.password })
-    applyAuth(res)
-  } catch (e: any) {
-    errorMsg.value = e.message || '注册失败'
-  } finally {
-    loading.value = false
-  }
-}
 
 async function handleGuest() {
   errorMsg.value = ''

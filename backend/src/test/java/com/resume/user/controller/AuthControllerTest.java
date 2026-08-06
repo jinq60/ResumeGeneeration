@@ -13,7 +13,6 @@ import com.resume.user.config.AuthProperties;
 import com.resume.user.dto.AuthResponse;
 import com.resume.user.security.JwtTokenProvider;
 import com.resume.user.dto.LoginRequest;
-import com.resume.user.dto.RegisterRequest;
 import com.resume.user.service.GuestAccountGuard;
 import com.resume.user.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -78,37 +77,6 @@ class AuthControllerTest {
         response.setRefreshToken("refresh123");
         response.setIsGuest(false);
         return response;
-    }
-
-    @Test
-    void testRegister_Success() throws Exception {
-        RegisterRequest request = new RegisterRequest();
-        request.setPhone("13800138000");
-        request.setVerifyCode("123456");
-        request.setPassword("Password123");
-
-        when(userService.register(any(RegisterRequest.class))).thenReturn(buildAuthResponse());
-
-        mockMvc.perform(post("/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.userId").value("user123"))
-                .andExpect(jsonPath("$.data.accessToken").value("token123"));
-    }
-
-    @Test
-    void testRegister_InvalidPhone() throws Exception {
-        RegisterRequest request = new RegisterRequest();
-        request.setPhone("invalid");
-        request.setVerifyCode("123456");
-        request.setPassword("Password123");
-
-        mockMvc.perform(post("/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
     }
 
     @Test

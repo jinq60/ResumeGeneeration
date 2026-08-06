@@ -2,6 +2,19 @@
 
 > 记录 `docs/superpowers/specs/2026-07-03-api-spec.md` 的所有变更，便于前后端联调与版本管理。
 
+## v2.0（2026-08-06）
+
+### 移除
+
+- 删除 `POST /auth/register` 注册接口与 `RegisterRequest`、`VerifyCodeService`/`PlaceholderVerifyCodeService`（登录即注册，不再需要独立注册与占位验证码）。
+
+### 调整
+
+- `POST /auth/login`：邮箱账号不存在时自动创建（登录即注册，密码作为初始密码，需满足强度要求）；手机号不存在仍返回 `AUTH_ACCOUNT_NOT_FOUND`。
+- 前端移除注册 Tab 与注册表单，登录页仅保留登录与第三方入口。
+
+---
+
 ## v1.9（2026-08-06）
 
 ### 新增（多方式登录适配器）
