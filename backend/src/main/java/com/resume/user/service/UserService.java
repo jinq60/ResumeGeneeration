@@ -301,7 +301,7 @@ public class UserService {
         return response;
     }
 
-    private AuthResponse buildAuthResponse(User user) {
+    public AuthResponse buildAuthResponse(User user) {
         AuthResponse response = new AuthResponse();
         response.setUserId(user.getId());
         String role = user.getRole() == null ? BizConstant.USER_ROLE_USER : user.getRole();

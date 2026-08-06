@@ -10,12 +10,8 @@
 
 | PRD 需求 | 范围对齐 | 数据模型 | API 规范 | 校验规则 | TDD 计划 | 代码位置 |
 |---|---|---|---|---|---|---|
-| 手机号/邮箱注册 | `scope-alignment.md` §2.1 | `user` 表 | `api-spec.md` §5.1 | `validation-rules.md` §2、§11 | `tdd-test-plan.md` §2.1 `UserServiceTest` | `backend/src/main/java/com/resume/user/service/UserService.java` |
-| 登录 | `scope-alignment.md` §2.1 | `user` 表 | `api-spec.md` §5.2 | `validation-rules.md` §2 | `tdd-test-plan.md` §2.3 | `AuthController`, `UserService` |
-| 游客模式 | `scope-alignment.md` §2.1 | `user` 表 `is_guest` | `api-spec.md` §5.3 | — | `tdd-test-plan.md` §2.3 | `AuthController`, `UserService` |
-| JWT 鉴权 | — | — | `api-spec.md` §3 | — | `tdd-test-plan.md` §2.1 `JwtTokenProviderTest` | `JwtTokenProvider`, `JwtAuthenticationFilter` |
-| Token 刷新 | `scope-alignment.md` §2.1 | `refresh_token` 表（可选） | `api-spec.md` §5.4 | — | `tdd-test-plan.md` §2.3 | `AuthController`, `UserService` |
-| 获取当前用户 | — | `user` 表 | `api-spec.md` §6 | — | `tdd-test-plan.md` §2.3 | `UserController` |
+| 注册/登录/游客 | `scope-alignment.md` §2.1 | `user` 表 | `api-spec.md` §5.1-5.3 | `validation-rules.md` §2 | `tdd-test-plan.md` §2.1 `UserServiceTest` | `AuthController`, `UserService` |
+| 多方式登录适配器 | 业务线 v1.1 后续迭代 | `user_auth` 表（V12） | `api-spec.md` §5.5 | 邮箱格式/验证码规则 | `AuthControllerTest`, `EmailCodeServiceTest`, `UserAuthServiceTest` | `user/auth/`（AuthProvider、OAuthProvider、EmailCodeService、UserAuthService） |
 
 ## 2. 简历管理模块
 

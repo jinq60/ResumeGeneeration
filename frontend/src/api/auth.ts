@@ -21,6 +21,11 @@ export interface AuthResponse {
   isGuest?: boolean
 }
 
+export interface EmailCodeLoginRequest {
+  email: string
+  code: string
+}
+
 export const authApi = {
   register(data: RegisterRequest): Promise<AuthResponse> {
     return request.post('/auth/register', data) as Promise<AuthResponse>
@@ -39,5 +44,20 @@ export const authApi = {
   },
   changePassword(oldPassword: string, newPassword: string): Promise<void> {
     return request.put('/users/me/password', { oldPassword, newPassword }) as Promise<void>
+  },
+  emailCodeSend(email: string): Promise<void> {
+    return request.post('/auth/email-code/send', { email }) as Promise<void>
+  },
+  emailCodeLogin(data: EmailCodeLoginRequest): Promise<AuthResponse> {
+    return request.post('/auth/email-code/login', data) as Promise<AuthResponse>
+  },
+  loginMethods(): Promise<{ loginMethods: { method: string; configured: boolean }[]; oauthProviders: { provider: string; configured: boolean }[] }> {
+    return request.get('/auth/methods') as Promise<{ loginMethods: { method: string; configured: boolean }[]; oauthProviders: { provider: string; configured: boolean }[] }>
   }
+}
+
+/** 第三方授权跳转地址（浏览器整页跳转，回跳后由 /login 处理 token） */
+export function oauthAuthorizeUrl(provider: string): string {
+  const base = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+  return `${base}/auth/oauth/${provider}/authorize`
 }

@@ -116,42 +116,100 @@
             class="mt-6 flex flex-col gap-3"
             @submit.prevent="handleLogin"
           >
-            <label class="text-label-md font-label-md text-on-surface-variant">手机号或邮箱</label>
-            <div class="relative flex items-center">
-              <span class="absolute left-3 text-outline pointer-events-none">
-                <el-icon size="16"><User /></el-icon>
-              </span>
-              <input
-                v-model="loginForm.account"
-                type="text"
-                required
-                placeholder="请输入手机号或邮箱"
-                class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-3 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
-              >
-            </div>
-
-            <label class="text-label-md font-label-md text-on-surface-variant mt-2">密码</label>
-            <div class="relative flex items-center">
-              <span class="absolute left-3 text-outline pointer-events-none">
-                <el-icon size="16"><Lock /></el-icon>
-              </span>
-              <input
-                v-model="loginForm.password"
-                :type="showPassword ? 'text' : 'password'"
-                required
-                placeholder="请输入 8-32 位密码"
-                class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-10 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
-              >
+            <div class="flex gap-2 mb-1">
               <button
                 type="button"
-                class="absolute right-3 text-outline hover:text-on-surface transition-colors"
-                @click="showPassword = !showPassword"
+                :class="['flex-1 py-2 rounded-lg text-label-md font-label-md transition-colors', loginMode === 'password' ? 'bg-primary-fixed text-primary' : 'text-on-surface-variant hover:bg-surface-container-low']"
+                @click="loginMode = 'password'"
               >
-                <el-icon size="16">
-                  <View v-if="showPassword" /><Hide v-else />
-                </el-icon>
+                账号密码
+              </button>
+              <button
+                type="button"
+                :class="['flex-1 py-2 rounded-lg text-label-md font-label-md transition-colors', loginMode === 'email_code' ? 'bg-primary-fixed text-primary' : 'text-on-surface-variant hover:bg-surface-container-low']"
+                @click="loginMode = 'email_code'"
+              >
+                邮箱验证码
               </button>
             </div>
+
+            <template v-if="loginMode === 'password'">
+              <label class="text-label-md font-label-md text-on-surface-variant">手机号或邮箱</label>
+              <div class="relative flex items-center">
+                <span class="absolute left-3 text-outline pointer-events-none">
+                  <el-icon size="16"><User /></el-icon>
+                </span>
+                <input
+                  v-model="loginForm.account"
+                  type="text"
+                  required
+                  placeholder="请输入手机号或邮箱"
+                  class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-3 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
+                >
+              </div>
+
+              <label class="text-label-md font-label-md text-on-surface-variant mt-2">密码</label>
+              <div class="relative flex items-center">
+                <span class="absolute left-3 text-outline pointer-events-none">
+                  <el-icon size="16"><Lock /></el-icon>
+                </span>
+                <input
+                  v-model="loginForm.password"
+                  :type="showPassword ? 'text' : 'password'"
+                  required
+                  placeholder="请输入 8-32 位密码"
+                  class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-10 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
+                >
+                <button
+                  type="button"
+                  class="absolute right-3 text-outline hover:text-on-surface transition-colors"
+                  @click="showPassword = !showPassword"
+                >
+                  <el-icon size="16">
+                    <View v-if="showPassword" /><Hide v-else />
+                  </el-icon>
+                </button>
+              </div>
+            </template>
+
+            <template v-else>
+              <label class="text-label-md font-label-md text-on-surface-variant">邮箱</label>
+              <div class="relative flex items-center">
+                <span class="absolute left-3 text-outline pointer-events-none">
+                  <el-icon size="16"><Message /></el-icon>
+                </span>
+                <input
+                  v-model="emailCodeForm.email"
+                  type="email"
+                  required
+                  placeholder="请输入邮箱"
+                  class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-3 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
+                >
+              </div>
+
+              <label class="text-label-md font-label-md text-on-surface-variant mt-2">验证码</label>
+              <div class="flex gap-2">
+                <input
+                  v-model="emailCodeForm.code"
+                  type="text"
+                  required
+                  maxlength="6"
+                  placeholder="6 位验证码"
+                  class="flex-1 bg-surface-container-low border-none rounded-lg px-3 py-2.5 text-body-md placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
+                >
+                <button
+                  type="button"
+                  class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2 font-label-md transition-colors whitespace-nowrap disabled:opacity-55 disabled:cursor-not-allowed"
+                  :disabled="countdown > 0 || codeSending"
+                  @click="handleSendEmailCode"
+                >
+                  {{ countdown > 0 ? `${countdown}s 后重发` : codeSending ? '发送中…' : '获取验证码' }}
+                </button>
+              </div>
+              <p class="text-label-md text-on-surface-variant">
+                未注册的邮箱将自动创建账号
+              </p>
+            </template>
 
             <button
               type="submit"
@@ -165,13 +223,52 @@
               >
                 <Loading />
               </el-icon>
-              <span>{{ loading ? '登录中...' : '登录' }}</span>
+              <span>{{ loading ? '登录中...' : loginMode === 'password' ? '登录' : '验证码登录' }}</span>
             </button>
 
             <div class="relative flex items-center my-5">
               <div class="flex-1 h-px bg-outline-variant" />
-              <span class="px-3 text-label-md text-on-surface-variant">或</span>
+              <span class="px-3 text-label-md text-on-surface-variant">其他方式</span>
               <div class="flex-1 h-px bg-outline-variant" />
+            </div>
+
+            <div class="grid grid-cols-4 gap-2">
+              <button
+                type="button"
+                class="flex flex-col items-center gap-1.5 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-low text-on-surface-variant transition-colors"
+                title="使用 Google 账号登录"
+                @click="handleOAuth('google')"
+              >
+                <span class="text-lg leading-none">G</span>
+                <span class="text-label-md">Google</span>
+              </button>
+              <button
+                type="button"
+                class="flex flex-col items-center gap-1.5 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-low text-on-surface-variant transition-colors"
+                title="使用 GitHub 账号登录"
+                @click="handleOAuth('github')"
+              >
+                <span class="text-lg leading-none">GH</span>
+                <span class="text-label-md">GitHub</span>
+              </button>
+              <button
+                type="button"
+                class="flex flex-col items-center gap-1.5 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-low text-on-surface-variant transition-colors"
+                title="使用 QQ 扫码登录"
+                @click="handleOAuth('qq')"
+              >
+                <span class="text-lg leading-none">QQ</span>
+                <span class="text-label-md">QQ 登录</span>
+              </button>
+              <button
+                type="button"
+                disabled
+                class="flex flex-col items-center gap-1.5 py-2.5 rounded-lg border border-outline-variant text-outline opacity-60 cursor-not-allowed"
+                title="手机验证码登录即将上线"
+              >
+                <span class="text-lg leading-none"><el-icon><Iphone /></el-icon></span>
+                <span class="text-label-md">短信登录</span>
+              </button>
             </div>
 
             <button
@@ -310,33 +407,53 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { authApi } from '@/api/auth'
-import { User, Lock, View, Hide, Loading, Iphone, Download, WarningFilled } from '@element-plus/icons-vue'
+import { authApi, oauthAuthorizeUrl } from '@/api/auth'
+import { User, Lock, View, Hide, Loading, Iphone, Message, Download, WarningFilled } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const activeTab = ref<'login' | 'register'>('login')
+const loginMode = ref<'password' | 'email_code'>('password')
 const showPassword = ref(false)
 const loading = ref(false)
 const errorMsg = ref('')
+const codeSending = ref(false)
+const countdown = ref(0)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 const loginForm = reactive({ account: '', password: '' })
 const registerForm = reactive({ phone: '', verifyCode: '', password: '' })
+const emailCodeForm = reactive({ email: '', code: '' })
 
 const skills = ['需求分析', '产品设计', '数据分析', 'Axure', 'SQL']
+
+function applyAuth(res: { userId: string; accessToken: string; refreshToken: string; isGuest?: boolean }) {
+  userStore.setUser({
+    userId: res.userId,
+    accessToken: res.accessToken,
+    refreshToken: res.refreshToken,
+    isGuest: res.isGuest
+  })
+  router.push('/workbench/dashboard')
+}
 
 async function handleLogin() {
   errorMsg.value = ''
   loading.value = true
   try {
-    const loginType = loginForm.account.includes('@') ? 'email' : 'phone'
-    const res = await authApi.login({ account: loginForm.account, password: loginForm.password, loginType } as any)
-    userStore.setUser({ userId: res.userId, accessToken: res.accessToken, refreshToken: res.refreshToken, isGuest: res.isGuest })
-    router.push('/workbench/dashboard')
+    if (loginMode.value === 'password') {
+      const loginType = loginForm.account.includes('@') ? 'email' : 'phone'
+      const res = await authApi.login({ account: loginForm.account, password: loginForm.password, loginType } as any)
+      applyAuth(res)
+    } else {
+      const res = await authApi.emailCodeLogin({ email: emailCodeForm.email, code: emailCodeForm.code })
+      applyAuth(res)
+    }
   } catch (e: any) {
     errorMsg.value = e.message || '登录失败'
   } finally {
@@ -344,13 +461,62 @@ async function handleLogin() {
   }
 }
 
+async function handleSendEmailCode() {
+  errorMsg.value = ''
+  if (!emailCodeForm.email) {
+    errorMsg.value = '请先输入邮箱'
+    return
+  }
+  codeSending.value = true
+  try {
+    await authApi.emailCodeSend(emailCodeForm.email)
+    countdown.value = 60
+    if (countdownTimer) clearInterval(countdownTimer)
+    countdownTimer = setInterval(() => {
+      countdown.value -= 1
+      if (countdown.value <= 0 && countdownTimer) {
+        clearInterval(countdownTimer)
+        countdownTimer = null
+      }
+    }, 1000)
+  } catch (e: any) {
+    errorMsg.value = e.message || '验证码发送失败'
+  } finally {
+    codeSending.value = false
+  }
+}
+
+function handleOAuth(provider: string) {
+  errorMsg.value = ''
+  window.location.href = oauthAuthorizeUrl(provider)
+}
+
+/** 第三方回调：/login?token=...&refresh=... 或 /login?error=... */
+onMounted(() => {
+  const query = route.query
+  if (query.error) {
+    errorMsg.value = String(query.error)
+  } else if (query.token) {
+    userStore.setUser({
+      userId: '',
+      accessToken: String(query.token),
+      refreshToken: String(query.refresh || ''),
+      isGuest: query.guest === 'true'
+    })
+    router.replace('/workbench/dashboard')
+  }
+})
+
+onBeforeUnmount(() => {
+  if (countdownTimer) clearInterval(countdownTimer)
+})
+
 async function handleRegister() {
   errorMsg.value = ''
   loading.value = true
   try {
     const res = await authApi.register({ phone: registerForm.phone, verifyCode: registerForm.verifyCode, password: registerForm.password })
-    userStore.setUser({ userId: res.userId, accessToken: res.accessToken, refreshToken: res.refreshToken, isGuest: res.isGuest })
-    router.push('/workbench/dashboard')
+    applyAuth(res)
   } catch (e: any) {
     errorMsg.value = e.message || '注册失败'
   } finally {

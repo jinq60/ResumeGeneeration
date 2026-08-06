@@ -2,6 +2,22 @@
 
 > 记录 `docs/superpowers/specs/2026-07-03-api-spec.md` 的所有变更，便于前后端联调与版本管理。
 
+## v1.9（2026-08-06）
+
+### 新增（多方式登录适配器）
+
+- `POST /auth/login/{method}`：统一登录入口，适配器分发（`password` / `email_code` / `sms_code` 预留）。
+- `GET /auth/methods`：可用登录方式与第三方配置状态（前端渲染入口）。
+- `POST /auth/email-code/send`：发送邮箱登录验证码（5 分钟有效、60 秒重发间隔；未配置 SMTP 时降级日志输出验证码）。
+- `POST /auth/email-code/login`：邮箱验证码免密登录，首次登录自动创建账号。
+- `GET /auth/oauth/{provider}/authorize`：第三方授权页跳转（google / github / qq），state 防 CSRF。
+- `GET /auth/oauth/{provider}/callback`：OAuth 回调，换 token → 拉取用户 → 登录/绑定 → 302 回前端携带 JWT。
+- `user_auth` 表（V12 迁移）：第三方账号绑定（provider + account 唯一）。
+- 错误码：`AUTH_EMAIL_CODE_INVALID`(1008)、`AUTH_EMAIL_CODE_SEND_FAILED`(1009)、`AUTH_OAUTH_NOT_CONFIGURED`(1010)、`AUTH_OAUTH_EXCHANGE_FAILED`(1011)、`AUTH_SMS_CODE_NOT_AVAILABLE`(1012)、`AUTH_EMAIL_CODE_TOO_FREQUENT`(1013)。
+- 配置：`app.auth.email-code.*`、`app.auth.oauth.*`（GOOGLE_CLIENT_ID / GITHUB_CLIENT_ID / QQ_APP_ID 等环境变量）、`app.auth.smtp.*`。
+
+---
+
 ## v1.8（2026-08-06）
 
 ### 新增

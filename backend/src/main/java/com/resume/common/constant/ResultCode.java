@@ -29,6 +29,16 @@ public final class ResultCode {
     public static final int AUTH_REFRESH_TOKEN_INVALID = 1007;
 
     /**
+     * 多方式认证错误码：1008-1099
+     */
+    public static final int AUTH_EMAIL_CODE_INVALID = 1008;
+    public static final int AUTH_EMAIL_CODE_SEND_FAILED = 1009;
+    public static final int AUTH_OAUTH_NOT_CONFIGURED = 1010;
+    public static final int AUTH_OAUTH_EXCHANGE_FAILED = 1011;
+    public static final int AUTH_SMS_CODE_NOT_AVAILABLE = 1012;
+    public static final int AUTH_EMAIL_CODE_TOO_FREQUENT = 1013;
+
+    /**
      * 简历模块错误码：2000-2099
      */
     public static final int RESUME_SCENE_INVALID = 2000;

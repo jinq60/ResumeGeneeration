@@ -62,6 +62,31 @@ app:
     verify-code:
       # 验证码模式：placeholder=任意 6 位数字（仅限开�?测试）；strict=未配置真实验证码服务时拒绝注�?
       mode: ${VERIFY_CODE_MODE:placeholder}
+    email-code:
+      # 邮箱验证码有效期与重发间隔
+      ttl-minutes: 5
+      resend-interval-seconds: 60
+    oauth:
+      # 后端对外基础地址（回调地址 = baseUrl + /auth/oauth/{provider}/callback）
+      base-url: ${AUTH_OAUTH_BASE_URL:http://localhost:8080/api}
+      # 登录成功后前端跳转地址（携带 token）
+      frontend-redirect: ${AUTH_OAUTH_FRONTEND_REDIRECT:http://localhost:5173/login}
+      google:
+        client-id: ${GOOGLE_CLIENT_ID:}
+        client-secret: ${GOOGLE_CLIENT_SECRET:}
+      github:
+        client-id: ${GITHUB_CLIENT_ID:}
+        client-secret: ${GITHUB_CLIENT_SECRET:}
+      qq:
+        app-id: ${QQ_APP_ID:}
+        app-key: ${QQ_APP_KEY:}
+    smtp:
+      # 邮箱验证码发送；host 留空时降级为日志输出验证码（仅限本地开发）
+      host: ${SMTP_HOST:}
+      port: ${SMTP_PORT:587}
+      username: ${SMTP_USERNAME:}
+      password: ${SMTP_PASSWORD:}
+      from: ${SMTP_FROM:}
     guest:
       # �?IP 每天可创建的游客会话上限（防刷号�?
       max-per-ip-per-day: ${GUEST_MAX_PER_IP_PER_DAY:50}
