@@ -12,61 +12,20 @@
             <p class="text-body-lg text-on-surface-variant mt-2">
               继续完善你的简历，让下一次投递更有把握
             </p>
-            <div class="mt-8 flex flex-wrap gap-8">
-              <div class="flex items-center gap-6">
-                <div class="relative w-24 h-24">
-                  <svg
-                    class="w-full h-full"
-                    viewBox="0 0 100 100"
-                  >
-                    <circle
-                      class="text-surface-variant stroke-current"
-                      cx="50"
-                      cy="50"
-                      fill="transparent"
-                      r="40"
-                      stroke-width="10"
-                    />
-                    <circle
-                      class="text-primary stroke-current"
-                      cx="50"
-                      cy="50"
-                      fill="transparent"
-                      r="40"
-                      stroke-linecap="round"
-                      stroke-width="10"
-                      :stroke-dasharray="circumference"
-                      :stroke-dashoffset="progressOffset"
-                      style="transform: rotate(-90deg); transform-origin: 50% 50%;"
-                    />
-                  </svg>
-                  <div class="absolute inset-0 flex items-center justify-center flex-col">
-                    <span class="text-title-md font-bold text-primary">{{ completion }}%</span>
-                    <span class="text-[10px] text-on-surface-variant">完成度</span>
-                  </div>
-                </div>
-                <div class="space-y-2">
-                  <p class="text-title-md text-on-surface">
-                    你的简历还有提升空间
-                  </p>
-                  <ul class="space-y-1">
-                    <li
-                      v-for="tip in tips"
-                      :key="tip"
-                      class="flex items-center gap-2 text-body-md text-on-surface-variant"
-                    >
-                      <span class="w-1.5 h-1.5 rounded-full bg-primary" />
-                      {{ tip }}
-                    </li>
-                  </ul>
-                </div>
-              </div>
+            <div class="mt-8 flex flex-wrap items-center gap-4">
               <RouterLink
                 to="/workbench/resumes"
-                class="bg-primary hover:bg-primary-container text-on-primary px-8 py-3 rounded-lg font-bold text-body-md transition-all flex items-center gap-2 self-end"
+                class="bg-primary hover:bg-primary-container text-on-primary px-8 py-3 rounded-lg font-bold text-body-md transition-all flex items-center gap-2"
               >
                 继续编辑
                 <el-icon><ArrowRight /></el-icon>
+              </RouterLink>
+              <RouterLink
+                to="/workbench/ai-review"
+                class="border border-outline-variant hover:bg-surface-container-low text-on-surface-variant px-6 py-3 rounded-lg font-bold text-body-md transition-all flex items-center gap-2"
+              >
+                <el-icon><MagicStick /></el-icon>
+                AI 点评
               </RouterLink>
             </div>
           </div>
@@ -144,7 +103,7 @@
             <div class="bg-surface-container-low rounded-lg overflow-hidden h-40 mb-3 border border-outline-variant/30">
               <img
                 class="w-full h-full object-cover"
-                :src="defaultThumbnails[0]"
+                :src="TEMPLATE_PLACEHOLDER"
                 :alt="resume.title"
               >
             </div>
@@ -200,64 +159,11 @@
           </div>
         </div>
       </section>
-
-      <!-- Activity Timeline -->
-      <section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-title-lg font-title-lg flex items-center gap-2">
-            <el-icon class="text-primary">
-              <Clock />
-            </el-icon> 最近活动
-          </h2>
-          <RouterLink
-            to="/workbench/delivery"
-            class="text-primary text-body-md hover:underline"
-          >
-            查看全部 &gt;
-          </RouterLink>
-        </div>
-        <div class="space-y-6">
-          <div
-            v-for="(activity, idx) in activities"
-            :key="idx"
-            class="flex gap-4"
-          >
-            <div class="flex flex-col items-center">
-              <div
-                class="w-8 h-8 rounded-full flex items-center justify-center"
-                :class="activity.iconBg"
-              >
-                <el-icon
-                  size="14"
-                  :class="activity.iconColor"
-                >
-                  <component :is="activity.icon" />
-                </el-icon>
-              </div>
-              <div
-                v-if="idx < activities.length - 1"
-                class="w-0.5 h-full bg-outline-variant/30 mt-2"
-              />
-            </div>
-            <div class="pb-6 w-full flex justify-between items-start">
-              <div>
-                <p class="text-body-md font-semibold">
-                  {{ activity.title }}
-                </p>
-                <p class="text-body-md text-on-surface-variant">
-                  {{ activity.desc }}
-                </p>
-              </div>
-              <span class="text-label-md text-on-surface-variant whitespace-nowrap">{{ activity.time }}</span>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
 
     <!-- Right Sidebar Area -->
     <aside class="space-y-gutter">
-      <!-- AI Suggestions Card -->
+      <!-- AI Capabilities Card -->
       <div class="bg-surface-container-lowest border-2 border-primary/20 rounded-xl p-6 relative overflow-hidden group">
         <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
           <el-icon class="text-6xl text-primary">
@@ -268,7 +174,7 @@
           <h3 class="text-title-md flex items-center gap-2">
             <el-icon class="text-primary">
               <MagicStick />
-            </el-icon> AI 建议
+            </el-icon> AI 能力
           </h3>
           <RouterLink
             to="/workbench/ai-review"
@@ -278,78 +184,70 @@
           </RouterLink>
         </div>
         <div class="space-y-stack-md">
-          <div
-            v-for="suggestion in aiSuggestions"
-            :key="suggestion.title"
-            class="flex gap-3 items-start p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 hover:border-primary/50 cursor-pointer transition-all"
+          <button
+            class="w-full flex gap-3 items-start p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 hover:border-primary/50 cursor-pointer transition-all text-left"
+            @click="router.push('/workbench/ai-review')"
           >
-            <div
-              class="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0"
-              :class="suggestion.bgClass"
-            >
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 bg-orange-500">
               <el-icon size="16">
-                <component :is="suggestion.icon" />
+                <Histogram />
               </el-icon>
             </div>
             <div class="flex-grow">
-              <p class="text-body-md font-semibold">
-                {{ suggestion.title }}
+              <p class="text-body-md font-semibold text-on-surface">
+                AI 简历点评
               </p>
               <p class="text-label-md text-on-surface-variant mt-1">
-                {{ suggestion.desc }}
+                多维度评估竞争力，给出可执行建议
               </p>
             </div>
             <el-icon class="text-on-surface-variant">
               <ArrowRight />
             </el-icon>
-          </div>
-        </div>
-      </div>
-
-      <!-- Stats Tool -->
-      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6">
-        <div class="space-y-6">
-          <div
-            v-for="stat in stats"
-            :key="stat.label"
-            class="flex items-center justify-between"
+          </button>
+          <button
+            class="w-full flex gap-3 items-start p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 hover:border-primary/50 cursor-pointer transition-all text-left"
+            @click="router.push('/workbench/ai-review')"
           >
-            <div class="flex items-center gap-3">
-              <div
-                class="w-10 h-10 rounded-full flex items-center justify-center"
-                :class="stat.iconBg"
-              >
-                <el-icon :class="stat.iconColor">
-                  <component :is="stat.icon" />
-                </el-icon>
-              </div>
-              <div>
-                <p class="text-label-md text-on-surface-variant">
-                  {{ stat.label }}
-                </p>
-                <p class="text-title-lg font-bold">
-                  {{ stat.value }}
-                </p>
-              </div>
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 bg-green-600">
+              <el-icon size="16">
+                <Collection />
+              </el-icon>
             </div>
-            <div class="text-right">
-              <p class="text-label-md text-on-surface-variant">
-                较上周
+            <div class="flex-grow">
+              <p class="text-body-md font-semibold text-on-surface">
+                JD 匹配优化
               </p>
-              <p class="text-label-md text-secondary font-bold flex items-center justify-end">
-                <el-icon size="10">
-                  <ArrowUp />
-                </el-icon> {{ stat.growth }}
+              <p class="text-label-md text-on-surface-variant mt-1">
+                对照岗位描述优化简历关键词
               </p>
             </div>
-          </div>
+            <el-icon class="text-on-surface-variant">
+              <ArrowRight />
+            </el-icon>
+          </button>
+          <button
+            class="w-full flex gap-3 items-start p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 hover:border-primary/50 cursor-pointer transition-all text-left"
+            @click="router.push('/workbench/resumes')"
+          >
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 bg-blue-600">
+              <el-icon size="16">
+                <CircleCheckFilled />
+              </el-icon>
+            </div>
+            <div class="flex-grow">
+              <p class="text-body-md font-semibold text-on-surface">
+                语法检查
+              </p>
+              <p class="text-label-md text-on-surface-variant mt-1">
+                编辑器内检查错别字与表达问题
+              </p>
+            </div>
+            <el-icon class="text-on-surface-variant">
+              <ArrowRight />
+            </el-icon>
+          </button>
         </div>
-        <RouterLink
-          to="/workbench/delivery"
-          class="w-full mt-6 py-2 border border-outline-variant text-on-surface-variant rounded-lg hover:bg-surface-container text-body-md transition-all flex items-center justify-center"
-        >
-          查看投递管理
-        </RouterLink>
       </div>
 
       <!-- Quick Actions -->
@@ -412,25 +310,18 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { resumeApi } from '@/api/resume'
+import { TEMPLATE_PLACEHOLDER } from '@/utils/placeholder'
 import type { Resume } from '@/types/resume'
 import {
   Document,
   Plus,
   ArrowRight,
-  Clock,
   Histogram,
   Collection,
-  CircleCheck,
   CircleCheckFilled,
   MagicStick,
-  Promotion,
-  User,
   Upload,
-  Brush,
-  Reading,
-  More,
-  Edit,
-  ArrowUp
+  More
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -442,115 +333,35 @@ const renameVisible = ref(false)
 const renameTitle = ref('')
 const renameTarget = ref<Resume | null>(null)
 
-const completion = 72
-const radius = 40
-const circumference = 2 * Math.PI * radius
-const progressOffset = computed(() => circumference - (completion / 100) * circumference)
-
-const tips = [
-  '完善项目经历的量化结果',
-  '补充技能证书，增强竞争力',
-  '上传作品集，展示专业能力'
-]
-
-const defaultThumbnails = [
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuD6s0nXSHl6onAPyKyzLwz3LckJnYOQSzphf5N4g5GJxBHRdU6fPrnRMe6b0r-sFRG5RSr1uYeLSi7NTN64EIsSnn7wBnjNStwvxo3dH9yxhhWd3Tbe-vp6WZfCvmuKh_-pGyhJUlFKB1rZraiVMoh6L7hUv2_qIpJMY9CqyGOR6tAKPDtDVM5WRCOp5yXg-_q0AM_hq-pXPCHkHu8Sd8Xtto--pWLWohN8ADSbKmwm61hMmsS7Kn3iw1n049mfbF_Rk-DCJ5mIdCY',
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuCsgMb1HQ5Mws5r6LKw_DnCmCcYXFd7KMMd7BIZuOiXfZ-tKdL9UUCwztKv_jZNMQ4Se0uPcoZmeHStmoDlr6uzxjM4vQbvHkKo4hHoyXtuYYTYiDNM1Q8TRoCxkbwfSWVl4wXMjDPauie2DU7kh1saKkO2yW09iL9wdwbvqacEzNYBbKvH62TVVqv49_etecoKIsW0uwRv5gELTAPIhf4nEKx0MsAJhhOSqaD5LvyEHx8nvDcNg_aGQ1QLi5p7pxwNKS87bckzYQI',
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuC-VO1IvkdwBnM9B0FAGb1p-267Nkd5WjO5wxbGhYcOne4nfXT0ZKPMXiucWHSxm3__B362KjZRbMpAS-OOEGz6LJFsC_zt4JFigzXz1PcRA0-kJsrrCBEtpeQxbXhEfbqDRjznV8jq4vKSnIA1ThrrHSLQkH77SA05NsfNF13Ai1wQzp7OjjABzocXGC8ysnnV3Eaq60Dqzo_7L0S0Nbyx7ovRzRSB2Fy3XFAKI7s05-lQmVeXzxbIhpNnlcmErTFGPJold6Hja4Y'
-]
-
 const displayedResumes = computed(() => resumes.value.slice(0, 3))
-
-const activities = [
-  {
-    title: '导出 PDF',
-    desc: '导出了简历「前端开发工程师」的 PDF 版本',
-    time: '2024-05-20 15:42',
-    icon: Document,
-    iconBg: 'bg-error-container',
-    iconColor: 'text-error'
-  },
-  {
-    title: '修改项目经历',
-    desc: '更新了简历「前端开发工程师」的项目经历',
-    time: '2024-05-20 14:18',
-    icon: Edit,
-    iconBg: 'bg-primary-container/20',
-    iconColor: 'text-primary'
-  },
-  {
-    title: '创建新简历',
-    desc: '创建了新简历「数据分析师」',
-    time: '2024-05-15 11:03',
-    icon: CircleCheck,
-    iconBg: 'bg-secondary-container',
-    iconColor: 'text-secondary'
-  }
-]
-
-const aiSuggestions = [
-  {
-    title: '项目经历缺少量化结果',
-    desc: '建议为 2 个项目补充数据指标，提升说服力',
-    icon: Histogram,
-    bgClass: 'bg-orange-500'
-  },
-  {
-    title: '建议补充 GitHub 作品链接',
-    desc: '完善开源项目，展示你的技术影响力',
-    icon: Collection,
-    bgClass: 'bg-green-600'
-  },
-  {
-    title: '当前模板适合技术岗位',
-    desc: '简洁专业的布局，更受技术面试官青睐',
-    icon: CircleCheckFilled,
-    bgClass: 'bg-blue-600'
-  }
-]
-
-const stats = [
-  { label: '本周投递', value: 18, growth: '20%', icon: Promotion, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
-  { label: 'AI 优化次数', value: 7, growth: '16%', icon: MagicStick, iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' },
-  { label: '面试邀请', value: 2, growth: '100%', icon: User, iconBg: 'bg-secondary/10', iconColor: 'text-secondary' }
-]
 
 const quickActions = [
   {
     label: '导入简历',
-    sub: 'Word / PDF',
+    sub: 'Markdown / JSON',
     icon: Upload,
     iconBg: 'bg-primary-container/10',
     iconColor: 'text-primary',
     hoverClass: 'hover:bg-primary/5 hover:text-primary',
-    onClick: () => ElMessage.info('导入功能即将上线')
+    onClick: () => router.push('/workbench/resumes')
   },
   {
     label: 'AI 优化',
     sub: '智能改写',
-    icon: Brush,
+    icon: MagicStick,
     iconBg: 'bg-tertiary-fixed-dim/30',
     iconColor: 'text-tertiary',
     hoverClass: 'hover:bg-tertiary/5 hover:text-tertiary',
     onClick: () => router.push('/workbench/ai-review')
   },
   {
-    label: '上传作品集',
-    sub: '展示项目',
+    label: '头像管理',
+    sub: '上传与优化',
     icon: Upload,
     iconBg: 'bg-primary-container/10',
     iconColor: 'text-primary',
     hoverClass: 'hover:bg-primary/5 hover:text-primary',
     onClick: () => router.push('/workbench/avatar/upload')
-  },
-  {
-    label: '职业测评',
-    sub: '了解自己',
-    icon: Reading,
-    iconBg: 'bg-tertiary-fixed-dim/30',
-    iconColor: 'text-tertiary',
-    hoverClass: 'hover:bg-tertiary/5 hover:text-tertiary',
-    onClick: () => ElMessage.info('职业测评即将上线')
   }
 ]
 

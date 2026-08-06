@@ -188,7 +188,7 @@
             <div class="w-full h-full bg-white shadow-md rounded-sm p-4 origin-top transition-transform group-hover:scale-[1.02]">
               <img
                 class="w-full h-full object-contain"
-                :src="defaultThumbnails[idx % defaultThumbnails.length]"
+                :src="TEMPLATE_PLACEHOLDER"
                 :alt="resume.title"
               >
             </div>
@@ -288,155 +288,29 @@
 
     <!-- Sidebar / Inspector Drawer -->
     <aside class="w-full lg:w-[360px] flex flex-col gap-stack-lg">
-      <!-- Preparedness Score Card -->
-      <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 shadow-sm">
-        <div class="flex justify-between items-center mb-6">
-          <div class="flex items-center gap-2">
-            <h2 class="font-title-md text-title-md">
-              求职准备度
-            </h2>
-            <el-icon class="text-outline text-sm">
-              <InfoFilled />
-            </el-icon>
-          </div>
-          <button class="text-primary text-label-md font-label-md flex items-center gap-1 hover:underline">
-            查看建议 <el-icon size="12">
-              <ArrowRight />
-            </el-icon>
-          </button>
-        </div>
-        <div class="flex items-center gap-stack-lg">
-          <div class="relative w-32 h-32 flex items-center justify-center">
-            <svg class="w-full h-full transform -rotate-90">
-              <circle
-                cx="64"
-                cy="64"
-                fill="transparent"
-                r="56"
-                stroke="#eceef1"
-                stroke-width="10"
-              />
-              <circle
-                cx="64"
-                cy="64"
-                fill="transparent"
-                r="56"
-                stroke="#0057c2"
-                stroke-dasharray="351.8"
-                :stroke-dashoffset="preparednessOffset"
-                stroke-linecap="round"
-                stroke-width="10"
-              />
-            </svg>
-            <div class="absolute inset-0 flex flex-col items-center justify-center">
-              <span class="text-3xl font-extrabold text-primary">72</span>
-              <span class="text-[10px] text-outline">/100</span>
-            </div>
-          </div>
-          <div class="flex-1 space-y-4">
-            <p class="text-body-md text-on-surface-variant leading-relaxed">
-              整体表现良好，继续优化可提升竞争力
-            </p>
-            <div
-              v-for="metric in metrics"
-              :key="metric.label"
-              class="space-y-2"
-            >
-              <div class="flex justify-between items-center">
-                <span class="text-[11px] text-outline">{{ metric.label }}</span>
-                <span class="text-[11px] font-bold">{{ metric.value }}/100</span>
-              </div>
-              <div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-primary"
-                  :style="{ width: metric.value + '%' }"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Recent Activity -->
-      <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 shadow-sm">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="font-title-md text-title-md">
-            最近活动
-          </h2>
-          <button class="text-outline text-label-md font-label-md flex items-center gap-1 hover:text-primary transition-colors">
-            查看全部 <el-icon size="12">
-              <ArrowRight />
-            </el-icon>
-          </button>
-        </div>
-        <div class="space-y-4">
-          <div
-            v-for="activity in recentActivities"
-            :key="activity.title"
-            class="flex items-center gap-3 group cursor-pointer"
-          >
-            <div
-              class="w-10 h-10 rounded-lg flex items-center justify-center"
-              :class="activity.iconBg"
-            >
-              <el-icon :class="activity.iconColor">
-                <component :is="activity.icon" />
-              </el-icon>
-            </div>
-            <div class="flex-1">
-              <h4 class="text-body-md font-bold group-hover:text-primary transition-colors">
-                {{ activity.title }}
-              </h4>
-              <p class="text-[11px] text-outline">
-                {{ activity.desc }}
-              </p>
-            </div>
-            <span class="text-[11px] text-outline whitespace-nowrap">{{ activity.time }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Task List -->
-      <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 shadow-sm">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="font-title-md text-title-md">
-            待办清单
-          </h2>
-          <span class="bg-surface-container text-[11px] px-2 py-0.5 rounded font-bold">共 {{ tasks.length }} 项</span>
-        </div>
-        <div class="space-y-4">
-          <div
-            v-for="task in tasks"
-            :key="task.title"
-            class="flex items-start gap-3"
-          >
-            <div
-              class="mt-1 w-5 h-5 flex items-center justify-center rounded"
-              :class="task.done ? 'bg-primary text-on-primary' : 'border-2 border-outline-variant'"
-            >
-              <el-icon
-                v-if="task.done"
-                size="12"
-              >
-                <Check />
-              </el-icon>
-            </div>
-            <div class="flex-1">
-              <h4
-                class="text-body-md font-bold text-on-surface"
-                :class="{ 'line-through decoration-outline-variant': task.done }"
-              >
-                {{ task.title }}
-              </h4>
-              <p class="text-[11px] text-outline">
-                {{ task.desc }}
-              </p>
-            </div>
-            <button class="text-primary text-[11px] font-bold hover:underline">
-              {{ task.action }}
-            </button>
-          </div>
-        </div>
+      <!-- Empty placeholder: real insights will be shown here once available -->
+      <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant p-8 text-center">
+        <el-icon
+          size="40"
+          class="text-outline mb-3"
+        >
+          <InfoFilled />
+        </el-icon>
+        <h2 class="font-title-md text-title-md text-on-surface">
+          求职准备度
+        </h2>
+        <p class="text-body-md text-on-surface-variant mt-2 leading-relaxed">
+          选择一份简历后，可查看 AI 给出的评估与改进建议
+        </p>
+        <RouterLink
+          to="/workbench/ai-review"
+          class="mt-4 inline-flex items-center gap-1 text-primary text-label-md font-label-md hover:underline"
+        >
+          去 AI 点评
+          <el-icon size="12">
+            <ArrowRight />
+          </el-icon>
+        </RouterLink>
       </div>
     </aside>
   </main>
@@ -472,6 +346,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { resumeApi } from '@/api/resume'
 import { templateApi } from '@/api/template'
+import { TEMPLATE_PLACEHOLDER } from '@/utils/placeholder'
 import type { Resume } from '@/types/resume'
 import {
   Plus,
@@ -486,8 +361,6 @@ import {
   More,
   InfoFilled,
   ArrowRight,
-  Check,
-  MagicStick,
   Upload
 } from '@element-plus/icons-vue'
 
@@ -541,36 +414,6 @@ async function handleImport() {
 const tabs = [
   { label: '最近编辑', value: 'recent' as const },
   { label: '全部简历', value: 'all' as const }
-]
-
-const defaultThumbnails = [
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuCOKj7X1S0R5U_u0nG3A4p1GqEu9u_GNOZVKTd4T6xvYvDm0F1VqaS4LGCZj4tF1fkF-2THPw0YR8cqLXT-6MLpQ4rx5EGmDI8-ZNMbLRtOCpHpcOdf1VpmljjcbehBf3czKgk__B6UzrpQmplktbopo4M2zC-0brztk1JBGhVe2P0VPvbWUkvwYyhk39K1jzLAPaOyaMIaFN8IorkLVG5Y2WrD0ul2MhsmfTXl9Hqaa8EASVlpkbF4xc6NSJwfNXz2B9agZkg7ajM',
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuBfnwrMHF9STQqnsUPe29L-T-2Huoh7HoQftk7fePaIHBHT8_Y3hO_8y_1VfMxPEp3UpAsMefcqMCvVc3TwpLcYVf33GVDccBLQDJ_g7TLXKEa0HrOph1tjB1q2bCyd2KFhIzcEDodhpr0OVRNa2BUBDoWXNEFMx9bVdhpvbZ6zM-9mURgPstGFunrxsUd6aq7GzlLivQpUuESWHg659JOTHJckhZBJktZwmmqOHsSExE0WkL-nexFpC-bTgjs8B7oSrtPo0t2Rm0A',
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuB4y6WXHAS8AHzR3LwrQ98p5P0c3f5O8eHtDaoM0JrFl5ZuyspkuQcra8dW0zRN1UoGDIo9oa_1Ba4E1RN6HVaADWNOMPONyap-Gc_fsnDpa4VojWc3M03N5gX4F46TCKSovh4h5xx3VosGxAhbJsLYQ8hHmj9ugWCl_N7nSHeQ7OkNP9WECtdHTOIBHtGWX0-b4HpTJybUO03TzKQX_tGMH2098fOQ9TnCRjr5HPviAJKV6gX-BNabHcb5BFT5c05bSyqZCw95qlk'
-]
-
-const preparednessOffset = computed(() => {
-  const circumference = 2 * Math.PI * 56
-  return circumference - (72 / 100) * circumference
-})
-
-const metrics = [
-  { label: '内容完整度', value: 80 },
-  { label: '关键词匹配度', value: 65 },
-  { label: '项目亮点', value: 70 }
-]
-
-const recentActivities = [
-  { title: '前端开发工程师', desc: '已导出 PDF', time: '今天 15:42', icon: Document, iconBg: 'bg-error-container/30', iconColor: 'text-error' },
-  { title: '产品实习生', desc: '已复制简历', time: '05-18 10:30', icon: CopyDocument, iconBg: 'bg-primary-fixed/30', iconColor: 'text-primary' },
-  { title: '运营专员', desc: 'AI 优化完成', time: '05-16 09:22', icon: MagicStick, iconBg: 'bg-tertiary-fixed/30', iconColor: 'text-tertiary' }
-]
-
-const tasks = [
-  { title: '完善项目经历', desc: '补充2个关键项目，突出技术成果', done: true, action: '去完善' },
-  { title: '添加技能标签', desc: '补充与目标职位匹配的技能', done: false, action: '去完善' },
-  { title: '优化个人简介', desc: '让个人亮点更吸引HR', done: false, action: '去完善' },
-  { title: '生成投递信', desc: '为意向职位生成个性化投递信', done: false, action: '去生成' }
 ]
 
 const filteredResumes = computed(() => {
