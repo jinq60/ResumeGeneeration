@@ -199,18 +199,8 @@ async function loadTemplate() {
   try {
     template.value = await templateApi.get(templateId)
   } catch (e: any) {
-    ElMessage.warning('后端连接失败，已加载示例模板用于预览')
-    template.value = {
-      id: templateId,
-      name: '示例模板',
-      category: 'classic',
-      description: '这是一个示例模板，用于展示模板详情页的界面效果。',
-      isRecommended: true,
-      renderEngine: 'server',
-      status: 'active',
-      updatedAt: '2024-05-20',
-      config: {}
-    }
+    ElMessage.error(e.message || '模板加载失败')
+    template.value = null
   } finally {
     loading.value = false
   }

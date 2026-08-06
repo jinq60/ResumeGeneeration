@@ -176,15 +176,6 @@ function onThumbnailError(event: Event) {
   }
 }
 
-const sampleTemplates: Template[] = [
-  { id: 'tpl-1', name: '经典商务', category: 'classic', description: '简洁稳重的通用简历模板，适合大多数岗位。', isRecommended: true, renderEngine: 'server', status: 'active', createdAt: '2024-01-01', updatedAt: '2024-01-01', config: {} },
-  { id: 'tpl-2', name: '技术极客', category: 'tech', description: '突出技术栈与项目经历，适合研发岗位。', isPremium: true, renderEngine: 'server', status: 'active', createdAt: '2024-01-01', updatedAt: '2024-01-01', config: {} },
-  { id: 'tpl-3', name: '应届生专属', category: 'fresh', description: '为校园招聘优化，强调教育背景与实习经历。', renderEngine: 'server', status: 'active', createdAt: '2024-01-01', updatedAt: '2024-01-01', config: {} },
-  { id: 'tpl-4', name: '商务简约', category: 'business', description: '现代商务风格，适合市场、运营、销售岗位。', isRecommended: true, renderEngine: 'server', status: 'active', createdAt: '2024-01-01', updatedAt: '2024-01-01', config: {} },
-  { id: 'tpl-5', name: '考研复试', category: 'postgraduate', description: '突出学术背景与科研经历，适合复试简历。', renderEngine: 'server', status: 'active', createdAt: '2024-01-01', updatedAt: '2024-01-01', config: {} },
-  { id: 'tpl-6', name: '创意设计师', category: 'tech', description: '视觉化展示作品集，适合设计与创意岗位。', isPremium: true, renderEngine: 'server', status: 'active', createdAt: '2024-01-01', updatedAt: '2024-01-01', config: {} }
-]
-
 const categories = [
   { label: '全部', value: 'all' },
   { label: '经典', value: 'classic' },
@@ -223,8 +214,8 @@ async function loadTemplates() {
   try {
     templates.value = await templateApi.list()
   } catch (e: any) {
-    ElMessage.warning('后端连接失败，已加载示例模板用于预览')
-    templates.value = sampleTemplates
+    ElMessage.error(e.message || '模板加载失败')
+    templates.value = []
   } finally {
     loading.value = false
   }

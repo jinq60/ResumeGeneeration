@@ -185,13 +185,6 @@ const selectedResumeId = ref('')
 const jobDescription = ref('')
 const analyzing = ref(false)
 
-const sampleResumes: Resume[] = [
-  { id: 'r1', userId: 'u1', title: 'Java 后端工程师', scene: 'social_recruitment', templateId: 'tpl-1', sections: [], createdAt: '2024-05-20', updatedAt: '2024-05-22' },
-  { id: 'r2', userId: 'u1', title: '产品经理（校招）', scene: 'campus_recruitment', templateId: 'tpl-3', sections: [], createdAt: '2024-05-18', updatedAt: '2024-05-21' },
-  { id: 'r3', userId: 'u1', title: '前端开发工程师', scene: 'social_recruitment', templateId: 'tpl-2', sections: [], createdAt: '2024-05-15', updatedAt: '2024-05-20' },
-  { id: 'r4', userId: 'u1', title: '考研复试简历', scene: 'postgraduate', templateId: 'tpl-5', sections: [], createdAt: '2024-05-10', updatedAt: '2024-05-12' }
-]
-
 const sceneMap: Record<string, string> = {
   campus_recruitment: '校园招聘',
   social_recruitment: '社会招聘',
@@ -211,8 +204,8 @@ async function loadResumes() {
     const res = await resumeApi.list()
     resumes.value = res.records || []
   } catch (e: any) {
-    ElMessage.warning('后端连接失败，已加载示例简历用于预览')
-    resumes.value = sampleResumes
+    ElMessage.error(e.message || '简历加载失败')
+    resumes.value = []
   } finally {
     loading.value = false
   }

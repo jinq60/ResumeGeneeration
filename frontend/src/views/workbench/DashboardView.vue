@@ -29,13 +29,6 @@
               </RouterLink>
             </div>
           </div>
-          <div class="hidden lg:block">
-            <img
-              class="w-64 h-auto drop-shadow-2xl"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDExuqoWJXMSEfUg1dwJj7yYbMnp4Hs2_uNDNJb-f6GttP-O6nJ2QGoHSeNnJ0NanRfWf2a7tYseevhitbpBFPjeTx-ozIj8LRYnIyhbfSx-DhT4pvvuGsFGb50aL_exfAIiKjJdONmF4W7q1vuUrE3X8_Zh9BO8UFuu30yDPh2n0LQFjITxBa5sS_euzwrfBS6-LfIJp_XFLPjyintec__17c8k-1QIl45GGYZDJJq35D5CSJ_sQCJBMG68K4N09Djpl5Tkab370c"
-              alt="resume illustration"
-            >
-          </div>
         </div>
         <div class="absolute -right-20 -bottom-20 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
       </section>

@@ -21,39 +21,6 @@
       </button>
     </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter mb-stack-lg">
-      <div
-        v-for="stat in stats"
-        :key="stat.label"
-        class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow"
-      >
-        <div class="flex items-center justify-between mb-2">
-          <div
-            class="w-10 h-10 rounded-lg flex items-center justify-center"
-            :class="stat.iconBg"
-          >
-            <el-icon
-              :class="stat.iconColor"
-              size="20"
-            >
-              <component :is="stat.icon" />
-            </el-icon>
-          </div>
-          <span class="text-[12px] text-secondary font-label-md flex items-center font-bold">
-            <el-icon size="14"><ArrowUp /></el-icon>
-            {{ stat.growth }}
-          </span>
-        </div>
-        <div class="text-headline-md font-headline-md text-on-surface">
-          {{ stat.value }}
-        </div>
-        <div class="text-body-md font-body-md text-on-surface-variant mt-1">
-          {{ stat.label }}
-        </div>
-      </div>
-    </div>
-
     <!-- Filters + Table -->
     <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden flex flex-col">
       <div class="p-4 flex flex-wrap items-center gap-4 border-b border-outline-variant bg-surface-container-low/30">
@@ -460,8 +427,7 @@
 import { ref, reactive, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Plus, Search, ArrowUp, MoreFilled, Close,
-  Promotion, Filter, UserFilled, CircleCheckFilled,
+  Plus, Search, MoreFilled, Close,
   OfficeBuilding, Calendar, InfoFilled, Document, ArrowDown
 } from '@element-plus/icons-vue'
 
@@ -494,14 +460,7 @@ const filters = reactive({ keyword: '', position: '', company: '', status: '', d
 const deliveryList = ref<DeliveryItem[]>([])
 const page = ref(1)
 const pageSize = ref(10)
-const total = ref(28)
-
-const stats = [
-  { label: '总投递', value: '28', growth: '27%', icon: Promotion, iconBg: 'bg-primary-fixed', iconColor: 'text-primary' },
-  { label: '筛选中', value: '9', growth: '13%', icon: Filter, iconBg: 'bg-tertiary-fixed', iconColor: 'text-tertiary' },
-  { label: '面试中', value: '4', growth: '33%', icon: UserFilled, iconBg: 'bg-secondary-fixed', iconColor: 'text-secondary' },
-  { label: 'Offer', value: '1', growth: '100%', icon: CircleCheckFilled, iconBg: 'bg-secondary-container', iconColor: 'text-on-secondary-container' }
-]
+const total = ref(0)
 
 function statusTagType(status: string) {
   switch (status) {
@@ -532,36 +491,12 @@ function resetFilters() {
   loadList()
 }
 
-const allDeliveries: DeliveryItem[] = [
-  { id: 'D1', company: '腾讯', logo: '', position: '后端开发工程师', dept: '技术工程事业群 | 深圳 | 社招', match: 89, date: '2024-05-18', status: 'interview1', statusLabel: '一面', nextAction: '准备一面', nextTime: '5月23日 10:00', isUrgent: true, interviewTitle: '一面 (技术面试)', interviewTime: '2024-05-23 (周四) 10:00', interviewLocation: '腾讯大厦 B 座 15 楼', interviewer: '李经理', resumeTitle: '后端开发工程师简历', resumeUpdated: '2024-05-18', tips: [{ text: '一面将于 5月23日 10:00 进行', urgent: true }, { text: '建议提前准备：高并发场景设计', urgent: false }] },
-  { id: 'D2', company: '字节跳动', logo: '', position: '后端开发工程师', dept: '抖音 | 北京 | 社招', match: 86, date: '2024-05-16', status: 'written', statusLabel: '笔试', nextAction: '完成在线笔试', nextTime: '截止 5月22日', isUrgent: true, interviewTitle: '在线笔试', interviewTime: '2024-05-22 19:00', interviewLocation: '线上', interviewer: '系统自动', resumeTitle: '后端开发工程师简历', resumeUpdated: '2024-05-18', tips: [{ text: '笔试包含算法与系统设计', urgent: false }] },
-  { id: 'D3', company: '华为', logo: '', position: '云计算开发工程师', dept: '云计算 | 深圳 | 社招', match: 83, date: '2024-05-14', status: 'hr', statusLabel: 'HR 面', nextAction: 'HR 面试', nextTime: '5月24日 15:00', isUrgent: false, interviewTitle: 'HR 面试', interviewTime: '2024-05-24 (周五) 15:00', interviewLocation: '华为坂田基地', interviewer: '王 HR', resumeTitle: '云计算开发工程师简历', resumeUpdated: '2024-05-14', tips: [{ text: '准备期望薪资与职业规划', urgent: false }] },
-  { id: 'D4', company: '小米', logo: '', position: 'Java 开发工程师', dept: '手机部 | 北京 | 社招', match: 80, date: '2024-05-12', status: 'delivered', statusLabel: '已投递', nextAction: '等待简历筛选', nextTime: '预计 3-5 个工作日', isUrgent: false, interviewTitle: '暂无', interviewTime: '-', interviewLocation: '-', interviewer: '-', resumeTitle: 'Java 开发工程师简历', resumeUpdated: '2024-05-10', tips: [{ text: '简历匹配度良好，耐心等待', urgent: false }] }
-]
-
-function applyFilters(items: DeliveryItem[]): DeliveryItem[] {
-  const kw = filters.keyword.trim().toLowerCase()
-  const position = filters.position.trim().toLowerCase()
-  const company = filters.company.trim().toLowerCase()
-  const status = filters.status
-  const start = filters.dateRange[0]
-  const end = filters.dateRange[1]
-  return items.filter((item) => {
-    if (kw && !`${item.company}${item.position}${item.dept}`.toLowerCase().includes(kw)) return false
-    if (position && !item.position.toLowerCase().includes(position)) return false
-    if (company && !item.company.toLowerCase().includes(company)) return false
-    if (status && item.status !== status) return false
-    if (start && new Date(item.date) < start) return false
-    if (end && new Date(item.date) > end) return false
-    return true
-  })
-}
-
 function loadList() {
   loading.value = true
+  // 投递管理后端接口待接入，当前展示空列表
   setTimeout(() => {
-    deliveryList.value = applyFilters(allDeliveries)
-    total.value = deliveryList.value.length
+    deliveryList.value = []
+    total.value = 0
     loading.value = false
   }, 300)
 }
