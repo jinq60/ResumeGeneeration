@@ -1,141 +1,186 @@
-<template>
-  <main class="max-w-[1440px] mx-auto p-margin-page grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-gutter">
-    <!-- Left Content Area -->
-    <div class="space-y-gutter">
-      <!-- Welcome Area -->
-      <section class="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary-container/10 to-tertiary-container/5 p-8 border border-outline-variant/30">
-        <div class="relative z-10 grid md:grid-cols-[1fr_auto] gap-8 items-center">
-          <div>
-            <h1 class="text-headline-md font-headline-md text-on-background flex items-center gap-2">
-              你好，{{ userStore.nickname || '求职者' }} 👋
-            </h1>
-            <p class="text-body-lg text-on-surface-variant mt-2">
-              继续完善你的简历，让下一次投递更有把握
-            </p>
-            <div class="mt-8 flex flex-wrap items-center gap-4">
-              <RouterLink
-                to="/workbench/resumes"
-                class="bg-primary hover:bg-primary-container text-on-primary px-8 py-3 rounded-lg font-bold text-body-md transition-all flex items-center gap-2"
-              >
-                继续编辑
-                <el-icon><ArrowRight /></el-icon>
-              </RouterLink>
-              <RouterLink
-                to="/workbench/ai-review"
-                class="border border-outline-variant hover:bg-surface-container-low text-on-surface-variant px-6 py-3 rounded-lg font-bold text-body-md transition-all flex items-center gap-2"
-              >
-                <el-icon><MagicStick /></el-icon>
-                AI 点评
-              </RouterLink>
-            </div>
-          </div>
-        </div>
-        <div class="absolute -right-20 -bottom-20 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
-      </section>
+﻿<template>
+  <div class="dashboard">
+    <!-- 页头 -->
+    <header class="dashboard-header">
+      <div>
+        <h1 class="dashboard-title">
+          工作台
+        </h1>
+        <p class="dashboard-subtitle">
+          {{ userStore.nickname ? `${userStore.nickname}，欢迎回来` : '欢迎回来' }} · 从这里继续完善你的简历
+        </p>
+      </div>
+      <div class="dashboard-header-actions">
+        <button
+          class="btn btn-ghost"
+          type="button"
+          @click="router.push('/workbench/resumes?import=1')"
+        >
+          <el-icon size="16">
+            <Upload />
+          </el-icon>
+          导入简历
+        </button>
+        <button
+          class="btn btn-primary"
+          type="button"
+          @click="createResume"
+        >
+          <el-icon size="16">
+            <Plus />
+          </el-icon>
+          新建简历
+        </button>
+      </div>
+    </header>
 
-      <!-- Resume List Area -->
-      <section>
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-title-lg font-title-lg flex items-center gap-2">
-            <el-icon class="text-primary">
-              <Document />
-            </el-icon> 我的简历
+    <!-- 统计条 -->
+    <section class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value">
+          {{ resumes.length }}
+        </div>
+        <div class="stat-label">
+          我的简历
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">
+          {{ lastEditedLabel }}
+        </div>
+        <div class="stat-label">
+          最近编辑
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">
+          {{ templateCount || '—' }}
+        </div>
+        <div class="stat-label">
+          可用模板
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">
+          {{ guestLabel }}
+        </div>
+        <div class="stat-label">
+          账号类型
+        </div>
+      </div>
+    </section>
+
+    <div class="dashboard-grid">
+      <!-- 简历列表 -->
+      <section class="panel resume-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            我的简历
           </h2>
           <RouterLink
             to="/workbench/resumes"
-            class="text-primary text-body-md hover:underline"
+            class="panel-link"
           >
-            全部简历 &gt;
+            全部简历
+            <el-icon size="12">
+              <ArrowRight />
+            </el-icon>
           </RouterLink>
         </div>
 
         <div
           v-if="loading"
-          class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-stack-md"
+          class="panel-loading"
         >
           <div
-            v-for="i in 4"
+            v-for="i in 3"
             :key="i"
-            class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 h-[300px] animate-pulse"
+            class="resume-row-skeleton"
+          />
+        </div>
+
+        <div
+          v-else-if="resumes.length === 0"
+          class="panel-empty"
+        >
+          <el-icon
+            size="32"
+            class="empty-icon"
           >
-            <div class="bg-surface-container-low rounded-lg h-40 mb-3" />
-            <div class="h-4 bg-surface-container rounded w-3/4 mb-2" />
-            <div class="h-3 bg-surface-container rounded w-1/2" />
-          </div>
+            <Files />
+          </el-icon>
+          <p class="empty-title">
+            还没有简历
+          </p>
+          <p class="empty-desc">
+            选择模板创建第一份简历，几分钟即可完成
+          </p>
+          <button
+            class="btn btn-primary mt-3"
+            type="button"
+            @click="createResume"
+          >
+            <el-icon size="16">
+              <Plus />
+            </el-icon>
+            新建简历
+          </button>
         </div>
 
         <div
           v-else
-          class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-stack-md"
+          class="resume-list"
         >
-          <!-- New Resume Entry -->
-          <button
-            class="border-2 border-dashed border-outline-variant rounded-xl flex flex-col items-center justify-center p-6 bg-surface-container-low hover:bg-surface-container hover:border-primary transition-all cursor-pointer group h-[300px] text-left"
-            @click="createResume"
-          >
-            <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform mb-4">
-              <el-icon size="24">
-                <Plus />
-              </el-icon>
-            </div>
-            <p class="text-title-md">
-              新建简历
-            </p>
-            <p class="text-label-md text-on-surface-variant mt-1">
-              选择模板，快速创建
-            </p>
-          </button>
-
-          <!-- Resume Cards -->
           <div
-            v-for="resume in displayedResumes"
+            v-for="resume in resumes"
             :key="resume.id"
-            class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 st-resume-card-hover transition-all cursor-pointer h-[300px] flex flex-col"
+            class="resume-row"
             @click="openEditor(resume)"
           >
-            <div class="bg-surface-container-low rounded-lg overflow-hidden h-40 mb-3 border border-outline-variant/30">
-              <img
-                class="w-full h-full object-cover"
-                :src="TEMPLATE_PLACEHOLDER"
-                :alt="resume.title"
-              >
-            </div>
-            <div class="flex-grow">
-              <p class="text-title-md text-on-surface truncate">
+            <div class="resume-row-main">
+              <div class="resume-row-title">
                 {{ resume.title || '未命名简历' }}
-              </p>
-              <p class="text-label-md text-on-surface-variant mt-1">
-                {{ formatTime(resume.updatedAt || resume.createdAt) }}
-              </p>
+              </div>
+              <div class="resume-row-meta">
+                {{ resume.targetPosition || sceneLabel(resume.scene) }} · {{ formatTime(resume.updatedAt || resume.createdAt) }}
+              </div>
             </div>
-            <div class="flex justify-between items-center mt-2 pt-2 border-t border-outline-variant/20">
-              <span
-                class="text-label-md"
-                :class="resume.targetPosition ? 'text-primary font-bold' : 'text-on-surface-variant'"
+            <div
+              class="resume-row-actions"
+              @click.stop
+            >
+              <button
+                class="row-action"
+                title="编辑"
+                @click="openEditor(resume)"
               >
-                {{ resume.targetPosition || sceneLabel(resume.scene) }}
-              </span>
+                <el-icon size="15">
+                  <Edit />
+                </el-icon>
+              </button>
+              <button
+                class="row-action"
+                title="复制"
+                @click="handleCopy(resume)"
+              >
+                <el-icon size="15">
+                  <CopyDocument />
+                </el-icon>
+              </button>
               <el-dropdown
                 trigger="click"
                 @command="(cmd: string) => handleResumeAction(cmd, resume)"
-                @click.stop
               >
                 <button
-                  class="p-1 hover:bg-surface-container rounded-md"
-                  @click.stop
+                  class="row-action"
+                  title="更多"
                 >
-                  <el-icon class="text-body-md">
-                    <More />
+                  <el-icon size="15">
+                    <MoreFilled />
                   </el-icon>
                 </button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="edit">
-                      编辑
-                    </el-dropdown-item>
-                    <el-dropdown-item command="copy">
-                      复制
-                    </el-dropdown-item>
                     <el-dropdown-item command="rename">
                       重命名
                     </el-dropdown-item>
@@ -152,149 +197,167 @@
           </div>
         </div>
       </section>
+
+      <!-- 右侧工具 -->
+      <aside class="dashboard-aside">
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              AI 能力
+            </h2>
+            <RouterLink
+              to="/workbench/ai-review"
+              class="panel-link"
+            >
+              查看
+              <el-icon size="12">
+                <ArrowRight />
+              </el-icon>
+            </RouterLink>
+          </div>
+          <div class="tool-list">
+            <button
+              class="tool-item"
+              type="button"
+              @click="router.push('/workbench/ai-review')"
+            >
+              <span class="tool-dot tool-dot-orange" />
+              <span class="tool-text">
+                <span class="tool-title">AI 简历点评</span>
+                <span class="tool-desc">竞争力评估与改进建议</span>
+              </span>
+              <el-icon
+                size="14"
+                class="tool-arrow"
+              >
+                <ArrowRight />
+              </el-icon>
+            </button>
+            <button
+              class="tool-item"
+              type="button"
+              @click="router.push('/workbench/ai-review')"
+            >
+              <span class="tool-dot tool-dot-green" />
+              <span class="tool-text">
+                <span class="tool-title">JD 匹配优化</span>
+                <span class="tool-desc">对照岗位描述优化内容</span>
+              </span>
+              <el-icon
+                size="14"
+                class="tool-arrow"
+              >
+                <ArrowRight />
+              </el-icon>
+            </button>
+            <button
+              class="tool-item"
+              type="button"
+              @click="router.push('/workbench/resumes')"
+            >
+              <span class="tool-dot tool-dot-blue" />
+              <span class="tool-text">
+                <span class="tool-title">语法检查</span>
+                <span class="tool-desc">错别字与表达问题检查</span>
+              </span>
+              <el-icon
+                size="14"
+                class="tool-arrow"
+              >
+                <ArrowRight />
+              </el-icon>
+            </button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              快捷操作
+            </h2>
+          </div>
+          <div class="quick-grid">
+            <button
+              class="quick-item"
+              type="button"
+              @click="router.push('/workbench/avatar/upload')"
+            >
+              <el-icon
+                size="18"
+                class="quick-icon"
+              >
+                <Picture />
+              </el-icon>
+              <span>头像管理</span>
+            </button>
+            <button
+              class="quick-item"
+              type="button"
+              @click="router.push('/workbench/downloads')"
+            >
+              <el-icon
+                size="18"
+                class="quick-icon"
+              >
+                <Download />
+              </el-icon>
+              <span>下载中心</span>
+            </button>
+            <button
+              class="quick-item"
+              type="button"
+              @click="router.push('/workbench/templates')"
+            >
+              <el-icon
+                size="18"
+                class="quick-icon"
+              >
+                <Postcard />
+              </el-icon>
+              <span>模板中心</span>
+            </button>
+            <button
+              class="quick-item"
+              type="button"
+              @click="router.push('/workbench/settings')"
+            >
+              <el-icon
+                size="18"
+                class="quick-icon"
+              >
+                <Setting />
+              </el-icon>
+              <span>账号设置</span>
+            </button>
+          </div>
+        </section>
+      </aside>
     </div>
 
-    <!-- Right Sidebar Area -->
-    <aside class="space-y-gutter">
-      <!-- AI Capabilities Card -->
-      <div class="bg-surface-container-lowest border-2 border-primary/20 rounded-xl p-6 relative overflow-hidden group">
-        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-          <el-icon class="text-6xl text-primary">
-            <MagicStick />
-          </el-icon>
-        </div>
-        <div class="flex justify-between items-center mb-6">
-          <h3 class="text-title-md flex items-center gap-2">
-            <el-icon class="text-primary">
-              <MagicStick />
-            </el-icon> AI 能力
-          </h3>
-          <RouterLink
-            to="/workbench/ai-review"
-            class="text-primary text-label-md hover:underline"
-          >
-            查看更多 &gt;
-          </RouterLink>
-        </div>
-        <div class="space-y-stack-md">
-          <button
-            class="w-full flex gap-3 items-start p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 hover:border-primary/50 cursor-pointer transition-all text-left"
-            @click="router.push('/workbench/ai-review')"
-          >
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 bg-orange-500">
-              <el-icon size="16">
-                <Histogram />
-              </el-icon>
-            </div>
-            <div class="flex-grow">
-              <p class="text-body-md font-semibold text-on-surface">
-                AI 简历点评
-              </p>
-              <p class="text-label-md text-on-surface-variant mt-1">
-                多维度评估竞争力，给出可执行建议
-              </p>
-            </div>
-            <el-icon class="text-on-surface-variant">
-              <ArrowRight />
-            </el-icon>
-          </button>
-          <button
-            class="w-full flex gap-3 items-start p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 hover:border-primary/50 cursor-pointer transition-all text-left"
-            @click="router.push('/workbench/ai-review')"
-          >
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 bg-green-600">
-              <el-icon size="16">
-                <Collection />
-              </el-icon>
-            </div>
-            <div class="flex-grow">
-              <p class="text-body-md font-semibold text-on-surface">
-                JD 匹配优化
-              </p>
-              <p class="text-label-md text-on-surface-variant mt-1">
-                对照岗位描述优化简历关键词
-              </p>
-            </div>
-            <el-icon class="text-on-surface-variant">
-              <ArrowRight />
-            </el-icon>
-          </button>
-          <button
-            class="w-full flex gap-3 items-start p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 hover:border-primary/50 cursor-pointer transition-all text-left"
-            @click="router.push('/workbench/resumes')"
-          >
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 bg-blue-600">
-              <el-icon size="16">
-                <CircleCheckFilled />
-              </el-icon>
-            </div>
-            <div class="flex-grow">
-              <p class="text-body-md font-semibold text-on-surface">
-                语法检查
-              </p>
-              <p class="text-label-md text-on-surface-variant mt-1">
-                编辑器内检查错别字与表达问题
-              </p>
-            </div>
-            <el-icon class="text-on-surface-variant">
-              <ArrowRight />
-            </el-icon>
-          </button>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6">
-        <h3 class="text-title-md mb-6">
-          快捷操作
-        </h3>
-        <div class="grid grid-cols-2 gap-4">
-          <button
-            v-for="action in quickActions"
-            :key="action.label"
-            class="flex flex-col items-center justify-center p-4 bg-surface-container-low rounded-xl transition-all group"
-            :class="action.hoverClass"
-            @click="action.onClick"
-          >
-            <div
-              class="w-10 h-10 rounded-lg flex items-center justify-center mb-2 group-hover:scale-110 transition-transform"
-              :class="action.iconBg"
-            >
-              <el-icon :class="action.iconColor">
-                <component :is="action.icon" />
-              </el-icon>
-            </div>
-            <span class="text-label-md font-semibold">{{ action.label }}</span>
-            <span class="text-[10px] text-on-surface-variant">{{ action.sub }}</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-  </main>
-
-  <!-- Rename Dialog -->
-  <el-dialog
-    v-model="renameVisible"
-    title="重命名简历"
-    width="420px"
-    align-center
-  >
-    <el-input
-      v-model="renameTitle"
-      placeholder="输入新标题"
-    />
-    <template #footer>
-      <el-button @click="renameVisible = false">
-        取消
-      </el-button>
-      <el-button
-        type="primary"
-        @click="handleRenameConfirm"
-      >
-        确认
-      </el-button>
-    </template>
-  </el-dialog>
+    <!-- 重命名对话框 -->
+    <el-dialog
+      v-model="renameVisible"
+      title="重命名简历"
+      width="420px"
+      align-center
+    >
+      <el-input
+        v-model="renameTitle"
+        placeholder="输入新标题"
+      />
+      <template #footer>
+        <el-button @click="renameVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          @click="handleRenameConfirm"
+        >
+          确认
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -303,18 +366,20 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { resumeApi } from '@/api/resume'
-import { TEMPLATE_PLACEHOLDER } from '@/utils/placeholder'
+import { templateApi } from '@/api/template'
 import type { Resume } from '@/types/resume'
 import {
-  Document,
   Plus,
   ArrowRight,
-  Histogram,
-  Collection,
-  CircleCheckFilled,
-  MagicStick,
   Upload,
-  More
+  Files,
+  Edit,
+  CopyDocument,
+  MoreFilled,
+  Picture,
+  Download,
+  Postcard,
+  Setting
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -322,41 +387,20 @@ const userStore = useUserStore()
 
 const loading = ref(true)
 const resumes = ref<Resume[]>([])
+const templateCount = ref(0)
 const renameVisible = ref(false)
 const renameTitle = ref('')
 const renameTarget = ref<Resume | null>(null)
 
-const displayedResumes = computed(() => resumes.value.slice(0, 3))
+const lastEditedLabel = computed(() => {
+  if (resumes.value.length === 0) return '—'
+  const latest = [...resumes.value].sort(
+    (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+  )[0]
+  return formatTime(latest.updatedAt || latest.createdAt)
+})
 
-const quickActions = [
-  {
-    label: '导入简历',
-    sub: 'Markdown / JSON',
-    icon: Upload,
-    iconBg: 'bg-primary-container/10',
-    iconColor: 'text-primary',
-    hoverClass: 'hover:bg-primary/5 hover:text-primary',
-    onClick: () => router.push('/workbench/resumes')
-  },
-  {
-    label: 'AI 优化',
-    sub: '智能改写',
-    icon: MagicStick,
-    iconBg: 'bg-tertiary-fixed-dim/30',
-    iconColor: 'text-tertiary',
-    hoverClass: 'hover:bg-tertiary/5 hover:text-tertiary',
-    onClick: () => router.push('/workbench/ai-review')
-  },
-  {
-    label: '头像管理',
-    sub: '上传与优化',
-    icon: Upload,
-    iconBg: 'bg-primary-container/10',
-    iconColor: 'text-primary',
-    hoverClass: 'hover:bg-primary/5 hover:text-primary',
-    onClick: () => router.push('/workbench/avatar/upload')
-  }
-]
+const guestLabel = computed(() => (userStore.isGuest ? '游客' : '会员'))
 
 function sceneLabel(scene: string) {
   const map: Record<string, string> = {
@@ -389,9 +433,7 @@ function openEditor(resume: Resume) {
 }
 
 function handleResumeAction(cmd: string, resume: Resume) {
-  if (cmd === 'edit') openEditor(resume)
-  else if (cmd === 'copy') handleCopy(resume)
-  else if (cmd === 'rename') handleRename(resume)
+  if (cmd === 'rename') handleRename(resume)
   else if (cmd === 'delete') handleDelete(resume)
 }
 
@@ -441,27 +483,400 @@ async function handleRenameConfirm() {
 
 async function fetchResumes() {
   try {
-    const data = await resumeApi.list(1, 4)
+    const data = await resumeApi.list(1, 5)
     resumes.value = data?.records || []
+  } catch (e: any) {
+    ElMessage.error(e.message || '简历加载失败')
+  }
+}
+
+async function fetchTemplates() {
+  try {
+    const data = await templateApi.list()
+    templateCount.value = data?.length || 0
   } catch {
-    // ignore
+    // 模板数量为非关键信息，失败时展示占位
   }
 }
 
 onMounted(async () => {
   loading.value = true
-  await fetchResumes()
+  await Promise.all([fetchResumes(), fetchTemplates()])
   loading.value = false
 })
 </script>
 
 <style scoped lang="scss">
-.st-resume-card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dashboard-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--st-on-surface);
+}
+
+.dashboard-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--st-on-surface-variant);
+}
+
+.dashboard-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--st-radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background: var(--st-primary);
+  color: var(--st-on-primary);
 
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--st-shadow-card);
+    background: var(--st-primary-container);
+    color: var(--st-on-primary-container);
   }
+}
+
+.btn-ghost {
+  background: var(--st-surface-container-lowest);
+  border-color: var(--st-outline-variant);
+  color: var(--st-on-surface-variant);
+
+  &:hover {
+    color: var(--st-on-surface);
+    background: var(--st-surface-container-low);
+  }
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.stat-card {
+  background: var(--st-surface-container-lowest);
+  border: 1px solid var(--st-outline-variant);
+  border-radius: var(--st-radius-md);
+  padding: 14px 16px;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--st-on-surface);
+}
+
+.stat-label {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--st-on-surface-variant);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: var(--st-surface-container-lowest);
+  border: 1px solid var(--st-outline-variant);
+  border-radius: var(--st-radius-md);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--st-outline-variant);
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--st-on-surface);
+}
+
+.panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--st-primary);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.resume-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.resume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--st-outline-variant);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: var(--st-surface-container-low);
+  }
+}
+
+.resume-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.resume-row-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--st-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resume-row-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--st-on-surface-variant);
+}
+
+.resume-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.resume-row:hover .resume-row-actions {
+  opacity: 1;
+}
+
+.row-action {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--st-radius-sm);
+  background: transparent;
+  color: var(--st-on-surface-variant);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: var(--st-primary);
+    background: var(--st-primary-container);
+  }
+}
+
+.panel-loading {
+  padding: 8px 16px;
+}
+
+.resume-row-skeleton {
+  height: 40px;
+  margin: 8px 0;
+  border-radius: var(--st-radius-sm);
+  background: linear-gradient(90deg, var(--st-surface-container-low) 25%, var(--st-surface-container) 50%, var(--st-surface-container-low) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.panel-empty {
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.empty-icon {
+  color: var(--st-outline);
+}
+
+.empty-title {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--st-on-surface);
+}
+
+.empty-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--st-on-surface-variant);
+}
+
+.dashboard-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tool-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.tool-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  border-bottom: 1px solid var(--st-outline-variant);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: var(--st-surface-container-low);
+  }
+}
+
+.tool-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tool-dot-orange {
+  background: #f59e0b;
+}
+
+.tool-dot-green {
+  background: #22c55e;
+}
+
+.tool-dot-blue {
+  background: #3b82f6;
+}
+
+.tool-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tool-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--st-on-surface);
+}
+
+.tool-desc {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--st-on-surface-variant);
+}
+
+.tool-arrow {
+  color: var(--st-outline);
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px;
+}
+
+.quick-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1px solid var(--st-outline-variant);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-container-lowest);
+  font-size: 12px;
+  color: var(--st-on-surface-variant);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: var(--st-primary);
+    border-color: var(--st-primary);
+    background: var(--st-primary-container);
+  }
+}
+
+.quick-icon {
+  color: var(--st-on-surface-variant);
+}
+
+.quick-item:hover .quick-icon {
+  color: var(--st-primary);
 }
 </style>
