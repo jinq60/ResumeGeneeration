@@ -94,6 +94,11 @@ app:
         model: qwen-turbo
         timeout: 60s
         retry: 2
+      resume-grammar:
+        provider: qwen
+        model: qwen-turbo
+        timeout: 60s
+        retry: 2
     openai:
       api-key: ${OPENAI_API_KEY:}
       base-url: https://api.openai.com
@@ -197,3 +202,27 @@ app:
         {originalText}
 
         要求：只输出最终文本本身，不要任何解释、标题、引号或前后缀。
+      resume-grammar: |
+        你是一位专业简历校对专家。请检查以下简历中的错别字、语法问题、表达不专业、主谓不一致和明显冗余。
+
+        目标岗位：
+        {targetPosition}
+
+        简历结构化内容：
+        {resumeContent}
+
+        只返回合法 JSON，不要 Markdown 或解释，结构必须是：
+        {
+          "issues": [
+            {
+              "sectionType": "introduction|work|project|education|profile|skill|custom",
+              "field": "字段名",
+              "itemIndex": 0,
+              "severity": "high|medium|low",
+              "originalText": "原文片段",
+              "suggestion": "修改后的表达",
+              "explanation": "问题说明"
+            }
+          ]
+        }
+        没有问题时返回 {"issues": []}。不要虚构事实，不要改变数字和技术名称。

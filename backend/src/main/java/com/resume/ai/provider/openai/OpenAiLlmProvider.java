@@ -16,8 +16,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.util.retry.Retry;
+import reactor.core.publisher.Flux;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -62,6 +64,22 @@ public class OpenAiLlmProvider implements LlmProvider {
             throw new BusinessException(ResultCode.AI_MODEL_CALL_FAILED,
                     "OpenAI 调用失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    public Flux<String> stream(AiChatRequest request) {
+        Map<String, Object> body = buildRequestBody(request, false);
+        body.put("stream", true);
+        return getClient().post()
+                .uri("/v1/chat/completions")
+                .bodyValue(body)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .flatMapIterable(this::parseStreamChunk)
+                .timeout(Duration.ofSeconds(120))
+                .retryWhen(Retry.backoff(2, Duration.ofSeconds(1))
+                        .filter(e -> e instanceof org.springframework.web.reactive.function.client.WebClientResponseException w
+                                && w.getStatusCode().is5xxServerError()));
     }
 
     @Override
@@ -153,5 +171,29 @@ public class OpenAiLlmProvider implements LlmProvider {
         }
         response.setLatencyMs(System.currentTimeMillis() - start);
         return response;
+    }
+
+    private List<String> parseStreamChunk(String chunk) {
+        return Arrays.stream(chunk.split("\\r?\\n"))
+                .map(String::trim)
+                .filter(line -> line.startsWith("data:"))
+                .map(line -> line.substring(5).trim())
+                .filter(data -> !data.isEmpty() && !"[DONE]".equals(data))
+                .map(this::parseDelta)
+                .filter(content -> !content.isEmpty())
+                .toList();
+    }
+
+    private String parseDelta(String data) {
+        try {
+            JsonNode root = objectMapper.readTree(data);
+            JsonNode choices = root.path("choices");
+            if (choices.isArray() && !choices.isEmpty()) {
+                return choices.get(0).path("delta").path("content").asText("");
+            }
+        } catch (JsonProcessingException e) {
+            log.debug("Ignore malformed OpenAI stream chunk: {}", data);
+        }
+        return "";
     }
 }

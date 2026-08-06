@@ -125,6 +125,8 @@ async function runAction(action: AiWritePayload['action']) {
   loading.value = true
   errorMsg.value = ''
   currentAction.value = action
+  editedContent.value = ''
+  dialogVisible.value = true
   try {
     const payload: AiWritePayload = {
       sectionType: props.sectionType,
@@ -135,9 +137,15 @@ async function runAction(action: AiWritePayload['action']) {
     if (action === 'translate') {
       payload.targetLang = 'en'
     }
-    const result = await resumeApi.aiWrite(props.resumeId, payload)
-    editedContent.value = result.content
-    dialogVisible.value = true
+    if (typeof resumeApi.aiWriteStream === 'function') {
+      await resumeApi.aiWriteStream(props.resumeId, payload, (content) => {
+        editedContent.value += content
+      })
+    } else {
+      // Keep component tests and older API mocks compatible with sync fallback.
+      const result = await resumeApi.aiWrite(props.resumeId, payload)
+      editedContent.value = result.content
+    }
   } catch (e: any) {
     errorMsg.value = e.message || 'AI 写作失败，请稍后重试'
     ElMessage.error(errorMsg.value)

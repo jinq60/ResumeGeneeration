@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import reactor.core.publisher.Flux;
 
 import java.util.HashMap;
 import java.util.List;
@@ -193,5 +194,19 @@ class AiWritingServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.write("user_1", "resume_1", buildRequest("polish")));
         assertEquals(ResultCode.AI_RESPONSE_PARSE_FAILED, ex.getErrorCode());
+    }
+
+    @Test
+    void stream_shouldReturnProviderDeltas() {
+        when(resumeService.getResumeEntity("user_1", "resume_1"))
+                .thenReturn(buildResume("user_1", "resume_1"));
+        when(llmProvider.stream(any(AiChatRequest.class)))
+                .thenReturn(Flux.just("第一段", "第二段"));
+
+        List<String> result = service.stream("user_1", "resume_1", buildRequest("polish"))
+                .collectList()
+                .block();
+
+        assertEquals(List.of("第一段", "第二段"), result);
     }
 }

@@ -1,5 +1,6 @@
 import request from '@/utils/request'
 import type { Resume, Section } from '@/types/resume'
+import type { RenderSettings } from '@/utils/renderSettings'
 
 export interface CreateResumeRequest {
   title?: string
@@ -13,6 +14,7 @@ export interface UpdateResumeRequest {
   targetPosition?: string
   templateId?: string
   sections?: Section[]
+  renderSettings?: RenderSettings
 }
 
 export interface Page<T> {
@@ -26,6 +28,24 @@ export interface Page<T> {
 export interface UpdateResumeResponse {
   id: string
   updatedAt: string
+}
+
+export interface GrammarIssue {
+  sectionType: string
+  field: string
+  itemIndex?: number
+  severity: 'high' | 'medium' | 'low' | string
+  originalText: string
+  suggestion: string
+  explanation: string
+}
+
+export interface GrammarCheckResponse {
+  status: 'success' | 'unavailable' | string
+  model: string
+  message?: string
+  issues: GrammarIssue[]
+  checkedAt?: string
 }
 
 export const resumeApi = {
@@ -56,8 +76,81 @@ export const resumeApi = {
   getLatestReview(id: string): Promise<any> {
     return request.get(`/resumes/${id}/reviews/latest`) as Promise<any>
   },
+  grammarCheck(id: string): Promise<GrammarCheckResponse> {
+    return request.post(`/resumes/${id}/grammar-check`) as Promise<GrammarCheckResponse>
+  },
   aiWrite(id: string, payload: AiWritePayload): Promise<{ content: string }> {
     return request.post(`/resumes/${id}/ai/write`, payload) as Promise<{ content: string }>
+  },
+  async aiWriteStream(
+    id: string,
+    payload: AiWritePayload,
+    onDelta: (content: string) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const baseURL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+    const token = localStorage.getItem('access_token')
+    const response = await fetch(`${baseURL}/resumes/${id}/ai/write/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload),
+      signal
+    })
+
+    if (!response.ok) {
+      throw new Error(`AI 写作请求失败（${response.status}）`)
+    }
+    if (!response.body) {
+      throw new Error('AI 写作未返回流式内容')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let eventName = 'message'
+    let dataLines: string[] = []
+    let streamDone = false
+
+    const dispatch = () => {
+      const data = dataLines.join('\n')
+      if (eventName === 'delta' && data) {
+        onDelta(data)
+      } else if (eventName === 'error') {
+        throw new Error(data || 'AI 写作失败，请稍后重试')
+      }
+      eventName = 'message'
+      dataLines = []
+    }
+
+    while (!streamDone) {
+      const { done, value } = await reader.read()
+      streamDone = done
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+      const lines = buffer.split(/\r?\n/)
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line) {
+          dispatch()
+        } else if (line.startsWith('event:')) {
+          eventName = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).replace(/^ /, ''))
+        }
+      }
+
+      if (done) break
+    }
+
+    if (buffer || dataLines.length > 0) {
+      if (buffer.startsWith('data:')) {
+        dataLines.push(buffer.slice(5).replace(/^ /, ''))
+      }
+      dispatch()
+    }
   }
 }
 

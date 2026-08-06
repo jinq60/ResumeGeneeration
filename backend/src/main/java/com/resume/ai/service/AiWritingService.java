@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import reactor.core.publisher.Flux;
 
 /**
  * 行内 AI 写作服务：对简历指定字段执行生成/润色/缩短/扩写/翻译。
@@ -112,6 +114,55 @@ public class AiWritingService {
         }
     }
 
+    /**
+     * Stream generated content as text deltas. The same validation and quota
+     * rules as the synchronous endpoint apply.
+     */
+    public Flux<String> stream(String userId, String resumeId, ResumeAiWriteRequest request) {
+        Resume resume = resumeService.getResumeEntity(userId, resumeId);
+        validateRequest(request);
+
+        String originalText = StringUtils.defaultString(request.getOriginalText());
+        validateOriginalText(request, originalText);
+
+        AtomicInteger counter = inFlight.computeIfAbsent(userId, k -> new AtomicInteger());
+        if (counter.incrementAndGet() > MAX_CONCURRENT_PER_USER) {
+            counter.decrementAndGet();
+            throw new BusinessException(ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED,
+                    "同时进行的 AI 请求过多，请稍后再试。");
+        }
+
+        try {
+            LlmProvider provider = providerRouter.resolve(FEATURE_KEY);
+            String model = providerRouter.resolveModel(FEATURE_KEY);
+            String prompt = buildPrompt(resume, request, originalText);
+            AiChatRequest aiRequest = AiChatRequest.builder()
+                    .model(model)
+                    .userPrompt(prompt)
+                    .temperature(0.4)
+                    .maxTokens(MAX_PROMPT_TOKENS)
+                    .build();
+            AiCallLog callLog = new AiCallLog();
+            callLog.setUserId(resume.getUserId());
+            callLog.setFeatureKey(FEATURE_KEY);
+            callLog.setProviderName(provider.getProviderName());
+            callLog.setModelName(model);
+            callLog.setRequestHash(String.valueOf(prompt.hashCode()));
+            callLog.setCreatedAt(LocalDateTime.now());
+            long start = System.currentTimeMillis();
+            AtomicBoolean finalized = new AtomicBoolean(false);
+
+            return provider.stream(aiRequest)
+                    .filter(StringUtils::isNotBlank)
+                    .doOnComplete(() -> finishStream(callLog, resume, request, start, true, finalized))
+                    .doOnError(error -> finishStream(callLog, resume, request, start, false, finalized))
+                    .doFinally(signal -> counter.decrementAndGet());
+        } catch (RuntimeException e) {
+            counter.decrementAndGet();
+            throw e;
+        }
+    }
+
     private ResumeAiWriteResponse doWrite(Resume resume, ResumeAiWriteRequest request, String originalText) {
         long start = System.currentTimeMillis();
         AiCallLog callLog = new AiCallLog();
@@ -186,6 +237,62 @@ public class AiWritingService {
             } catch (Exception logEx) {
                 log.warn("Insert AiCallLog failed: {}", logEx.getMessage());
             }
+        }
+    }
+
+    private void validateRequest(ResumeAiWriteRequest request) {
+        if (!FIELD_WHITELIST.containsKey(request.getSectionType())
+                || !FIELD_WHITELIST.get(request.getSectionType()).contains(request.getField())) {
+            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "该字段暂不支持 AI 写作。");
+        }
+        if (!ACTIONS.contains(request.getAction())) {
+            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "不支持的 AI 写作动作。");
+        }
+        if ("translate".equals(request.getAction()) && StringUtils.isBlank(request.getTargetLang())) {
+            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "翻译需要指定目标语言。");
+        }
+    }
+
+    private void validateOriginalText(ResumeAiWriteRequest request, String originalText) {
+        if (originalText.length() > MAX_TEXT_LENGTH) {
+            throw new BusinessException(ResultCode.AI_WRITING_CONTENT_TOO_LONG,
+                    "原文过长，AI 写作单次最多支持 " + MAX_TEXT_LENGTH + " 字符。");
+        }
+        if (!"generate".equals(request.getAction()) && StringUtils.isBlank(originalText)) {
+            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID,
+                    "请先填写内容，再进行 AI 改写。");
+        }
+    }
+
+    private String buildPrompt(Resume resume, ResumeAiWriteRequest request, String originalText) {
+        String resumeContent = toJson(resume.getSections());
+        return promptTemplates.render(FEATURE_KEY, Map.of(
+                "resumeContent", resumeContent,
+                "jobDescription", StringUtils.defaultString(resume.getTargetPosition()),
+                "sectionType", request.getSectionType(),
+                "field", request.getField(),
+                "action", request.getAction(),
+                "originalText", originalText,
+                "targetLang", StringUtils.defaultString(request.getTargetLang())
+        ));
+    }
+
+    private void finishStream(AiCallLog callLog, Resume resume, ResumeAiWriteRequest request,
+                              long start, boolean success, AtomicBoolean finalized) {
+        if (!finalized.compareAndSet(false, true)) return;
+        callLog.setSuccess(success);
+        callLog.setLatencyMs(System.currentTimeMillis() - start);
+        if (!success) {
+            callLog.setErrorMsg("AI stream failed");
+        } else {
+            auditLogService.record(resume.getUserId(), "ai_write", resume.getId(),
+                    "stream=true, section=" + request.getSectionType()
+                            + ", field=" + request.getField() + ", action=" + request.getAction());
+        }
+        try {
+            aiCallLogMapper.insert(callLog);
+        } catch (Exception logEx) {
+            log.warn("Insert streaming AiCallLog failed: {}", logEx.getMessage());
         }
     }
 

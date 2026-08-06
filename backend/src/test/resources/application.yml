@@ -53,6 +53,9 @@ app:
       resume-writing:
         provider: qwen
         model: qwen-turbo
+      resume-grammar:
+        provider: qwen
+        model: qwen-turbo
     openai:
       api-key: ${OPENAI_API_KEY:test-key}
       base-url: https://api.openai.com
@@ -74,3 +77,4 @@ app:
       resume-optimize: "Test prompt {resumeContent} {jobDescription}"
       avatar-optimize: "Test prompt {backgroundType} {style}"
       resume-writing: "Test prompt {resumeContent} {jobDescription} {sectionType} {field} {action} {originalText} {targetLang}"
+      resume-grammar: "Test prompt {resumeContent} {targetPosition}"

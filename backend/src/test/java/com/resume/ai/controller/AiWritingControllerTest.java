@@ -17,6 +17,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import reactor.core.publisher.Flux;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @WebMvcTest(AiWritingController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -89,5 +91,20 @@ class AiWritingControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sectionType\":\"introduction\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockJwt(userId = "user123")
+    void stream_shouldReturnServerSentEvents() throws Exception {
+        when(aiWritingService.stream(eq("user123"), eq("resume123"), any(ResumeAiWriteRequest.class)))
+                .thenReturn(Flux.just("first", "second"));
+
+        mockMvc.perform(post("/resumes/resume123/ai/write/stream")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(buildRequest())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("event:delta")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("first")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("event:done")));
     }
 }
