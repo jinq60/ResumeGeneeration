@@ -33,37 +33,35 @@
       </div>
 
       <!-- 导入对话框 -->
-      <el-dialog
-        v-model="importDialogVisible"
+      <a-modal
+        :visible="importDialogVisible"
         title="导入简历"
-        width="560px"
-        align-center
+        :width="560"
+        @cancel="importDialogVisible = false"
+        @before-ok="handleImport"
       >
         <div class="flex flex-col gap-4">
           <div class="flex items-center gap-4">
-            <el-select
+            <a-select
               v-model="importForm.format"
               class="w-36"
             >
-              <el-option
-                label="Markdown"
-                value="markdown"
-              />
-              <el-option
-                label="JSON"
-                value="json"
-              />
-            </el-select>
-            <el-input
+              <a-option value="markdown">
+                Markdown
+              </a-option>
+              <a-option value="json">
+                JSON
+              </a-option>
+            </a-select>
+            <a-input
               v-model="importForm.title"
               placeholder="简历标题（可选，默认取首个模块标题）"
-              maxlength="128"
+              :max-length="128"
             />
           </div>
-          <el-input
+          <a-textarea
             v-model="importForm.content"
-            type="textarea"
-            :rows="10"
+            :auto-size="{ minRows: 10, maxRows: 14 }"
             :placeholder="importForm.format === 'markdown'
               ? '粘贴 Markdown 内容：# 姓名\n## 工作经历\n公司 · 岗位\n- 工作描述\n## 自我介绍\n...'
               : '粘贴 JSON：模块数组或 {sections: [...]}'"
@@ -73,19 +71,19 @@
           </div>
         </div>
         <template #footer>
-          <el-button @click="importDialogVisible = false">
+          <a-button @click="importDialogVisible = false">
             取消
-          </el-button>
-          <el-button
+          </a-button>
+          <a-button
             type="primary"
             :loading="importing"
             :disabled="!importForm.content.trim()"
             @click="handleImport"
           >
             导入并打开
-          </el-button>
+          </a-button>
         </template>
-      </el-dialog>
+      </a-modal>
 
       <!-- Tabs & Search -->
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-stack-lg bg-surface-container-lowest p-2 rounded-xl border border-outline-variant/30">
@@ -236,9 +234,9 @@
                 {{ formatTime(resume.updatedAt || resume.createdAt) }}
               </p>
             </div>
-            <el-dropdown
+            <a-dropdown
               trigger="click"
-              @command="(cmd: string) => handleResumeAction(cmd, resume)"
+              @select="(value: any) => handleResumeAction(String(value), resume)"
               @click.stop
             >
               <button
@@ -247,26 +245,24 @@
               >
                 <el-icon><More /></el-icon>
               </button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="edit">
-                    编辑
-                  </el-dropdown-item>
-                  <el-dropdown-item command="copy">
-                    复制
-                  </el-dropdown-item>
-                  <el-dropdown-item command="rename">
-                    重命名
-                  </el-dropdown-item>
-                  <el-dropdown-item
-                    command="delete"
-                    divided
-                  >
-                    删除
-                  </el-dropdown-item>
-                </el-dropdown-menu>
+              <template #content>
+                <a-doption value="edit">
+                  编辑
+                </a-doption>
+                <a-doption value="copy">
+                  复制
+                </a-doption>
+                <a-doption value="rename">
+                  重命名
+                </a-doption>
+                <a-doption
+                  value="delete"
+                  class="!text-error"
+                >
+                  删除
+                </a-doption>
               </template>
-            </el-dropdown>
+            </a-dropdown>
           </div>
         </div>
 
@@ -316,34 +312,24 @@
   </main>
 
   <!-- Rename Dialog -->
-  <el-dialog
-    v-model="renameVisible"
+  <a-modal
+    :visible="renameVisible"
     title="重命名简历"
-    width="420px"
-    align-center
+    :width="420"
+    @cancel="renameVisible = false"
+    @before-ok="handleRenameConfirm"
   >
-    <el-input
+    <a-input
       v-model="renameTitle"
       placeholder="输入新标题"
     />
-    <template #footer>
-      <el-button @click="renameVisible = false">
-        取消
-      </el-button>
-      <el-button
-        type="primary"
-        @click="handleRenameConfirm"
-      >
-        确认
-      </el-button>
-    </template>
-  </el-dialog>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { Message, Modal } from '@arco-design/web-vue'
 import { resumeApi } from '@/api/resume'
 import { templateApi } from '@/api/template'
 import { TEMPLATE_PLACEHOLDER } from '@/utils/placeholder'
@@ -391,7 +377,7 @@ function openImportDialog() {
 async function handleImport() {
   const content = importForm.value.content.trim()
   if (!content) {
-    ElMessage.warning('请粘贴导入内容')
+    Message.warning('请粘贴导入内容')
     return
   }
   importing.value = true
@@ -402,10 +388,10 @@ async function handleImport() {
       content
     })
     importDialogVisible.value = false
-    ElMessage.success('导入成功')
+    Message.success('导入成功')
     router.push(`/workbench/editor/${resume.id}`)
   } catch (e: any) {
-    ElMessage.error(e.message || '导入失败')
+    Message.error(e.message || '导入失败')
   } finally {
     importing.value = false
   }
@@ -487,29 +473,34 @@ function handleResumeAction(cmd: string, resume: Resume) {
 async function handleCopy(resume: Resume) {
   try {
     await resumeApi.duplicate(resume.id)
-    ElMessage.success('已复制')
+    Message.success('已复制')
     fetchResumes()
   } catch {
-    ElMessage.error('复制失败')
+    Message.error('复制失败')
   }
 }
 
 async function handleDelete(resume: Resume) {
   try {
-    await ElMessageBox.confirm('确定删除该简历？删除后不可恢复。', '确认', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
+    await new Promise<void>((resolve, reject) => {
+      Modal.confirm({
+        title: '确认',
+        content: '确定删除该简历？删除后不可恢复。',
+        okText: '删除',
+        cancelText: '取消',
+        onOk: () => resolve(),
+        onCancel: () => reject(new Error('cancelled'))
+      })
     })
   } catch {
     return // 用户取消
   }
   try {
     await resumeApi.remove(resume.id)
-    ElMessage.success('已删除')
+    Message.success('已删除')
     fetchResumes()
   } catch {
-    ElMessage.error('删除失败')
+    Message.error('删除失败')
   }
 }
 
@@ -523,11 +514,11 @@ async function handleRenameConfirm() {
   if (renameTarget.value && renameTitle.value.trim()) {
     try {
       await resumeApi.rename(renameTarget.value.id, renameTitle.value.trim())
-      ElMessage.success('重命名成功')
+      Message.success('重命名成功')
       renameVisible.value = false
       fetchResumes()
     } catch {
-      ElMessage.error('重命名失败')
+      Message.error('重命名失败')
     }
   }
 }

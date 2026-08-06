@@ -129,6 +129,51 @@
   --el-border-radius-round: var(--st-radius-full);
   --el-box-shadow-light: var(--st-shadow-sm);
   --el-box-shadow: var(--st-shadow-md);
+
+  /* ==========================================================================
+     Arco Design Vue 主题桥接：将 --st-* 令牌映射到 Arco CSS 变量
+     （Arco 使用 --primary-6 / --color-bg-* / --color-text-* 等变量）
+     ========================================================================== */
+  --primary-1: var(--st-primary-container);
+  --primary-2: var(--st-primary-fixed-dim);
+  --primary-3: var(--st-primary-fixed-dim);
+  --primary-4: var(--st-primary);
+  --primary-5: var(--st-primary);
+  --primary-6: var(--st-primary);
+  --primary-7: var(--st-primary);
+  --primary-8: var(--st-primary);
+  --primary-9: var(--st-primary);
+  --primary-10: var(--st-primary-container);
+
+  --success-6: var(--st-secondary);
+  --danger-6: var(--st-error);
+  --warning-6: #d9892b;
+
+  --color-bg-white: var(--st-surface-container-lowest);
+  --color-bg-1: var(--st-surface-container-lowest);
+  --color-bg-2: var(--st-surface-container-lowest);
+  --color-bg-3: var(--st-surface-container-low);
+  --color-bg-4: var(--st-surface-container);
+
+  --color-fill-1: var(--st-surface-container-low);
+  --color-fill-2: var(--st-surface-container);
+  --color-fill-3: var(--st-surface-container-high);
+
+  --color-text-1: var(--st-on-surface);
+  --color-text-2: var(--st-on-surface-variant);
+  --color-text-3: var(--st-outline);
+  --color-text-4: var(--st-outline);
+
+  --color-border-1: var(--st-outline-variant);
+  --color-border-2: var(--st-outline-variant);
+  --color-border-3: var(--st-outline);
+
+  --color-white: var(--st-surface-container-lowest);
+  --color-black: var(--st-on-surface);
+
+  --border-radius-small: var(--st-radius-sm);
+  --border-radius-medium: var(--st-radius-md);
+  --border-radius-large: var(--st-radius-lg);
 }
 
 body {
