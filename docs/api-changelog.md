@@ -2,6 +2,13 @@
 
 > 记录 `docs/superpowers/specs/2026-07-03-api-spec.md` 的所有变更，便于前后端联调与版本管理。
 
+## v1.5（2026-08-06）
+
+### 新增
+
+- 简历详情与更新接口新增 `renderSettings`，支持一页纸适配、字体、字号、行高、页面边距、模块间距和主题色。
+- 实时预览、PDF 和 Word 导出统一应用简历排版设置。
+
 ---
 
 ## v1.4（2026-08-05）
@@ -9,6 +16,9 @@
 ### 新增
 
 - `POST /resumes/{id}/ai/write`：行内 AI 写作（generate/polish/shorten/expand/translate），字段白名单 + 每用户并发限制，复用多厂商 LLM 路由与 `ai_call_log` 审计。
+- `POST /resumes/{id}/ai/write/stream`：行内 AI 写作 SSE 流式接口，发送 `delta`、`done`、`error` 事件；复用同步接口校验和并发限制。
+- `POST /resumes/{id}/grammar-check`：AI 语法检查，返回字段级问题、严重程度、修改建议和解释。
+- 富文本字段：自我介绍使用 `contentHtml`，工作/项目描述与成就使用 `descriptionHtml`；服务端渲染与导出统一执行 HTML 白名单清洗。
 - `POST /resumes/{id}/share` / `GET /resumes/{id}/share` / `DELETE /resumes/{id}/share`：简历公开分享（创建/轮换、查询、关闭）。
 - `GET /share/{token}`：公开只读分享页（HTML，CSP/noindex/no-store）。
 - `GET /resumes/{id}/export/markdown`：导出 Markdown 文件。

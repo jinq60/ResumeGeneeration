@@ -2,7 +2,7 @@
 
 > 作用：多厂商 LLM 集成、异步任务调度、AI 调用审计。
 > 范围：`backend/src/main/java/com/resume/ai/`。
-> 必读：`../CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
+> 必读：`backend/CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
 
 ---
 
@@ -12,7 +12,7 @@
 
 - 多 LLM 厂商统一抽象与路由
 - Prompt 模板管理
-- 异步 AI 任务执行（简历点评、JD 优化、头像优化）
+- AI 能力执行（异步简历点评、JD 优化、头像优化，以及同步行内写作）
 - AI 调用日志与成本审计
 
 ---
@@ -26,12 +26,16 @@ com.resume.ai/
 │   ├── AsyncAiConfig.java         # AI 专用线程池
 │   └── AiPromptTemplates.java     # Prompt 模板管理
 ├── controller/
-│   └── AiResumeController.java    # POST /resumes/{id}/optimize 等
+│   ├── AiResumeController.java    # POST /resumes/{id}/optimize 等
+│   ├── AiWritingController.java   # 同步/流式 POST /resumes/{id}/ai/write*
+│   └── AiGrammarController.java   # POST /resumes/{id}/grammar-check
 ├── dto/
 │   ├── AiChatRequest.java         # LLM 统一请求
 │   ├── AiChatResponse.java        # LLM 统一响应
 │   ├── ResumeOptimizeRequest.java # JD 优化请求
-│   └── ResumeOptimizeResponse.java # JD 优化响应
+│   ├── ResumeOptimizeResponse.java # JD 优化响应
+│   ├── ResumeAiWriteRequest.java  # 行内写作请求
+│   └── ResumeAiWriteResponse.java # 行内写作响应
 ├── entity/
 │   ├── AiCallLog.java             # AI 调用日志
 │   └── ResumeOptimizeTask.java    # JD 优化任务
@@ -46,7 +50,9 @@ com.resume.ai/
 └── service/
     ├── AiResumeReviewService.java    # 异步简历点评
     ├── AiResumeOptimizeService.java  # 异步 JD 优化
-    └── AiAvatarService.java          # 异步头像优化（P1）
+    ├── AiAvatarService.java          # P0 占位头像优化
+    ├── AiWritingService.java          # 同步/流式行内写作
+    └── AiGrammarService.java          # AI 语法检查
 ```
 
 ---
@@ -60,6 +66,7 @@ app.ai.providers:
   resume-review:    { provider: qwen,   model: qwen-turbo }
   resume-optimize:  { provider: openai, model: gpt-4o-mini }
   avatar-optimize:  { provider: openai, model: gpt-4o }
+  resume-writing:   { provider: qwen,   model: qwen-turbo }
 ```
 
 - `ProviderRouter.resolve("resume-review")` 返回对应厂商的 `LlmProvider`。
@@ -78,6 +85,7 @@ public interface LlmProvider {
 ```
 
 - `chat()`: 发送对话请求，返回文本内容 + token 统计。
+- `stream()`: 返回文本增量 Flux；OpenAI/Qwen 解析 SSE `data:` 片段，不支持流式的 Provider 回退为单片段。
 - `chatStructured()`: 发送对话请求并直接将响应解析为指定类型。
 - 所有实现通过 `@Component` 注册，由 `ProviderRouter` 自动发现。
 
@@ -99,7 +107,7 @@ app.ai.thread-pool:
 
 ### 4.2 异步方法
 
-所有 `@Async("aiTaskExecutor")` 方法遵循统一模式：
+异步任务方法使用 `@Async("aiTaskExecutor")`，同步行内写作直接在请求线程中执行。异步任务遵循统一模式：
 
 1. 从 DB 读取任务记录
 2. 更新状态为 `processing`
@@ -125,6 +133,8 @@ app.ai.thread-pool:
 | LLM 返回非 JSON | 解析失败 → `AI_RESPONSE_PARSE_FAILED` |
 | 网络错误 | 重试 2 次（间隔 1s），仍失败则回退占位 |
 | 线程池满 | CallerRunsPolicy 降级同步执行 |
+
+行内写作流式接口使用 SSE `delta` / `done` / `error` 事件；富文本结果仍需经过简历字段白名单和 HTML 清洗。
 
 ---
 
@@ -166,6 +176,8 @@ app.ai.thread-pool:
 | 6004 | AI_CONCURRENT_LIMIT_EXCEEDED | 超出用户并发限制 |
 | 6005 | AI_RESPONSE_PARSE_FAILED | AI 响应解析失败 |
 | 6006 | AI_CONTENT_TOO_LONG | 内容过长超出 token 限制 |
+| 6007 | AI_WRITING_FIELD_INVALID | 行内写作字段不在白名单 |
+| 6008 | AI_WRITING_CONTENT_TOO_LONG | 行内写作原文超过长度限制 |
 
 ---
 

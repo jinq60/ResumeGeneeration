@@ -13,7 +13,7 @@
 
 服务器需安装：
 - Docker 24.x + Docker Compose V2
--（可选，仅用于本地构建验证）Node 20
+-（可选，仅用于本地构建验证）Node.js 20.19+
 
 > 后端依赖 JDK 17 / Maven 已包含在 `backend/Dockerfile` 的构建镜像中，无需在宿主机安装。
 
@@ -35,7 +35,7 @@ docker compose -f docker-compose.server.yml up -d --build
 
 ## GitHub Actions 自动部署
 
-`.github/workflows/deploy.yml` 会在 `production`/`develop` 分支推送时自动执行：
+`.github/workflows/deploy.yml` 会在 `production` 分支推送或手动触发时执行：
 
 1. 前端 `npm ci && npm run build`
 2. 通过 SCP 把后端源码、`dist` 与 Docker/Compose 文件上传到服务器

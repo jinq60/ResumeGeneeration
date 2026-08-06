@@ -2,7 +2,7 @@
 
 > 作用：简历模板的后台管理与前台查询。
 > 范围：`backend/src/main/java/com/resume/template/`。
-> 必读：`../CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
+> 必读：`backend/CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
 
 ---
 

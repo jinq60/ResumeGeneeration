@@ -2,7 +2,7 @@
 
 > 作用：用户账号生命周期与认证流程。
 > 范围：`backend/src/main/java/com/resume/user/`。
-> 必读：`../CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
+> 必读：`backend/CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
 
 ---
 

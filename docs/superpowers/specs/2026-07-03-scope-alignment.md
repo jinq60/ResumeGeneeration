@@ -2,7 +2,7 @@
 
 > 版本：v1.1  
 > 日期：2026-07-07  
-> 作用：消除 `docs/需求PRD-v1.md` 与 `docs/superpowers/specs/2026-07-03-resume-generation-design.md` 之间的冲突，作为后续所有设计文档、接口文档、测试用例的最高参考。
+> 作用：记录初始 P0 范围，消除 `docs/需求PRD-v1.md` 与 `docs/superpowers/specs/2026-07-03-resume-generation-design.md` 之间的冲突。后续 v1.4 功能扩展以 `docs/2026-08-05-business-line-roadmap.md`、`docs/api-changelog.md` 和当前 API 规范为准。
 
 ---
 

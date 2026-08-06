@@ -2,7 +2,7 @@
 
 > 作用：全局基础设施与跨模块共享能力。
 > 范围：`backend/src/main/java/com/resume/common/`。
-> 必读：`../CLAUDE.md`（后端工程约束） + 本文件。
+> 必读：`backend/CLAUDE.md`（后端工程约束） + 本文件。
 
 ---
 
@@ -43,7 +43,8 @@ com.resume.common/
 │   └── JwtAuthenticationFilter.java
 └── service/
     ├── MinioStorageService.java  # MinIO 上传/下载/删除
-    └── ResumeRenderService.java  # 简历 HTML 渲染
+    ├── ResumeRenderService.java  # 简历 HTML 渲染
+    └── RichTextSanitizer.java    # 富文本白名单清洗
 ```
 
 ---
@@ -98,7 +99,7 @@ throw new BusinessException(ResultCode.RESUME_NOT_FOUND, "简历不存在");
 - Access Token：有效期 1 小时， claims 含 `sub=userId`、`guest=boolean`。
 - Refresh Token：有效期 7 天， claims 含 `sub=userId`。
 - 请求头：`Authorization: Bearer {accessToken}`
-- 白名单（permitAll）：`/auth/**`、`/templates`、`/templates/**`、`/actuator/health`
+- 白名单（permitAll）：`/auth/**`、`/templates`、`/templates/**`、`/share/**`、`/actuator/health`、`/actuator/prometheus`
 
 ### 3.5 逻辑删除
 
@@ -120,7 +121,7 @@ mybatis-plus:
 ### 3.6 安全配置
 
 - 无状态会话（`STATELESS`）。
-- CORS 仅允许 `http://localhost:5173`。
+- CORS 默认允许 `http://localhost:5173`，生产环境通过 `app.cors.allowed-origins` 配置。
 - 密码编码器：`BCryptPasswordEncoder`。
 
 ---

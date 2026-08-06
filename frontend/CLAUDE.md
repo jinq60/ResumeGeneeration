@@ -2,7 +2,7 @@
 
 > 作用：为前端开发 Agent 提供全局前端上下文、目录约定、状态管理、API 映射与开发红线。
 > 范围：`frontend/` 目录下所有代码。
-> 必读：根目录 `../CLAUDE.md` + 本文件。
+> 必读：根目录 `../AGENTS.md` + 本文件。
 
 ---
 
@@ -15,8 +15,9 @@
 - 简历编辑器（左侧表单 + 右侧实时预览）
 - 模板选择与切换
 - 头像上传与一寸照优化
-- PDF 导出
-- AI 简历点评展示（P1）
+- PDF、Word、Markdown 导出
+- AI 简历点评、JD 优化和编辑器内 AI 写作
+- 简历公开分享页
 
 ---
 
@@ -34,9 +35,11 @@
 | Element Plus Icons | 2.3.1 | 图标 |
 | vue-cropper | 1.1.1 | 头像裁剪 |
 | SCSS | 1.74.1 | 样式 |
+| Tailwind CSS | 4.3.3 | 设计令牌与工具类样式 |
 | Vitest | 1.4.0 | 单元/组件测试 |
 | Playwright | 1.43.0 | E2E 测试 |
 | ESLint / Prettier | 8 / 3 | 代码规范 |
+| Node.js | >=20.19.0 | 前端运行时 |
 
 ---
 
@@ -83,6 +86,7 @@ frontend/src/
 - `src/router/website.ts`：官网路由（`/` 下无鉴权）
 - `src/router/workbench.ts`：用户工作台路由（`/workbench/*` 需登录）
 - `src/router/admin.ts`：后台管理路由（`/admin/*`）
+- `/share/:token`：匿名简历分享页，内部通过 iframe 加载后端 HTML
 
 ```typescript
 const routes = [
@@ -104,7 +108,9 @@ const routes = [
 { path: '/workbench/resumes', name: 'ResumeList', component: () => import('@/views/workbench/ResumeListView.vue') },
 { path: '/workbench/resumes/create', name: 'TemplateSelect', component: () => import('@/views/workbench/TemplateSelectView.vue') },
 { path: '/workbench/templates', name: 'TemplateCenter', component: () => import('@/views/workbench/TemplateCenterView.vue') },
+{ path: '/workbench/templates/:id', name: 'TemplateDetail', component: () => import('@/views/workbench/TemplateDetailView.vue') },
 { path: '/workbench/editor/:id', name: 'Editor', component: () => import('@/views/workbench/EditorView.vue') },
+{ path: '/workbench/resumes/:id/edit', name: 'ResumeEdit', component: () => import('@/views/workbench/EditorView.vue') },
 { path: '/workbench/resumes/:id', name: 'ResumeDetail', component: () => import('@/views/workbench/ResumeDetailView.vue') },
 { path: '/workbench/resumes/:id/export', name: 'Export', component: () => import('@/views/workbench/ExportView.vue') },
 { path: '/workbench/ai-review', name: 'AIReviewCenter', component: () => import('@/views/workbench/AIReviewCenterView.vue') },
@@ -171,6 +177,10 @@ const routes = [
 | `api/template.ts` | template | 模板列表、详情 |
 | `api/avatar.ts` | avatar | 头像上传、优化、查询、删除 |
 | `api/pdf.ts` | pdf | PDF 导出、查询、下载 |
+| `api/export.ts` | resume | Word/Markdown 文件下载 |
+| `api/share.ts` | resume/share | 分享创建、查询、关闭 |
+| `api/preview.ts` | resume | 预览地址与 HTML 预览 |
+| `api/admin/*.ts` | user/template/resume | 后台登录与管理接口 |
 
 ### 6.3 后端接口映射
 
@@ -196,6 +206,15 @@ const routes = [
 | `pdf.export` | `POST /api/pdf/export` |
 | `pdf.getTask` | `GET /api/pdf/tasks/{taskId}` |
 | `pdf.download` | `GET /api/pdf/download/{taskId}` |
+| `resume.aiWrite` | `POST /api/resumes/{id}/ai/write` |
+| `resume.aiWriteStream` | `POST /api/resumes/{id}/ai/write/stream`（SSE） |
+| `resume.grammarCheck` | `POST /api/resumes/{id}/grammar-check` |
+| `export.downloadWord` | `GET /api/resumes/{id}/export/word` |
+| `export.downloadMarkdown` | `GET /api/resumes/{id}/export/markdown` |
+| `share.create` | `POST /api/resumes/{id}/share` |
+| `share.get` | `GET /api/resumes/{id}/share` |
+| `share.revoke` | `DELETE /api/resumes/{id}/share` |
+| `share page` | `GET /api/share/{token}` |
 
 ---
 
@@ -245,6 +264,7 @@ export interface Resume {
   targetPosition?: string
   templateId: string
   sections: Section[]
+  renderSettings?: RenderSettings | null
   createdAt: string
   updatedAt: string
 }
@@ -276,8 +296,8 @@ export interface Resume {
 - `ResumeListView.vue`：简历列表、新建、重命名、复制、删除、分页
 - `EditorView.vue`：左侧模块编辑区、右侧预览、模板切换、导出入口
 - `TemplateSelectView.vue` / `TemplateCenterView.vue`：模板选择与模板中心
-- `ExportView.vue`：PDF 导出流程 UI
-- `AIReviewView.vue` / `AIReviewCenterView.vue`：AI 简历点评入口与结果展示
+- `ExportView.vue`：PDF/Word/Markdown 导出流程 UI
+- `AIReviewView.vue` / `AIReviewCenterView.vue`：AI 简历点评、JD 优化入口与结果展示
 - `AvatarUploadView.vue`：头像上传、裁剪、一寸照优化 UI
 - `DeliveryManagementView.vue`：投递记录管理
 - `SettingsView.vue`：用户账号设置
@@ -291,17 +311,26 @@ export interface Resume {
 
 #### 公共
 - `LoginView.vue`：登录/注册/游客模式完整页面
+- `ShareView.vue`：匿名分享页壳，iframe 加载后端只读 HTML
 - `NotFoundView.vue`：404 页面
 - `ResumePreview.vue`：iframe 加载后端 `/api/resumes/{id}/preview`
 - `frontend/src/utils/download.ts`：PDF/头像任务本地存储与读取工具
 - `useAutoSave.ts`：2 秒防抖自动保存 hook
+- `components/editor/*.vue`：Profile、Education、Work、Project、Skill、Introduction、Custom 表单及 AI 写作按钮
 - 类型、API 封装、状态管理、路由骨架、路由守卫
 
-### 待完善（占位）
+### 当前实现边界
 
-- `ProfileForm.vue`：个人信息表单
-- 新增：`EducationForm.vue`、`WorkForm.vue`、`ProjectForm.vue`、`SkillForm.vue`、`IntroductionForm.vue`、`CustomForm.vue`
-- 以上表单组件与编辑器内部数据流的深度集成
+- 编辑器已实现两栏布局、模块 Tab、上下排序、表单更新、自动保存和实时预览。
+- 编辑器已实现撤销/重做（连续输入合并）、`Ctrl/Cmd + Z`、`Ctrl/Cmd + Shift + Z`、`Ctrl/Cmd + S` 快捷键、缩放、页码导航和本地草稿恢复。
+- 工作台已实现窄屏侧栏抽屉；编辑器移动端支持“编辑内容 / 预览简历”双 Tab，桌面端支持收起编辑面板进入专注预览。
+- 自我介绍、工作描述、项目描述和成就字段支持白名单富文本；富文本保存为 `contentHtml` / `descriptionHtml`，旧纯文本字段继续保留。
+- AI 写作支持 SSE 增量预览，流式接口不可用时回退到同步写作接口。
+- AI 写作已接入自我介绍、工作/项目描述等文本字段，结果支持预览后应用。
+- 编辑器工具栏提供 AI 语法检查抽屉，问题可按模块定位回编辑区；未配置供应商时显示不可用状态。
+- 编辑器支持保存一页纸适配、字体、字号、行高、边距、模块间距和主题色，并同步到实时预览、PDF 与 Word 导出。
+- E2E 当前仅覆盖官网基础流程，新增页面仍需持续补充端到端覆盖。
+- 真实头像 AI、AI 按日配额、简历导入和富文本编辑属于后续迭代。
 
 ---
 
@@ -392,7 +421,7 @@ npm run dev              # http://localhost:5173
 npm run build            # 生产构建
 npm run test:unit        # 单元/组件测试
 npm run test:e2e         # E2E 测试
-npm run lint
+npx eslint . --ext .vue,.ts,.tsx
 npm run format
 ```
 
@@ -405,6 +434,7 @@ npm run format
 - E2E 测试：`tests/e2e/`
 - 新增组件/视图必须补充测试。
 - 运行：`npm run test:unit -- --run`
+- 当前基线：13 个测试文件、36 个单元/组件测试通过；E2E 覆盖仍较少。
 
 ---
 

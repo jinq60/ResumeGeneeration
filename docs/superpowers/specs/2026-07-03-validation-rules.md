@@ -283,8 +283,21 @@ public void validateAvatarFile(MultipartFile file) {
 | `targetPosition` | 否 | ≤128 字符 | `@Size(max=128)` | “目标岗位过长” |
 | `templateId` | 否 | 非空，≤64 字符 | `@Size(max=64)` | “模板 ID 过长” |
 | `sections` | 否 | 数组 | — | “简历内容不能为空”仅在传入时校验 |
+| `renderSettings` | 否 | 排版设置对象 | `@Valid`；数值范围与主题色格式见下表 | “排版设置不正确” |
 
 **注意**：更新接口所有字段均为可选；仅更新传入的字段，未传入的字段保持原值不变。
+
+### 11.3 渲染设置（`renderSettings`）
+
+| 字段 | 规则 |
+|---|---|
+| `autoOnePage` | boolean；默认关闭 |
+| `fontFamily` | 仅允许前端提供的字体选项，后端渲染时再次执行白名单清洗 |
+| `baseFontSize` | 8–16pt |
+| `lineHeight` | 1.0–2.2 |
+| `pagePadding` | 8–30mm |
+| `sectionSpacing` | 4–32px |
+| `accentColor` | `#RRGGBB` 格式 |
 
 ---
 

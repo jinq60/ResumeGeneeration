@@ -472,4 +472,4 @@ CREATE DATABASE resume_generation DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_
 | 环境变量 | `docs/environment.md` |
 | 安全合规 | `docs/security-guide.md` |
 | 开发流程 | `docs/development-workflow.md` |
-| AI 辅助约束 | 根目录 `AGENTS.md` + `backend/AGENTS.md` + 各模块 `AGENTS.md` |
+| AI 辅助约束 | 根目录 `AGENTS.md` + `backend/CLAUDE.md` + 各模块 `CLAUDE.md` |

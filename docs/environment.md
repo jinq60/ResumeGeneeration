@@ -1,7 +1,7 @@
 # 环境变量说明
 
-> 版本：v1.0  
-> 日期：2026-07-07  
+> 版本：v1.1
+> 日期：2026-08-05
 > 作用：列出项目运行所需的全部环境变量与配置文件项，便于部署和排查。
 
 ---
@@ -23,20 +23,20 @@
 
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |---|---|---|---|
-| `jwt.secret` | `JWT_SECRET` | — | Base64 编码密钥，≥ 256 bit |
-| `jwt.access-token-expiration` | `JWT_ACCESS_TOKEN_EXPIRATION` | `3600000` | Access Token 有效期（毫秒） |
-| `jwt.refresh-token-expiration` | `JWT_REFRESH_TOKEN_EXPIRATION` | `604800000` | Refresh Token 有效期（毫秒） |
+| `app.jwt.secret` | `JWT_SECRET`（dev）/ `APP_JWT_SECRET`（prod） | — | Base64 编码密钥，≥ 256 bit |
+| `app.jwt.access-token-expiration` | — | `3600000` | Access Token 有效期（毫秒） |
+| `app.jwt.refresh-token-expiration` | — | `604800000` | Refresh Token 有效期（毫秒） |
 
 ### 1.3 MinIO（对象存储）
 
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |---|---|---|---|
-| `minio.endpoint` | `MINIO_ENDPOINT` | `http://localhost:9000` | MinIO 服务端点 |
-| `minio.access-key` | `MINIO_ACCESS_KEY` | — | Access Key |
-| `minio.secret-key` | `MINIO_SECRET_KEY` | — | Secret Key |
-| `minio.buckets.avatars` | `MINIO_BUCKET_AVATARS` | `resume-avatars` | 头像 Bucket |
-| `minio.buckets.pdfs` | `MINIO_BUCKET_PDFS` | `resume-pdfs` | PDF Bucket |
-| `minio.buckets.templates` | `MINIO_BUCKET_TEMPLATES` | `resume-templates` | 模板 Bucket |
+| `app.minio.endpoint` | `MINIO_ENDPOINT`（dev）/ `APP_MINIO_ENDPOINT`（prod） | `http://localhost:9000` | MinIO 服务端点 |
+| `app.minio.access-key` | `MINIO_ACCESS_KEY`（dev）/ `APP_MINIO_ACCESS_KEY`（prod） | — | Access Key |
+| `app.minio.secret-key` | `MINIO_SECRET_KEY`（dev）/ `APP_MINIO_SECRET_KEY`（prod） | — | Secret Key |
+| `app.minio.buckets.avatars` | `APP_MINIO_BUCKET_AVATARS`（prod） | `resume-avatars` | 头像 Bucket |
+| `app.minio.buckets.pdfs` | `APP_MINIO_BUCKET_PDFS`（prod） | `resume-pdfs` | PDF Bucket |
+| `app.minio.buckets.templates` | `APP_MINIO_BUCKET_TEMPLATES`（prod） | `resume-templates` | 模板 Bucket |
 
 ### 1.4 服务端口号
 
@@ -49,7 +49,18 @@
 
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |---|---|---|---|
-| `logging.level.com.resume` | `LOGGING_LEVEL_COM_RESUME` | `INFO` | 应用日志级别 |
+| `logging.level.com.resume` | — | dev `DEBUG` / prod `INFO` | 应用日志级别 |
+
+### 1.6 认证、AI 与跨域配置
+
+| 配置项 | 环境变量 | 默认值 | 说明 |
+|---|---|---|---|
+| `app.cors.allowed-origins` | `CORS_ALLOWED_ORIGINS`（dev）/ `APP_CORS_ALLOWED_ORIGINS`（prod） | `http://localhost:5173` | 允许的前端来源，逗号分隔 |
+| `app.auth.verify-code.mode` | `VERIFY_CODE_MODE` | `placeholder` | dev/test 可用占位验证码；生产必须 `strict` |
+| `app.admin.bootstrap.phone` | `ADMIN_BOOTSTRAP_PHONE` | 空 | 首个管理员引导手机号 |
+| `app.admin.bootstrap.password` | `ADMIN_BOOTSTRAP_PASSWORD` | 空 | 首个管理员引导密码 |
+| `app.render.public-base-url` | `APP_PUBLIC_BASE_URL` | 空 | PDF/分享渲染时的外部访问前缀 |
+| `app.ai.*` | `OPENAI_API_KEY`、`DASHSCOPE_API_KEY`、`ERNIE_API_KEY` 等 | 空 | AI 供应商配置；未配置时按功能降级 |
 
 ---
 
@@ -82,7 +93,7 @@ VITE_APP_TITLE=智能简历生成工具
 
 ## 3. 安全配置检查清单
 
-- [ ] 生产环境 `jwt.secret` 已替换为随机强密钥。
+- [ ] 生产环境 `app.jwt.secret` 已替换为随机强密钥。
 - [ ] 数据库密码不为默认弱密码。
 - [ ] MinIO Bucket 在生产环境不公开，使用预签名 URL。
 - [ ] MySQL 不对外暴露 3306 端口。

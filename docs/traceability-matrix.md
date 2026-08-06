@@ -1,7 +1,7 @@
 # 需求追溯矩阵
 
 > 版本：v1.1  
-> 日期：2026-07-26  
+> 日期：2026-08-05
 > 作用：将 PRD 需求追溯到设计文档、数据模型、API 规范、校验规则、测试计划与代码，便于审计与迭代。
 
 ---
@@ -24,7 +24,7 @@
 | 新建简历 | `scope-alignment.md` §2.1 | `resume` 表 | `api-spec.md` §7.1 | `validation-rules.md` §11.1 | `tdd-test-plan.md` §2.1 `ResumeServiceTest` | `ResumeController`, `ResumeService` |
 | 简历列表 | `scope-alignment.md` §2.1 | `resume` 表 | `api-spec.md` §7.2 | — | `tdd-test-plan.md` §2.3 | `ResumeController`, `ResumeService` |
 | 获取详情 | `scope-alignment.md` §2.1 | `resume` 表 | `api-spec.md` §7.3 | — | `tdd-test-plan.md` §2.3 | `ResumeController`, `ResumeService` |
-| 更新简历 | `scope-alignment.md` §2.1 | `resume` 表 `sections` | `api-spec.md` §7.4 | `validation-rules.md` §11.2、§12 | `tdd-test-plan.md` §2.1 | `ResumeController`, `ResumeService` |
+| 更新简历 | `scope-alignment.md` §2.1 | `resume` 表 `sections`、`render_settings` | `api-spec.md` §7.4 | `validation-rules.md` §11.2、§12 | `tdd-test-plan.md` §2.1 | `ResumeController`, `ResumeService` |
 | 删除简历 | `scope-alignment.md` §2.1 | `resume` 表 `deleted` | `api-spec.md` §7.5 | — | `tdd-test-plan.md` §2.1 | `ResumeController`, `ResumeService` |
 | 复制简历 | `scope-alignment.md` §2.1 | `resume` 表 | `api-spec.md` §7.6 | — | `tdd-test-plan.md` §2.1 | `ResumeController`, `ResumeService` |
 | 重命名简历 | `scope-alignment.md` §2.1 | `resume` 表 `title` | `api-spec.md` §7.7 | — | `tdd-test-plan.md` §2.3 | `ResumeController`, `ResumeService` |
@@ -33,10 +33,15 @@
 
 | PRD 需求 | 范围对齐 | 数据模型 | API 规范 | 校验规则 | TDD 计划 | 代码位置 |
 |---|---|---|---|---|---|---|
-| 左侧表单 + 右侧实时预览 | `scope-alignment.md` §2.1 | `resume.sections` | `api-spec.md` §7 | `validation-rules.md` §3–§8 | `tdd-test-plan.md` §3 | `frontend/src/views/EditorView.vue` |
+| 左侧表单 + 右侧实时预览 | `scope-alignment.md` §2.1 | `resume.sections` | `api-spec.md` §7 | `validation-rules.md` §3–§8 | `tdd-test-plan.md` §3 | `frontend/src/views/workbench/EditorView.vue` |
 | 模块增删改 | `scope-alignment.md` §2.1 | `resume.sections` | `api-spec.md` §7.4 | `validation-rules.md` §12 | `tdd-test-plan.md` §3 | `ResumeService` |
-| 模块排序（按钮） | `scope-alignment.md` §2.1、§2.2 | `resume.sections.order` | `api-spec.md` §7.4 | — | `tdd-test-plan.md` §2.1 `SectionSorterTest` | 待实现 |
-| 自动保存 | `scope-alignment.md` §2.1 | `resume.sections` | `api-spec.md` §7.4 | `validation-rules.md` §1.3 | `tdd-test-plan.md` §3 | `frontend/src/composables/useAutoSave.ts`（待连接） |
+| 模块排序（按钮） | `scope-alignment.md` §2.1、§2.2 | `resume.sections.order` | `api-spec.md` §7.4 | — | `tdd-test-plan.md` §2.1 `SectionSorterTest` | `frontend/src/views/workbench/EditorView.vue` `moveSection` |
+| 自动保存 | `scope-alignment.md` §2.1 | `resume.sections` | `api-spec.md` §7.4 | `validation-rules.md` §1.3 | `tdd-test-plan.md` §3 | `frontend/src/composables/useAutoSave.ts` + `EditorView.vue` |
+| 撤销/重做 | 业务线 v1.1 编辑器体验 2.0 | 前端内存历史快照 | — | — | `useResumeHistory.test.ts` | `frontend/src/composables/useResumeHistory.ts` + `EditorView.vue` |
+| 预览缩放与分页导航 | 业务线 v1.1 编辑器体验 2.0 | — | — | — | `ResumePreview.test.ts` | `EditorView.vue`, `ResumePreview.vue` |
+| 一页适配与排版设置 | 编辑器体验 2.0 | `resume.render_settings`（V9） | `api-spec.md` §7.4 | 字体/颜色白名单、数值范围 | `ResumeRenderServiceTest`, `ResumeServiceTest`, `renderSettings.test.ts` | `RenderSettings`, `ResumeRenderService`, `PdfService`, `EditorView.vue` |
+| 本地草稿恢复 | 业务线 v1.1 编辑器体验 2.0 | 浏览器 `localStorage` | — | — | `useResumeDraft.test.ts` | `frontend/src/composables/useResumeDraft.ts` + `EditorView.vue` |
+| 工作台移动导航与编辑器响应式布局 | 业务线 v1.1 编辑器体验 2.0 | — | — | — | `WorkbenchLayout.test.ts` | `WorkbenchLayout.vue`, `WorkbenchSidebar.vue`, `EditorView.vue` |
 
 ## 4. 内容模块
 
@@ -71,20 +76,33 @@
 
 | PRD 需求 | 范围对齐 | 数据模型 | API 规范 | 校验规则 | TDD 计划 | 代码位置 |
 |---|---|---|---|---|---|---|
-| 导出 PDF | `scope-alignment.md` §2.1 | `pdf_task` 表 | `api-spec.md` §11.1 | `validation-rules.md` §10 | `tdd-test-plan.md` §2.1 `PdfServiceTest` | `PdfController`, `PdfService` |
+| 导出 PDF | `scope-alignment.md` §2.1 | `pdf_task` 表、`resume.render_settings` | `api-spec.md` §11.1 | `validation-rules.md` §10 | `tdd-test-plan.md` §2.1 `PdfServiceTest` | `PdfController`, `PdfService`, `ResumeRenderService` |
 | 查询 PDF 任务 | `scope-alignment.md` §2.1 | `pdf_task` 表 | `api-spec.md` §11.2 | — | `tdd-test-plan.md` §2.3 | `PdfController`, `PdfService` |
 | 下载 PDF | `scope-alignment.md` §2.1 | `pdf_task` 表 | `api-spec.md` §11.3 | — | `tdd-test-plan.md` §2.3 | `PdfController`, `PdfService` |
 
-## 8. AI 简历点评（P1）
+## 8. AI 能力
 
 | PRD 需求 | 范围对齐 | 数据模型 | API 规范 | 校验规则 | TDD 计划 | 代码位置 |
 |---|---|---|---|---|---|---|
-| 创建 AI 点评 | `scope-alignment.md` §2.1 | `resume_review` 表 | `api-spec.md` §7.8 | — | `tdd-test-plan.md` §2.1 `ResumeReviewServiceTest` | `ResumeController`, `ResumeReviewService`（stub） |
+| 创建 AI 点评 | `scope-alignment.md` §2.1 | `resume_review` 表 | `api-spec.md` §7.8 | — | `tdd-test-plan.md` §2.1 `ResumeReviewServiceTest` | `ResumeController`, `ResumeReviewService`, `AiResumeReviewService`（真实调用 + 占位降级） |
 | 获取最新点评 | `scope-alignment.md` §2.1 | `resume_review` 表 | `api-spec.md` §7.9 | — | `tdd-test-plan.md` §2.3 | `ResumeController`, `ResumeReviewService` |
+| JD 简历优化 | 业务线 v1.1 Phase 1 | `resume_optimize_task` 表 | `api-changelog.md` v1.3 | — | `AiResumeControllerTest` | `AiResumeController`, `AiResumeOptimizeService` |
+| 编辑器内 AI 写作 | 业务线 v1.1 Phase 1 | `ai_call_log` 表 | `api-changelog.md` v1.4 | 字段白名单、长度限制 | `AiWritingServiceTest`, `AiWritingControllerTest` | `AiWritingController`, `AiWritingService`, `frontend/src/components/editor/AiWriterButton.vue` |
+| AI 流式写作 | 编辑器体验 2.0 | `ai_call_log` 表 | `api-changelog.md` v1.4 | SSE delta/done/error 事件 | `AiWritingServiceTest`, `AiWritingControllerTest`, `resumeApiStream.test.ts` | `AiWritingController`, `LlmProvider.stream`, `frontend/src/api/resume.ts` |
+| AI 语法检查 | 编辑器体验 2.0 | `ai_call_log` 表 | `api-spec.md` §7.13 | status、severity、字段定位 | `AiGrammarServiceTest`, `AiGrammarControllerTest` | `AiGrammarService`, `AiGrammarController`, `EditorView.vue` 语法检查抽屉 |
+| 富文本字段 | 编辑器体验 2.0 | `contentHtml` / `descriptionHtml` JSON 字段 | `api-spec.md` §7.10 | 前后端 HTML 白名单清洗 | `RichTextSanitizerTest`, `richText.test.ts`, `RichTextEditor.test.ts` | `RichTextSanitizer`, `ResumeRenderService`, `ResumeExportService`, `RichTextEditor.vue` |
+
+## 9. 分享与多格式导出
+
+| PRD 需求 | 范围对齐 | 数据模型 | API 规范 | 校验规则 | TDD 计划 | 代码位置 |
+|---|---|---|---|---|---|---|
+| 公开分享链接 | 业务线 v1.1 Phase 2 | `resume_share` 表（V8） | `api-changelog.md` v1.4 | token、状态、过期校验 | `ShareServiceTest`（控制层测试待补） | `backend/src/main/java/com/resume/resume/share/` |
+| Markdown 导出 | 业务线 v1.1 Phase 3 | `resume` 表 | `api-changelog.md` v1.4 | 导出前姓名/联系方式校验 | `ResumeExportServiceTest`（控制层测试待补） | `ResumeExportService`, `frontend/src/api/export.ts` |
+| Word 导出 | 业务线 v1.1 Phase 3 | `resume` 表、`resume.render_settings` | `api-changelog.md` v1.5 | 导出前姓名/联系方式校验 | `ResumeExportServiceTest`（控制层测试待补） | `ResumeExportService`, `frontend/src/api/export.ts` |
 
 ---
 
-## 9. 通用与基础设施
+## 10. 通用与基础设施
 
 | 需求/决策 | 文档 | 代码位置 |
 |---|---|---|
@@ -96,15 +114,15 @@
 
 ---
 
-## 10. 前端页面实现
+## 11. 前端页面实现
 
 | 页面/能力 | 设计来源 | 代码位置 |
 |---|---|---|
-| 用户工作台（Dashboard） | Google Stitch 项目 `workbench-overview` | `frontend/src/views/DashboardView.vue` |
-| 简历列表 | Google Stitch 项目 `my-resumes` | `frontend/src/views/ResumeListView.vue` |
-| 简历编辑器 | Google Stitch 项目 `resume-editor` | `frontend/src/views/EditorView.vue` |
-| 官网首页 | Google Stitch 项目 `landing-page` | `frontend/src/views/LandingView.vue` |
-| 投递管理（用户侧） | Google Stitch 项目 `delivery-management` | `frontend/src/views/DeliveryManagementView.vue` |
+| 用户工作台（Dashboard） | Google Stitch 项目 `workbench-overview` | `frontend/src/views/workbench/DashboardView.vue` |
+| 简历列表 | Google Stitch 项目 `my-resumes` | `frontend/src/views/workbench/ResumeListView.vue` |
+| 简历编辑器 | Google Stitch 项目 `resume-editor` | `frontend/src/views/workbench/EditorView.vue` |
+| 官网首页 | Google Stitch 项目 `landing-page` | `frontend/src/views/website/HomeView.vue` |
+| 投递管理（用户侧） | Google Stitch 项目 `delivery-management` | `frontend/src/views/workbench/DeliveryManagementView.vue` |
 | 后台总览 | Google Stitch 项目 `admin-overview` | `frontend/src/views/admin/Dashboard.vue` |
 | 用户管理 | Google Stitch 项目 `user-management` | `frontend/src/views/admin/UserManagement.vue` |
 | 模板管理 | Google Stitch 项目 `template-management` | `frontend/src/views/admin/TemplateManagement.vue` |
@@ -112,24 +130,25 @@
 | AI 规则管理 | Google Stitch 项目 `ai-rules` | `frontend/src/views/admin/SystemSettings.vue` |
 | 内容审核 | Google Stitch 项目 `content-audit` | `frontend/src/views/admin/ContentAudit.vue` |
 | 投递数据 | Google Stitch 项目 `delivery-data` | `frontend/src/views/admin/DeliveryData.vue` |
-| 用户端布局与导航 | Google Stitch 设计系统 | `frontend/src/components/layout/MainLayout.vue`, `TopNavbar.vue` |
+| 用户端布局与导航 | Google Stitch 设计系统 | `frontend/src/components/workbench/WorkbenchLayout.vue`, `WorkbenchSidebar.vue` |
 | 管理端布局 | Google Stitch 设计系统 | `frontend/src/components/admin/AdminLayout.vue` |
 | 设计系统/主题 | Google Stitch 设计令牌 | `frontend/src/assets/styles/design-system.scss`, `tailwind.css` |
 | 管理员登录 | 设计系统 | `frontend/src/views/admin/Login.vue` |
-| 用户账号设置 | 设计系统 | `frontend/src/views/SettingsView.vue` |
-| 模板中心 | 设计系统 | `frontend/src/views/TemplateCenterView.vue` |
-| AI 点评入口 | 设计系统 | `frontend/src/views/AIReviewCenterView.vue` |
+| 用户账号设置 | 设计系统 | `frontend/src/views/workbench/SettingsView.vue` |
+| 模板中心 | 设计系统 | `frontend/src/views/workbench/TemplateCenterView.vue` |
+| AI 点评入口 | 设计系统 | `frontend/src/views/workbench/AIReviewCenterView.vue` |
 | 404 页面 | 设计系统 | `frontend/src/views/NotFoundView.vue` |
-| 模板详情页 | 设计系统 | `frontend/src/views/TemplateDetailView.vue` |
-| 下载中心 | 设计系统 | `frontend/src/views/DownloadCenterView.vue` |
-| 通知中心 | 设计系统 | `frontend/src/views/NotificationCenterView.vue` |
-| 简历详情/预览页 | 设计系统 | `frontend/src/views/ResumeDetailView.vue` |
+| 模板详情页 | 设计系统 | `frontend/src/views/workbench/TemplateDetailView.vue` |
+| 下载中心 | 设计系统 | `frontend/src/views/workbench/DownloadCenterView.vue` |
+| 通知中心 | 设计系统 | `frontend/src/views/workbench/NotificationCenterView.vue` |
+| 简历详情/预览页 | 设计系统 | `frontend/src/views/workbench/ResumeDetailView.vue` |
+| 简历分享页 | 业务线 v1.1 Phase 2 | `frontend/src/views/ShareView.vue` |
 | 路由与鉴权守卫 | `security-guide.md` | `frontend/src/router/index.ts` |
 | 导出/头像任务本地存储 | 设计系统 | `frontend/src/utils/download.ts` |
 
 ---
 
-## 11. 说明
+## 12. 说明
 
 - “代码位置”列标记为“待实现”或“（待完善）”的项，是下一阶段开发重点。
 - 本矩阵随需求变更和功能实现同步更新。

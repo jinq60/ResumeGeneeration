@@ -1,7 +1,8 @@
 # 简历生成工具 TDD 测试计划
 
-> 版本：v1.0  
-> 日期：2026-07-03  > 基于：`docs/superpowers/specs/2026-07-03-scope-alignment.md`、`docs/superpowers/specs/2026-07-03-api-spec.md`、`docs/superpowers/specs/2026-07-03-template-system-spec.md`、`docs/superpowers/specs/2026-07-03-validation-rules.md`
+> 版本：v1.1
+> 日期：2026-08-05
+> 基于：`docs/superpowers/specs/2026-07-03-scope-alignment.md`、`docs/superpowers/specs/2026-07-03-api-spec.md`、`docs/superpowers/specs/2026-07-03-template-system-spec.md`、`docs/superpowers/specs/2026-07-03-validation-rules.md`
 
 ---
 
@@ -14,7 +15,7 @@
 | 层级 | 后端 | 前端 | 作用 |
 |---|---|---|---|
 | 单元测试 | JUnit 5 + Mockito | Vitest | 验证纯业务逻辑、工具函数 |
-| 组件/集成测试 | Spring Boot Test + Testcontainers | Vue Test Utils | 验证组件渲染、模块集成 |
+| 组件/集成测试 | Spring Boot Test + H2 / Docker Compose MySQL | Vue Test Utils | 验证组件渲染、模块集成 |
 | 接口/E2E 测试 | MockMvc / RestAssured | Playwright | 验证端到端链路 |
 
 ### 1.2 TDD 节奏
@@ -34,7 +35,8 @@ backend/src/test/java/com/resume/
 ├── resume/
 ├── template/
 ├── avatar/
-└── pdf/
+├── pdf/
+└── ai/
 ```
 
 前端：
@@ -85,6 +87,8 @@ frontend/tests/
 | `ResumeReviewPromptBuilderTest` | Prompt 组装包含 sections、岗位 JD、scene |
 | `ResumeReviewScoreValidatorTest` | 评分范围 0–100、维度完整性校验 |
 | `ResumeReviewResultParserTest` | JSON 结果解析、字段缺失兜底 |
+| `ResumeRenderServiceTest` | 排版设置覆盖模板 CSS、一页适配标记、设置安全清洗 |
+| `ResumeServiceTest` | 排版设置保存与复制 |
 
 #### avatar 模块
 
@@ -103,16 +107,13 @@ frontend/tests/
 
 ### 2.2 集成测试
 
-使用 `@SpringBootTest` + Testcontainers MySQL。
+使用 `@SpringBootTest`。默认测试使用 H2；需要真实持久化验证时，启动 `ops/docker-compose.test.yml`，设置 `RUN_INTEGRATION_TESTS=true`，连接 MySQL `localhost:3307` 和 MinIO `localhost:9002`。
 
 | 测试类 | 测试内容 |
 |---|---|
-| `AuthControllerIntegrationTest` | 注册、登录、游客、Token 刷新 |
-| `ResumeControllerIntegrationTest` | CRUD、复制、重命名、越权 |
-| `TemplateControllerIntegrationTest` | 列表、详情 |
-| `AvatarControllerIntegrationTest` | 上传、优化、查询、删除 |
-| `PdfControllerIntegrationTest` | 导出、查询、下载 |
-| `ResumeReviewControllerIntegrationTest` | 点评成功、保存最新记录、越权、内容过少 |
+| `ResumeServiceIntegrationTest` | 简历 CRUD、复制、删除、越权，当前 5 个用例 |
+
+其余模块通过 H2、MockMvc 和 Service/Controller 测试覆盖；真实 MySQL 集成测试按需扩展。
 
 ### 2.3 接口测试
 
@@ -170,6 +171,7 @@ frontend/tests/
 | `TemplateSelector.test.ts` | 模板切换、配置应用 |
 | `AvatarUploader.test.ts` | 文件选择、格式校验、裁剪交互 |
 | `ResumeReviewPanel.test.ts` | 评分展示、建议列表、重新点评 |
+| `renderSettings.test.ts` | 排版设置默认值合并且不修改服务端对象 |
 
 ### 3.3 E2E 测试
 
@@ -336,7 +338,7 @@ frontend/tests/
 
 ### 6.1 后端测试数据
 
-- 使用 Testcontainers 启动 MySQL 容器。
+- 使用 `ops/docker-compose.test.yml` 启动 MySQL/MinIO 容器。
 - 每个测试类独立初始化数据，测试结束后清理。
 - 使用 `@Sql` 或 Flyway 初始化模板数据。
 
@@ -353,8 +355,11 @@ frontend/tests/
 ### 7.1 本地开发
 
 ```bash
-# 后端
-./mvnw test
+# 后端（必须使用 JDK 17）
+mvn test
+
+# 后端集成测试（需先启动 Docker）
+RUN_INTEGRATION_TESTS=true mvn test -Dtest=com.resume.resume.service.ResumeServiceIntegrationTest
 
 # 前端
 npm run test:unit
@@ -377,8 +382,8 @@ npm run test:e2e
 | 环境 | 数据库 | 文件存储 | 用途 |
 |---|---|---|---|
 | 本地单元测试 | H2 / Mockito | Mockito Mock | 快速验证逻辑 |
-| 本地集成测试 | Testcontainers MySQL | 临时目录 | 验证持久化与文件操作 |
-| CI | Testcontainers MySQL | 临时目录 | 自动化回归 |
+| 本地集成测试 | Docker Compose MySQL/MinIO | 命名卷 | 验证持久化与文件操作 |
+| CI | H2；集成测试按环境显式启用 | — | 自动化回归 |
 | E2E | 开发后端 | 临时目录 | 端到端验证 |
 
 ---

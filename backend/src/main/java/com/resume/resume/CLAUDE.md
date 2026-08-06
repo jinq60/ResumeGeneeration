@@ -2,7 +2,7 @@
 
 > 作用：简历核心生命周期管理、AI 简历点评、服务端 HTML 预览。
 > 范围：`backend/src/main/java/com/resume/resume/`。
-> 必读：`../CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
+> 必读：`backend/CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
 
 ---
 
@@ -14,7 +14,9 @@
 - 简历复制、重命名
 - 简历 Section 结构校验
 - 服务端 HTML 实时预览
-- AI 简历点评（P1 占位实现）
+- 富文本字段的服务端安全渲染
+- AI 简历点评任务入口（真实 LLM 调用，未配置时回退占位结果）
+- Word/Markdown 导出与公开分享子模块
 
 ---
 
@@ -27,7 +29,9 @@ com.resume.resume/
 │   └── PreviewController.java    # /resumes/{id}/preview HTML 预览
 ├── service/
 │   ├── ResumeService.java        # 简历核心业务
-│   └── ResumeReviewService.java  # AI 点评（P1 占位）
+│   ├── ResumeReviewService.java  # AI 点评任务入口
+│   └── ResumeExportService.java  # Word/Markdown 导出
+├── share/                         # 公开分享链接与只读 HTML
 ├── mapper/
 │   ├── ResumeMapper.java
 │   └── ResumeReviewMapper.java
@@ -63,9 +67,12 @@ Base URL：`http://localhost:8080/api`
 | DELETE | `/resumes/{id}` | 路径参数 | `R<Void>` | 逻辑删除，并清理关联任务与文件 |
 | POST | `/resumes/{id}/duplicate` | 路径参数 | `R<{id, title, createdAt}>` | 复制简历 |
 | PUT | `/resumes/{id}/title` | `RenameResumeRequest` | `R<{id, title, updatedAt}>` | 重命名 |
-| POST | `/resumes/{id}/reviews` | `ReviewResumeRequest` | `R<ResumeReviewResponse>` | 创建 AI 点评（P1 占位） |
+| POST | `/resumes/{id}/reviews` | `ReviewResumeRequest` | `R<ResumeReviewResponse>` | 创建 AI 点评任务，异步调用 LLM 或回退占位结果 |
 | GET | `/resumes/{id}/reviews/latest` | 路径参数 | `R<ResumeReviewResponse>` | 获取最新点评 |
 | GET | `/resumes/{resumeId}/preview` | `templateId`（可选） | `text/html` | 服务端渲染预览 |
+| GET | `/resumes/{id}/export/markdown` | 路径参数 | Markdown 文件流 | 导出 Markdown |
+| GET | `/resumes/{id}/export/word` | 路径参数 | DOCX 文件流 | 导出 Word |
+| POST/GET/DELETE | `/resumes/{id}/share` | 路径参数 | `R<ShareResponse>` | 创建、查询、关闭分享 |
 
 ---
 
@@ -83,6 +90,7 @@ Base URL：`http://localhost:8080/api`
 | `targetIndustry` | String | 目标行业（P1 预留） |
 | `templateId` | String | 当前模板 ID |
 | `sections` | `List<SectionDTO>` | JSON 数组，TypeHandler 自动映射 |
+| `renderSettings` | `RenderSettings` | JSON 对象，用户排版与一页适配设置 |
 | `status` | String | `active` / `deleted` |
 | `exportCount` | Integer | 导出次数 |
 | `deleted` | Integer | 逻辑删除 |
@@ -162,6 +170,7 @@ Base URL：`http://localhost:8080/api`
 | `targetPosition` | 可选 |
 | `templateId` | 可选 |
 | `sections` | 可选；提供时做结构校验 |
+| `renderSettings` | 可选；包含一页适配、字体、字号、行高、边距、模块间距和主题色 |
 
 ### 6.3 `RenameResumeRequest`
 
@@ -195,9 +204,9 @@ Base URL：`http://localhost:8080/api`
 - 复制 `sections` 内容。
 - 不复制 PDF/头像任务记录。
 
-### 7.5 AI 点评（P1 占位）
+### 7.5 AI 点评
 
-- 当前为占位实现，返回固定评分和建议。
+- 优先异步调用已配置的 LLM；未配置供应商或调用失败时按降级策略返回占位结果。
 - 简历内容字符数少于 20 时返回 `RESUME_CONTENT_TOO_SHORT`。
 - 每次点评插入一条 `resume_review` 记录。
 
@@ -217,6 +226,7 @@ Base URL：`http://localhost:8080/api`
 | `template` | 校验模板存在性、预览时读取模板 |
 | `pdf` | 删除简历时清理 `pdf_task` 与 MinIO PDF 文件 |
 | `avatar` | 删除简历时清理 `avatar_task` 与 MinIO 头像文件 |
+| `ai` | 异步 AI 点评、优化任务与调用审计 |
 
 ---
 
@@ -254,7 +264,7 @@ Base URL：`http://localhost:8080/api`
   - 创建/更新/删除/复制/重命名
   - Section 结构校验
   - 越权访问拦截
-  - AI 点评占位行为
+  - AI 点评真实调用与未配置供应商时的降级行为
 - 运行：`mvn test -Dtest=com.resume.resume.**`
 
 ---

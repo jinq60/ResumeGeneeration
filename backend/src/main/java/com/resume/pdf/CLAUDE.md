@@ -2,7 +2,7 @@
 
 > 作用：简历 PDF 导出任务。
 > 范围：`backend/src/main/java/com/resume/pdf/`。
-> 必读：`../CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
+> 必读：`backend/CLAUDE.md`（后端工程约束） + `../common/CLAUDE.md` + 本文件。
 
 ---
 

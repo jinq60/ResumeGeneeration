@@ -1,7 +1,7 @@
 # 简历生成工具数据模型与 DDL
 
-> 版本：v1.1  
-> 日期：2026-07-07  
+> 版本：v1.2
+> 日期：2026-08-06
 > 基于：`docs/superpowers/specs/2026-07-03-scope-alignment.md`
 
 ---
@@ -48,6 +48,7 @@
 | `target_industry` | VARCHAR(128) | NULLABLE | 目标行业（P1） |
 | `template_id` | VARCHAR(64) | NOT NULL | 当前模板 ID |
 | `sections` | JSON | NOT NULL | Section 数组 |
+| `render_settings` | JSON | NULLABLE | 用户排版设置：一页适配、字体、字号、行高、边距、模块间距、主题色 |
 | `status` | VARCHAR(16) | NOT NULL DEFAULT 'active' | active / deleted（业务状态） |
 | `deleted` | TINYINT(1) | NOT NULL DEFAULT 0 | 逻辑删除：0 未删除，1 已删除 |
 | `export_count` | INT | NOT NULL DEFAULT 0 | 导出次数（P1 统计） |
@@ -236,6 +237,7 @@ JSON 数组，每个元素为 Section 统一结构：
 | `resume_review.highlights` | `List<String>` | `string[]` | 亮点字符串数组 |
 | `avatar_task.options` | `Map<String, Boolean>` | `Record<string, boolean>` | 优化选项键值对 |
 | `template.config` | `Map<String, Object>` | `Record<string, any>` | 模板配置，结构由模板规范定义 |
+| `resume.render_settings` | `RenderSettings` | `RenderSettings` | 用户排版覆盖设置，使用 TypeHandler 自动映射 |
 
 **实现要求**：
 - Java 实体使用 MyBatis-Plus `JacksonTypeHandler` 或自定义 `TypeHandler` 将 JSON 自动映射到上述类型；禁止在 Service 中手动 `ObjectMapper` 解析。

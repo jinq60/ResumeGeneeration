@@ -3,6 +3,8 @@
 > 版本：v1.0  
 > 日期：2026-07-03  
 > 基于需求文档：[需求PRD-v1.md](../../需求PRD-v1.md)
+>
+> 说明：本文档保留初始 MVP 设计；AI 写作、公开分享和 Word/Markdown 导出等后续能力以业务线路线图和 v1.4 API 规范为准。
 
 ---
 
@@ -70,7 +72,7 @@
 | 安全 | Spring Security + JWT | 认证鉴权 |
 | PDF 生成 | Playwright（无头 Chromium） | 渲染 HTML 后导出 PDF，保证与预览一致 |
 | 文件存储 | MinIO（兼容 S3） | 头像、PDF、模板缩略图统一对象存储，数据库只存 URL |
-| 测试 | JUnit 5 + Mockito + Spring Boot Test + Testcontainers | 单元、集成测试 |
+| 测试 | JUnit 5 + Mockito + Spring Boot Test + H2 / Docker Compose | 单元、集成测试 |
 
 ### 3.2 前端
 
@@ -187,6 +189,7 @@ frontend/
 | target_industry | VARCHAR(128) | 目标行业（P1） |
 | template_id | VARCHAR(64) | 当前模板 ID |
 | sections | JSON | 模块数组 |
+| render_settings | JSON | 用户排版设置与一页适配开关（V9） |
 | status | VARCHAR(16) | active / deleted（业务状态） |
 | deleted | TINYINT(1) | 逻辑删除：0 未删除，1 已删除 |
 | export_count | INT | 导出次数（P1 统计） |
@@ -740,13 +743,14 @@ P1 功能：对用户简历进行 AI 点评并保存最近一次结果。
 2. 表单变更通过 Pinia store 同步到右侧预览组件，预览即时更新。
 3. 输入停止 2 秒后，前端调用 `PUT /api/resumes/{id}` 自动保存；游客模式优先写 `localStorage`。
 4. 切换模板仅更新 `templateId`，不改动已填内容。
-5. 用户点击预览区模块标题，左侧滚动到对应编辑区。
+5. 用户可在排版面板调整一页适配、字体、字号、行高、边距、模块间距和主题色；设置随自动保存提交。
+6. 用户点击预览区模块标题，左侧滚动到对应编辑区。
 
 ### 8.2 PDF 导出
 
 1. 导出前前端检查：姓名、联系方式、空模块、头像加载状态。
 2. 调用 `POST /api/pdf/export`。
-3. 后端读取简历和模板配置，渲染完整 HTML。
+3. 后端读取简历、模板配置和 `render_settings`，渲染完整 HTML。
 4. 调用 Playwright 将 HTML 转为 A4 PDF。
 5. 前端轮询 `GET /api/pdf/tasks/{taskId}`，成功后通过 `GET /api/pdf/download/{taskId}` 下载。
 
@@ -812,7 +816,7 @@ P1 功能：对用户简历进行 AI 点评并保存最近一次结果。
 ### 11.1 后端测试
 
 - **单元测试**：Service 层纯业务逻辑，使用 JUnit 5 + Mockito。
-- **集成测试**：Controller + Service + Mapper + Testcontainers MySQL，覆盖接口端到端。
+- **集成测试**：Controller + Service + Mapper + Docker Compose MySQL/MinIO，覆盖关键持久化链路；默认通过环境变量显式启用。
 - **接口测试**：使用 JUnit 测试所有 REST API 的字段校验、鉴权、越权、状态流转。
 
 ### 11.2 前端测试

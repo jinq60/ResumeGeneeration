@@ -88,8 +88,8 @@ git push -u origin feature/resume-export-pdf
 | 工作流文件 | 作用 |
 |---|---|
 | `.github/workflows/backend-ci.yml` | JDK 17 环境；运行 `mvn -B clean test` |
-| `.github/workflows/frontend-ci.yml` | Node 20 环境；运行 `npm ci`、lint、unit tests、production build |
-| `.github/workflows/deploy.yml` | `production`/`develop` 推送时构建 dist，SCP 源码/产物到服务器后由后端 Dockerfile 构建 jar，再用 Docker Compose 部署 |
+| `.github/workflows/frontend-ci.yml` | Node.js 20 环境；运行 `npm ci`、lint、unit tests、production build |
+| `.github/workflows/deploy.yml` | `production` 推送或手动触发时构建 dist，SCP 源码/产物到服务器后由后端 Dockerfile 构建 jar，再用 Docker Compose 部署 |
 
 ### 3.3 本地验证
 
@@ -98,11 +98,13 @@ git push -u origin feature/resume-export-pdf
 ```bash
 # 后端
 cd backend
+$env:JAVA_HOME="D:\Java\jdk-17.0.12"
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
 mvn clean test
 
 # 前端
-cd frontend
-npm run lint
+cd ..\frontend
+npx eslint . --ext .vue,.ts,.tsx
 npm run test:unit -- --run
 npm run build
 ```
@@ -129,7 +131,7 @@ npm run build
 - `ci`：CI/CD
 - `chore`：构建/工具
 
-Scope 示例：`backend`、`frontend`、`common`、`user`、`resume`、`template`。
+Scope 示例：`backend`、`frontend`、`common`、`user`、`resume`、`template`、`ai`。
 
 ---
 
@@ -146,7 +148,7 @@ Scope 示例：`backend`、`frontend`、`common`、`user`、`resume`、`template
 
 - 开发/测试环境服务器：`101.43.117.17`（Ubuntu 24.04）。
 - 服务器初始化由 Devin 统一配置，业务服务以 Docker Compose 运行。
-- 生产部署通过 `production` 分支触发，测试部署通过 `develop` 分支触发。
+- 生产部署通过 `production` 分支触发；`develop` 和 `stable` 仅触发 CI，不自动部署。
 - 详细环境变量与运行参数见 `docs/environment.md` 与 `docs/setup-guide.md`。
 
 ---

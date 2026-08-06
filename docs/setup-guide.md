@@ -1,7 +1,7 @@
 # 环境搭建与运行指南
 
-> 版本：v1.0  
-> 日期：2026-07-07  
+> 版本：v1.1
+> 日期：2026-08-05
 > 作用：帮助新开发者或运维人员在一台新机器上快速跑通本项目。
 
 ---
@@ -14,7 +14,7 @@
 |---|---|---|---|
 | Java JDK | 17+ | 后端编译运行 | Oracle JDK 17 或 Eclipse Temurin 17 |
 | Maven | 3.8+ | 后端构建 | 随 IDE 安装或官网下载 |
-| Node.js | 18+ | 前端构建运行 | 使用 nvm 或官网 LTS 安装包 |
+| Node.js | 20.19+ | 前端构建运行 | 使用 nvm 或官网 LTS 安装包 |
 | MySQL | 8.0+ | 业务数据库 | Docker 或本地安装 |
 | MinIO | 最新稳定版 | 对象存储（头像/PDF/模板缩略图） | Docker 单节点即可 |
 
@@ -84,22 +84,22 @@ spring:
     username: resume
     password: your_password
 
-jwt:
-  secret: your-base64-encoded-secret-at-least-256-bits
-  access-token-expiration: 3600000
-  refresh-token-expiration: 604800000
-
-minio:
-  endpoint: http://localhost:9000
-  access-key: minioadmin
-  secret-key: minioadmin
-  buckets:
-    avatars: resume-avatars
-    pdfs: resume-pdfs
-    templates: resume-templates
+app:
+  jwt:
+    secret: your-base64-encoded-secret-at-least-256-bits
+    access-token-expiration: 3600000
+    refresh-token-expiration: 604800000
+  minio:
+    endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin
+    buckets:
+      avatars: resume-avatars
+      pdfs: resume-pdfs
+      templates: resume-templates
 ```
 
-> **注意**：`jwt.secret` 必须是 Base64 编码，长度建议 ≥ 256 bit。生产环境务必使用随机生成的强密钥。
+> **注意**：`app.jwt.secret` 必须是 Base64 编码，长度建议 ≥ 256 bit。生产环境务必使用随机生成的强密钥。
 
 ### 3.4 启动后端
 
@@ -111,7 +111,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=dev
 
 启动成功后访问：
 
-- 健康检查：`http://localhost:8080/actuator/health`
+- 健康检查：`http://localhost:8080/api/actuator/health`
 - API Base URL：`http://localhost:8080/api`
 
 ### 3.5 首个管理员初始化（生产环境）
@@ -166,7 +166,7 @@ npm run dev
 
 ## 5. 数据库初始化
 
-项目使用 Flyway 管理数据库迁移。首次启动时，Flyway 会自动执行 `backend/src/main/resources/db/migration/V1__init_schema.sql` 建表并插入系统内置模板。
+项目使用 Flyway 管理数据库迁移。首次启动时，Flyway 会自动执行 `backend/src/main/resources/db/migration/V1__init.sql` 至 `V9__resume_render_settings.sql`，并插入/更新系统内置模板。
 
 如需手动初始化，可执行 `docs/superpowers/specs/2026-07-03-data-model-and-ddl.md` §7 中的 DDL。
 
@@ -181,6 +181,16 @@ cd backend
 export JAVA_HOME=/path/to/jdk-17
 mvn test
 ```
+
+默认测试使用 H2，5 个 MySQL 集成测试需要先启动 `ops/docker-compose.test.yml`，再显式启用：
+
+```bash
+docker compose -f ops/docker-compose.test.yml -p resume-test up -d
+export RUN_INTEGRATION_TESTS=true
+mvn test -Dtest=com.resume.resume.service.ResumeServiceIntegrationTest
+```
+
+集成测试连接 MySQL `localhost:3307`、MinIO `localhost:9002`；开发配置默认使用 `3306`、`9000`。
 
 ### 6.2 前端单元测试
 

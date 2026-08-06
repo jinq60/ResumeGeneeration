@@ -2,7 +2,7 @@
 
 > 作用：为进入本项目的所有开发 Agent 提供全局上下文、模块地图、开发流程与不可违背的约定。
 > 范围：根目录 / 全项目。
-> 必读：本文件 + 你将要修改的模块的 `AGENTS.md`。
+> 必读：本文件 + 你将要修改的模块的 `CLAUDE.md`（如存在）。
 
 ---
 
@@ -12,9 +12,10 @@
 
 - 用户可在线创建、编辑、预览、导出 PDF 简历。
 - 支持手机号/邮箱注册、游客模式、JWT 鉴权。
-- 支持头像一寸照优化（P0 占位实现，P1 接入真实 AI）。
+- 支持头像上传与一寸照优化（当前为 P0 占位实现）。
 - 支持模板后台化管理。
-- P1 支持 AI 简历点评。
+- 支持 AI 简历点评、JD 优化和编辑器内 AI 写作，未配置供应商时回退到占位结果。
+- 支持简历公开分享，以及 PDF、Word、Markdown 多格式导出。
 
 ---
 
@@ -27,8 +28,9 @@
 | 对象存储 | MinIO（兼容 S3） |
 | 安全 | Spring Security + JWT（JJWT 0.12.5） |
 | PDF 生成 | Playwright 1.43.0 |
-| 前端 | Vue 3 + Vite + TypeScript + Pinia + Element Plus |
-| 测试 | 后端：JUnit 5 + Testcontainers + H2；前端：Vitest + Playwright |
+| 前端 | Vue 3 + Vite + TypeScript + Pinia + Element Plus + Tailwind CSS |
+| 前端运行时 | Node.js 20.19+ |
+| 测试 | 后端：JUnit 5 + H2，集成测试使用 Docker Compose MySQL/MinIO；前端：Vitest + Playwright |
 
 ---
 
@@ -40,12 +42,15 @@ ResumeGeneeration/
 │   ├── src/main/java/com/resume/
 │   │   ├── common/             # 全局基础设施、异常、响应、安全、MinIO
 │   │   ├── user/               # 用户、认证、JWT
-│   │   ├── resume/             # 简历 CRUD、AI 点评
+│   │   ├── resume/             # 简历 CRUD、预览、分享、Word/Markdown 导出
 │   │   ├── template/           # 模板查询、后台模板管理
 │   │   ├── avatar/             # 头像上传、一寸照优化任务
-│   │   └── pdf/                # PDF 导出任务
+│   │   ├── pdf/                # PDF 导出任务
+│   │   └── ai/                 # 多厂商 AI 路由、点评、优化与写作
 │   └── src/main/resources/db/migration/
-│       └── V1__init.sql        # Flyway 初始迁移脚本
+│       ├── V1__init.sql        # Flyway 初始迁移脚本
+│       ├── V8__resume_share.sql # 分享功能迁移
+│       └── V9__resume_render_settings.sql # 排版与一页适配设置迁移
 ├── frontend/                   # Vue 3 前端
 │   ├── src/api/                # 按模块封装的 Axios 接口
 │   ├── src/components/         # 公共组件、编辑器组件、预览组件
@@ -89,7 +94,7 @@ ResumeGeneeration/
 
 - 使用 JWT access token，前端通过 `Authorization: Bearer <token>` 传递。
 - Token 由 `/auth/login`、`/auth/register`、`/auth/guest` 返回。
-- `/auth/**`、`/actuator/health`、`GET /templates`、`GET /templates/{id}` 可匿名访问，其余接口需认证。
+- `/auth/**`、`/actuator/health`、`GET /templates`、`GET /templates/{id}`、`GET /share/{token}` 可匿名访问，其余接口需认证；`/admin/**` 需要管理员角色。
 
 ### 4.3 逻辑删除
 
@@ -110,7 +115,7 @@ ResumeGeneeration/
 ### 4.6 测试
 
 - 后端新增功能必须先写测试（TDD）。
-- 单元测试使用 H2 内存数据库；集成测试可使用 Testcontainers MySQL。
+- 单元测试使用 H2 内存数据库；集成测试使用 `ops/docker-compose.test.yml` 提供的 MySQL/MinIO。
 - 前端新增组件/页面需补充 Vitest 单元/组件测试。
 
 ---
@@ -119,7 +124,7 @@ ResumeGeneeration/
 
 ```
 common
-├── 被 user、resume、template、avatar、pdf 依赖
+├── 被 user、resume、template、avatar、pdf、ai 依赖
 ├── 提供：R、异常、JWT 过滤器、SecurityConfig、MinIO 服务、全局异常处理
 
 user
@@ -127,9 +132,9 @@ user
 ├── 提供：User 实体、JWT Token 生成、当前用户上下文
 
 resume
-├── 依赖：common、user
-├── 被 pdf、avatar（可选回填）、review 依赖
-├── 提供：Resume 实体、简历 CRUD、Section 校验、AI 点评入口
+├── 依赖：common、user、template
+├── 被 pdf、avatar、ai 依赖；内部包含 share 子包
+├── 提供：Resume 实体、简历 CRUD、Section 校验、预览、分享和多格式导出
 
 template
 ├── 依赖：common
@@ -143,6 +148,10 @@ avatar
 pdf
 ├── 依赖：common、user、resume、template
 ├── 提供：PDF 导出任务、下载
+
+ai
+├── 依赖：common、resume
+├── 提供：多厂商 LLM 路由、AI 点评、JD 优化、头像优化和行内写作
 ```
 
 **依赖原则**：
@@ -155,12 +164,13 @@ pdf
 
 ## 6. 开发流程
 
-1. **读文档**：先读本文件 + 目标模块 `AGENTS.md` + 相关 `docs/superpowers/specs/*.md`。
+1. **读文档**：先读本文件 + 目标模块 `CLAUDE.md`（如存在）+ 相关 `docs/superpowers/specs/*.md`。
 2. **读代码**：了解目标模块现有 Controller / Service / Mapper / DTO / Entity 骨架。
 3. **写测试**：按 `docs/superpowers/specs/2026-07-03-tdd-test-plan.md` 补充测试用例。
 4. **实现功能**：遵循模块约束与全局约定。
 5. **运行测试**：
-   - 后端：`mvn test`
+   - 后端：使用 JDK 17 执行 `mvn test`
+   - 后端集成测试：设置 `RUN_INTEGRATION_TESTS=true`，并先启动 `ops/docker-compose.test.yml`
    - 前端：`npm run test:unit`
 6. **更新追溯矩阵**：如修改 `docs/traceability-matrix.md` 中对应行的代码位置。
 
@@ -215,8 +225,8 @@ npm run build                   # 生产构建
 
 ---
 
-## 10. 与本模块相关的其他 AGENTS.md
+## 10. 相关工程约束文件
 
-- `backend/AGENTS.md`
-- `frontend/AGENTS.md`
-- `backend/src/main/java/com/resume/{module}/AGENTS.md`（按你工作的模块选择）
+- `backend/CLAUDE.md`
+- `frontend/CLAUDE.md`
+- `backend/src/main/java/com/resume/{module}/CLAUDE.md`（按你工作的模块选择）

@@ -2,7 +2,7 @@
 
 > 作用：为后端开发 Agent 提供全局后端上下文、模块地图、接口约定与开发红线。
 > 范围：`backend/` 目录下所有代码。
-> 必读：根目录 `../CLAUDE.md` + 本文件 + 你目标子模块的 `CLAUDE.md`。
+> 必读：根目录 `../AGENTS.md` + 本文件 + 你目标子模块的 `CLAUDE.md`。
 
 ---
 
@@ -12,10 +12,11 @@
 
 - `common`：全局基础设施
 - `user`：用户与认证
-- `resume`：简历核心（CRUD、AI 点评、预览）
+- `resume`：简历核心（CRUD、预览、富文本内容、分享、Word/Markdown 导出）
 - `template`：模板查询与后台管理
 - `avatar`：头像上传与一寸照优化任务
 - `pdf`：PDF 导出任务
+- `ai`：多厂商 AI 路由、点评、JD 优化、头像优化与行内写作
 
 ---
 
@@ -86,7 +87,7 @@ com.resume.{module}/
 
 - Token 通过 `Authorization: Bearer {accessToken}` 传递。
 - 当前用户 ID 通过 `@AuthenticationPrincipal String userId` 注入。
-- 白名单（permitAll）：`/auth/**`、`/templates`、`/templates/**`、`/actuator/health`。
+- 白名单（permitAll）：`/auth/**`、`/templates`、`/templates/**`、`/share/**`、`/actuator/health`。
 - 其余接口需认证。
 
 ### 4.5 分页
@@ -108,9 +109,10 @@ com.resume.{module}/
 common
   ├── user
   ├── template
-  ├── resume ── template (校验/预览)
+  ├── resume ── template (校验/预览，内部包含分享与多格式导出)
   ├── avatar ── resume (可选回填)
-  └── pdf ───── resume, template
+  ├── pdf ───── resume, template
+  └── ai ────── resume
 ```
 
 **规则**：
@@ -120,6 +122,7 @@ common
 - `resume` 可依赖 `template`（查模板是否存在）。
 - `pdf` 可依赖 `resume`、`template`（读简历和模板数据）。
 - `avatar` 可依赖 `resume`（将优化结果回填到简历 profile.avatarUrl）。
+- `ai` 可依赖 `resume`（读取简历内容并回写 AI 任务结果）。
 - 禁止循环依赖。
 
 ---
@@ -129,7 +132,7 @@ common
 ### 6.1 数据库
 
 - 开发环境 MySQL：`resume_generation`
-- 迁移脚本：`backend/src/main/resources/db/migration/V1__init.sql`
+- 迁移脚本：`backend/src/main/resources/db/migration/V1__init.sql` 至 `V9__resume_render_settings.sql`
 - 列名使用下划线，Java 实体使用驼峰（MyBatis-Plus 自动映射）。
 - 主键策略：`assign_id`（Snowflake）。
 
@@ -174,8 +177,9 @@ common
 
 - 后端采用 TDD：新增功能前先补充测试。
 - 单元测试使用 H2：`backend/src/test/resources/application.yml`
-- 集成测试可用 Testcontainers MySQL。
-- 运行命令：`mvn clean test`
+- 集成测试使用 `ops/docker-compose.test.yml` 提供的 MySQL/MinIO。
+- 运行命令：使用 JDK 17 执行 `mvn clean test`。
+- 集成测试：先启动 `ops/docker-compose.test.yml`，设置 `RUN_INTEGRATION_TESTS=true` 后运行 `ResumeServiceIntegrationTest`。
 
 ---
 
@@ -189,6 +193,7 @@ common
 | template | `backend/src/main/java/com/resume/template/CLAUDE.md` |
 | avatar | `backend/src/main/java/com/resume/avatar/CLAUDE.md` |
 | pdf | `backend/src/main/java/com/resume/pdf/CLAUDE.md` |
+| ai | `backend/src/main/java/com/resume/ai/CLAUDE.md` |
 
 ---
 
