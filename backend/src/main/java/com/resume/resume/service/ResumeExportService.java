@@ -2,6 +2,8 @@ package com.resume.resume.service;
 
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
+import com.resume.common.service.RichTextSanitizer;
+import com.resume.resume.dto.RenderSettings;
 import com.resume.resume.dto.SectionDTO;
 import com.resume.resume.entity.Resume;
 import lombok.RequiredArgsConstructor;
@@ -107,8 +109,22 @@ public class ResumeExportService {
      * 注意：docx4j XHTMLImporter 按严格 XML（XHTML）解析，所有空标签必须自闭合。
      */
     private String renderWordHtml(Resume resume) {
+        RenderSettings settings = RenderSettings.sanitized(resume.getRenderSettings());
+        String fontFamily = settings.getFontFamily() != null
+                ? settings.getFontFamily() : RenderSettings.DEFAULT_FONT_FAMILY;
+        String fontSize = settings.getBaseFontSize() != null
+                ? cssNumber(settings.getBaseFontSize()) + "pt" : "10.5pt";
+        String lineHeight = settings.getLineHeight() != null
+                ? cssNumber(settings.getLineHeight()) : "1.5";
+        String accentColor = settings.getAccentColor() != null
+                ? settings.getAccentColor() : RenderSettings.DEFAULT_ACCENT_COLOR;
         StringBuilder sb = new StringBuilder();
-        sb.append("<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"/></head><body>\n");
+        sb.append("<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"/>")
+                .append("<style>body { font-family: ").append(fontFamily)
+                .append("; font-size: ").append(fontSize).append("; line-height: ")
+                .append(lineHeight).append("; } h2 { color: ").append(accentColor)
+                .append("; border-bottom: 1px solid ").append(accentColor)
+                .append("; }</style></head><body>\n");
         sb.append("<h1>").append(escapeHtml(profileValue(resume, "name"))).append("</h1>\n");
         String contact = buildContactLine(resume);
         if (StringUtils.isNotBlank(contact)) {
@@ -136,7 +152,11 @@ public class ResumeExportService {
             case "profile" -> appendProfileMarkdown(sb, toMap(data));
             case "introduction" -> {
                 Map<String, Object> intro = toMap(data);
-                sb.append(getString(intro, "content")).append("\n\n");
+                String richContent = getString(intro, "contentHtml");
+                sb.append(StringUtils.isNotBlank(richContent)
+                        ? RichTextSanitizer.toPlainText(richContent)
+                        : getString(intro, "content"))
+                  .append("\n\n");
             }
             case "education", "work", "project", "skill" -> {
                 if (data instanceof List<?> items) {
@@ -152,9 +172,9 @@ public class ResumeExportService {
                                 sb.append(" · ").append(sub);
                             }
                             sb.append("\n");
-                            appendListMarkdown(sb, map, "description");
-                            appendListMarkdown(sb, map, "achievements");
-                            appendListMarkdown(sb, map, "items");
+                             appendRichTextMarkdown(sb, map, "descriptionHtml", "description");
+                             appendRichTextMarkdown(sb, map, "achievementsHtml", "achievements");
+                             appendListMarkdown(sb, map, "items");
                         }
                     }
                 }
@@ -171,7 +191,12 @@ public class ResumeExportService {
             case "profile" -> { /* 已在头部输出 */ }
             case "introduction" -> {
                 Map<String, Object> intro = toMap(data);
-                sb.append("<p>").append(escapeHtml(getString(intro, "content"))).append("</p>\n");
+                String richContent = getString(intro, "contentHtml");
+                if (StringUtils.isNotBlank(richContent)) {
+                    sb.append(RichTextSanitizer.sanitize(richContent)).append("\n");
+                } else {
+                    sb.append("<p>").append(escapeHtml(getString(intro, "content"))).append("</p>\n");
+                }
             }
             case "education", "work", "project", "skill" -> {
                 if (data instanceof List<?> items) {
@@ -187,9 +212,9 @@ public class ResumeExportService {
                                 sb.append(" · ").append(escapeHtml(sub));
                             }
                             sb.append("</p>\n");
-                            appendListHtml(sb, map, "description");
-                            appendListHtml(sb, map, "achievements");
-                            appendListHtml(sb, map, "items");
+                             appendRichTextHtml(sb, map, "descriptionHtml", "description");
+                             appendRichTextHtml(sb, map, "achievementsHtml", "achievements");
+                             appendListHtml(sb, map, "items");
                         }
                     }
                 }
@@ -218,6 +243,21 @@ public class ResumeExportService {
         }
     }
 
+    private void appendRichTextMarkdown(StringBuilder sb, Map<String, Object> map,
+                                        String htmlKey, String plainKey) {
+        String richText = getString(map, htmlKey);
+        if (StringUtils.isNotBlank(richText)) {
+            String plainText = RichTextSanitizer.toPlainText(richText);
+            for (String line : plainText.split("\\R")) {
+                if (StringUtils.isNotBlank(line)) {
+                    sb.append("  - ").append(line.trim()).append("\n");
+                }
+            }
+            return;
+        }
+        appendListMarkdown(sb, map, plainKey);
+    }
+
     private void appendListHtml(StringBuilder sb, Map<String, Object> map, String key) {
         Object value = map.get(key);
         if (value instanceof List<?> list && !list.isEmpty()) {
@@ -231,6 +271,17 @@ public class ResumeExportService {
             }
             sb.append("</ul>\n");
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendRichTextHtml(StringBuilder sb, Map<String, Object> map,
+                                    String htmlKey, String plainKey) {
+        String richText = getString(map, htmlKey);
+        if (StringUtils.isNotBlank(richText)) {
+            sb.append(RichTextSanitizer.sanitize(richText)).append("\n");
+            return;
+        }
+        appendListHtml(sb, map, plainKey);
     }
 
     private String buildContactLine(Resume resume) {
@@ -291,6 +342,10 @@ public class ResumeExportService {
             }
         }
         return "";
+    }
+
+    private String cssNumber(Double value) {
+        return value % 1 == 0 ? String.valueOf(value.intValue()) : String.valueOf(value);
     }
 
     private String escapeHtml(String text) {

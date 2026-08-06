@@ -19,6 +19,7 @@ public class ResumeDetailResponse {
     private String targetIndustry;
     private String templateId;
     private List<SectionDTO> sections;
+    private RenderSettings renderSettings;
     private Integer exportCount;
     private LocalDateTime lastEditedAt;
     private LocalDateTime createdAt;

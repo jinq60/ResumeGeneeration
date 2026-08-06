@@ -1,5 +1,8 @@
 <template>
-  <aside class="app-sidebar">
+  <aside
+    class="app-sidebar"
+    :class="{ 'is-mobile-open': props.mobileOpen }"
+  >
     <div class="sidebar-brand">
       <div class="sidebar-brand-mark">
         <el-icon
@@ -12,7 +15,10 @@
       <span class="sidebar-brand-name">智能简历</span>
     </div>
 
-    <nav class="sidebar-nav">
+    <nav
+      class="sidebar-nav"
+      @click="emit('closeMobile')"
+    >
       <RouterLink
         v-for="item in navItems"
         :key="item.path"
@@ -99,6 +105,11 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
+const props = withDefaults(defineProps<{ mobileOpen?: boolean }>(), {
+  mobileOpen: false
+})
+const emit = defineEmits<{ closeMobile: [] }>()
+
 interface NavItem { path: string; label: string; icon: any; badge?: string }
 
 const navItems: NavItem[] = [
@@ -155,6 +166,7 @@ async function handleLogout() {
   flex-direction: column;
   z-index: 40;
   border-right: 1px solid var(--st-outline-variant);
+  transition: transform 180ms ease;
 }
 
 .sidebar-brand {
@@ -291,6 +303,18 @@ async function handleLogout() {
   &:hover {
     color: var(--st-error);
     background: var(--st-error-container);
+  }
+}
+
+@media (max-width: 768px) {
+  .app-sidebar {
+    width: min(82vw, 280px);
+    transform: translateX(-100%);
+    box-shadow: var(--st-shadow-lg);
+
+    &.is-mobile-open {
+      transform: translateX(0);
+    }
   }
 }
 </style>

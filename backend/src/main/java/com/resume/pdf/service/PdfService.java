@@ -259,6 +259,7 @@ public class PdfService {
                  Page page = context.newPage()) {
                 page.navigate(htmlPath.toUri().toString(),
                         new Page.NavigateOptions().setTimeout(60_000));
+                applyOnePageFit(page);
                 page.pdf(new Page.PdfOptions().setPath(pdfPath)
                         .setFormat("A4")
                         .setPrintBackground(true));
@@ -299,6 +300,25 @@ public class PdfService {
                 }
             }
         }
+    }
+
+    /**
+     * 将开启一页适配的简历内容按 A4 高度缩放，避免 PDF 产生第二页。
+     * 页面默认不缩放，只有渲染 HTML 标记了 data-auto-one-page=true 时才执行。
+     */
+    private void applyOnePageFit(Page page) {
+        page.evaluate("() => {"
+                + "const resumePage = document.querySelector('.resume-page[data-auto-one-page=\\\"true\\\"]');"
+                + "if (!resumePage) return;"
+                + "resumePage.style.setProperty('--resume-fit-scale', '1');"
+                + "const originalMinHeight = resumePage.style.minHeight;"
+                + "resumePage.style.minHeight = '0';"
+                + "const contentHeight = resumePage.scrollHeight;"
+                + "resumePage.style.minHeight = originalMinHeight;"
+                + "const a4Height = 297 * 96 / 25.4;"
+                + "const scale = Math.min(1, a4Height / Math.max(contentHeight, 1));"
+                + "resumePage.style.setProperty('--resume-fit-scale', String(scale));"
+                + "}");
     }
 
     private void updateTaskStatus(String taskId, String status, String errorMsg) {

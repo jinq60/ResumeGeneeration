@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import com.resume.resume.dto.SectionDTO;
+import com.resume.resume.dto.RenderSettings;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,6 +32,9 @@ public class Resume {
 
     @TableField(typeHandler = com.resume.resume.handler.SectionListTypeHandler.class)
     private List<SectionDTO> sections;
+
+    @TableField(typeHandler = com.resume.resume.handler.RenderSettingsTypeHandler.class)
+    private RenderSettings renderSettings;
 
     private String status;
     private Integer exportCount;

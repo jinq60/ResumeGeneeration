@@ -19,9 +19,10 @@ const router = createRouter({
 })
 
 const publicRouteNames = ['Login', 'AdminLogin', 'Share', 'Home', 'Features', 'TemplatesShowcase', 'Pricing', 'About', 'Contact', 'HelpDocs']
+const appTitle = import.meta.env.VITE_APP_TITLE || '智能简历生成工具'
 
 router.beforeEach((to, _from, next) => {
-  document.title = to.meta.title ? `${to.meta.title} - 智能简历` : '智能简历'
+  document.title = to.meta.title ? `${to.meta.title} - ${appTitle}` : appTitle
 
   // Admin routes use separate token
   if (to.path.startsWith('/admin')) {

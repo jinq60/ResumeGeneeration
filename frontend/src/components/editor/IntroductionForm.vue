@@ -70,16 +70,13 @@
               section-type="introduction"
               field="content"
               :get-original-text="() => formData.content"
-              @apply="(content: string) => { formData.content = content }"
+              @apply="applyAiContent"
             />
           </div>
-          <el-input
-            v-model="formData.content"
-            type="textarea"
-            :rows="8"
+          <RichTextEditor
+            :model-value="formData.contentHtml"
             placeholder="请输入自我介绍内容"
-            show-word-limit
-            :maxlength="formData.maxWords || 500"
+            @update:model-value="handleRichTextChange"
           />
         </div>
       </el-form-item>
@@ -125,6 +122,8 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSectionSync } from '@/composables/useSectionSync'
 import AiWriterButton from './AiWriterButton.vue'
+import RichTextEditor from './RichTextEditor.vue'
+import { plainTextToRichHtml, richTextToPlainText } from '@/utils/richText'
 
 interface Props {
   sections: any[]
@@ -136,12 +135,14 @@ const emit = defineEmits(['update'])
 
 const formData = ref<{
   content: string
+  contentHtml: string
   keywords: string[]
   keywordsText: string
   style: string
   maxWords: number
 }>({
   content: '',
+  contentHtml: '',
   keywords: [],
   keywordsText: '',
   style: 'concise_formal',
@@ -183,6 +184,7 @@ function extractIntroduction() {
     const introductionSection = props.sections.find((s: any) => s.type === 'introduction')
     if (introductionSection && introductionSection.data) {
       formData.value.content = introductionSection.data.content || ''
+      formData.value.contentHtml = introductionSection.data.contentHtml || plainTextToRichHtml(formData.value.content)
       formData.value.style = introductionSection.data.style || 'concise_formal'
       formData.value.maxWords = introductionSection.data.maxWords || 300
       formData.value.keywords = introductionSection.data.keywords || []
@@ -191,11 +193,22 @@ function extractIntroduction() {
   }
 }
 
+function handleRichTextChange(html: string) {
+  formData.value.contentHtml = html
+  formData.value.content = richTextToPlainText(html)
+}
+
+function applyAiContent(content: string) {
+  formData.value.content = content
+  formData.value.contentHtml = plainTextToRichHtml(content)
+}
+
 function applyTemplate() {
   const template = templates[selectedTemplate.value as keyof typeof templates]
   if (template) {
     formData.value.style = template.style
     formData.value.content = template.content
+    formData.value.contentHtml = plainTextToRichHtml(template.content)
     formData.value.keywords = template.keywords
     formData.value.keywordsText = template.keywords.join(', ')
     ElMessage.success('模板应用成功')
@@ -213,6 +226,7 @@ useSectionSync(
   () => {
     const introductionData = {
       content: formData.value.content,
+      contentHtml: formData.value.contentHtml,
       keywords: formData.value.keywordsText ? formData.value.keywordsText.split(',').map(k => k.trim()).filter(k => k) : [],
       style: formData.value.style,
       maxWords: formData.value.maxWords

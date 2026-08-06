@@ -29,4 +29,7 @@ public class UpdateResumeRequest {
 
     @Valid
     private List<SectionDTO> sections;
+
+    @Valid
+    private RenderSettings renderSettings;
 }

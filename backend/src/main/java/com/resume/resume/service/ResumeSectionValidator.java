@@ -4,6 +4,7 @@ import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.enums.SectionType;
 import com.resume.common.exception.BusinessException;
+import com.resume.common.service.RichTextSanitizer;
 import com.resume.resume.dto.SectionDTO;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -197,8 +198,10 @@ public class ResumeSectionValidator {
             validateEnumIfPresent(item, "type", Arrays.asList(BizConstant.WORK_TYPES), "工作类型不正确。");
             validateStringIfPresent(item, "city", 50, "工作城市过长。", false, 0, null);
             validateDateRange(item, "入职时间格式不正确。", "离职时间格式不正确。");
-            validateStringList(item, "description", 1, 8, 200, strict, "工作内容至少需要 1 条。", "工作内容描述过长。");
+            validateRichTextList(item, "description", "descriptionHtml", 1, 8, 200, 1600, strict,
+                    "工作内容至少需要 1 条。", "工作内容描述过长。", "工作内容富文本过长。");
             validateStringArray(item, "achievements", 200, "工作成果描述过长。");
+            validateRichTextIfPresent(item, "achievementsHtml", 1600, "工作成果富文本过长。");
             validateStringArray(item, "techStack", 32, "技术栈标签过长。");
             validateStringIfPresent(item, "leaveReason", 200, "离职原因描述过长。", false, 0, null);
         }
@@ -223,7 +226,9 @@ public class ResumeSectionValidator {
             validateStringIfPresent(item, "background", 500, "项目背景描述过长。", false, 0, null);
             validateStringIfPresent(item, "responsibility", 500, "个人职责描述过长。", false, 0, null);
             validateStringArray(item, "achievements", 200, "项目成果描述过长。");
-            validateStringList(item, "description", 1, 8, 200, strict, "项目描述至少需要 1 条。", "项目描述过长。");
+            validateRichTextIfPresent(item, "achievementsHtml", 1600, "项目成果富文本过长。");
+            validateRichTextList(item, "description", "descriptionHtml", 1, 8, 200, 1600, strict,
+                    "项目描述至少需要 1 条。", "项目描述过长。", "项目描述富文本过长。");
             validateUrlIfPresent(item, "link");
             validateUrlIfPresent(item, "github");
         }
@@ -276,7 +281,13 @@ public class ResumeSectionValidator {
             throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "自我介绍模块数据格式不正确。");
         }
         Map<String, Object> item = (Map<String, Object>) data;
-        validateStringIfPresent(item, "content", 500, "自我介绍过长。", strict, ResultCode.RESUME_SECTION_INVALID, "自我介绍为必填项。");
+        String richText = getString(item, "contentHtml");
+        boolean hasRichText = StringUtils.isNotBlank(RichTextSanitizer.toPlainText(richText));
+        validateStringIfPresent(item, "content", 500, "自我介绍过长。", false, 0, null);
+        if (strict && StringUtils.isBlank(getString(item, "content")) && !hasRichText) {
+            throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "自我介绍为必填项。");
+        }
+        validateRichTextIfPresent(item, "contentHtml", 500, "自我介绍富文本过长。");
         validateStringArray(item, "keywords", 20, "关键词过长。");
         validateEnumIfPresent(item, "style", Arrays.asList(BizConstant.INTRODUCTION_STYLES), "自我介绍风格不正确。");
 
@@ -388,6 +399,33 @@ public class ResumeSectionValidator {
                 throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, tooLongMessage);
             }
         }
+    }
+
+    private void validateRichTextIfPresent(Map<String, Object> item, String key, int maxTextLength,
+                                           String tooLongMessage) {
+        Object value = item.get(key);
+        if (value == null) {
+            return;
+        }
+        if (!(value instanceof String html)) {
+            throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, key + " 格式不正确。");
+        }
+        if (RichTextSanitizer.toPlainText(html).length() > maxTextLength) {
+            throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, tooLongMessage);
+        }
+    }
+
+    private void validateRichTextList(Map<String, Object> item, String listKey, String htmlKey,
+                                      int minSize, int maxSize, int itemMaxLength, int richTextMaxLength,
+                                      boolean required, String requiredMessage, String listTooLongMessage,
+                                      String richTextTooLongMessage) {
+        String richText = getString(item, htmlKey);
+        if (StringUtils.isNotBlank(RichTextSanitizer.toPlainText(richText))) {
+            validateRichTextIfPresent(item, htmlKey, richTextMaxLength, richTextTooLongMessage);
+            return;
+        }
+        validateStringList(item, listKey, minSize, maxSize, itemMaxLength,
+                required, requiredMessage, listTooLongMessage);
     }
 
     @SuppressWarnings("unchecked")

@@ -105,6 +105,32 @@ class ResumeSectionValidatorTest {
     }
 
     @Test
+    void draft_shouldRejectOverlongRichText() {
+        Map<String, Object> intro = new HashMap<>();
+        intro.put("content", "简短文本");
+        intro.put("contentHtml", "<p>" + "x".repeat(501) + "</p>");
+        SectionDTO section = createSection("introduction", "自我介绍", 0, intro);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> validator.validateDraft(List.of(section)));
+        assertEquals(ResultCode.RESUME_SECTION_INVALID, ex.getErrorCode());
+    }
+
+    @Test
+    void export_shouldAcceptRichTextWithoutLegacyPlainTextField() {
+        Map<String, Object> intro = new HashMap<>();
+        intro.put("contentHtml", "<p>富文本自我介绍</p>");
+        SectionDTO section = createSection("introduction", "自我介绍", 0, intro);
+
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("name", "张三");
+        profile.put("email", "zhangsan@example.com");
+        SectionDTO profileSection = createSection("profile", "个人信息", 1, profile);
+
+        assertDoesNotThrow(() -> validator.validateForExport(List.of(profileSection, section)));
+    }
+
+    @Test
     void draft_shouldRejectInvalidSectionType() {
         SectionDTO section = createSection("unknown", "未知", 0, new HashMap<String, Object>());
 

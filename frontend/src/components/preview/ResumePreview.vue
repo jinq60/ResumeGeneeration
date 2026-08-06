@@ -49,14 +49,18 @@
 import { ref, watch } from 'vue'
 import { Loading, Warning } from '@element-plus/icons-vue'
 import { fetchResumePreview, fetchLivePreview } from '@/api/preview'
+import type { Resume } from '@/types/resume'
 
 interface Props {
   resumeId?: string
-  resume?: any
+  resume?: Resume
   templateId?: string
 }
 
 const props = defineProps<Props>()
+const emit = defineEmits<{
+  loaded: [contentHeight: number]
+}>()
 
 const html = ref('')
 const iframeRef = ref<HTMLIFrameElement>()
@@ -100,7 +104,40 @@ function scheduleLoadPreview() {
 }
 
 function handleIframeLoad() {
-  // iframe加载完成后的处理
+  const document = iframeRef.value?.contentDocument
+  const fittedHeight = applyOnePageFit(document)
+  if (fittedHeight !== null) {
+    emit('loaded', fittedHeight)
+    return
+  }
+  const contentHeight = Math.max(
+    document?.documentElement?.scrollHeight || 0,
+    document?.body?.scrollHeight || 0
+  )
+  emit('loaded', contentHeight)
+}
+
+function applyOnePageFit(document: Document | null | undefined): number | null {
+  if (!document || typeof document.querySelector !== 'function') {
+    return null
+  }
+  const page = document.querySelector<HTMLElement>('.resume-page[data-auto-one-page="true"]')
+  if (!page || !page.style) {
+    return null
+  }
+
+  page.style.setProperty('--resume-fit-scale', '1')
+  const originalMinHeight = page.style.minHeight
+  page.style.minHeight = '0'
+  const contentHeight = page.scrollHeight
+  page.style.minHeight = originalMinHeight
+
+  const a4Height = 297 * 96 / 25.4
+  const scale = Math.min(1, a4Height / Math.max(contentHeight, 1))
+  page.style.setProperty('--resume-fit-scale', String(scale))
+
+  const measuredHeight = page.getBoundingClientRect().height
+  return Math.max(measuredHeight, contentHeight * scale)
 }
 
 // 深监听 resume 内容（编辑器原地修改 sections 时也能触发），避免引用陷阱

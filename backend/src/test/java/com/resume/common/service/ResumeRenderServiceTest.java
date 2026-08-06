@@ -1,6 +1,7 @@
 package com.resume.common.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.resume.resume.dto.RenderSettings;
 import com.resume.resume.dto.SectionDTO;
 import com.resume.resume.entity.Resume;
 import com.resume.template.entity.Template;
@@ -152,5 +153,90 @@ class ResumeRenderServiceTest {
         String html = renderService.render(resume, template);
 
         assertTrue(html.contains("src=\"/uploads/avatars/user_1/avatars/b.png\""));
+    }
+
+    @Test
+    void render_shouldSanitizeAndRenderRichTextFields() {
+        Resume resume = new Resume();
+
+        Map<String, Object> introData = new HashMap<>();
+        introData.put("content", "纯文本回退");
+        introData.put("contentHtml", "<p><strong>专业介绍</strong></p><script>alert(1)</script>");
+        SectionDTO intro = new SectionDTO();
+        intro.setId("sec_intro");
+        intro.setType("introduction");
+        intro.setTitle("自我介绍");
+        intro.setOrder(0);
+        intro.setVisible(true);
+        intro.setData(introData);
+        resume.setSections(List.of(intro));
+
+        Template template = new Template();
+        template.setHtmlTemplate(null);
+        template.setConfig("{}");
+
+        String html = renderService.render(resume, template);
+
+        assertTrue(html.contains("<strong>专业介绍</strong>"));
+        assertFalse(html.contains("<script"));
+        assertFalse(html.contains("alert(1)"));
+    }
+
+    @Test
+    void render_shouldApplyResumeRenderSettingsAndOnePageMarker() {
+        Resume resume = new Resume();
+        resume.setRenderSettings(new RenderSettings()
+                .setAutoOnePage(true)
+                .setFontFamily("Arial, sans-serif")
+                .setBaseFontSize(9.5)
+                .setLineHeight(1.25)
+                .setPagePadding(12.0)
+                .setSectionSpacing(8.0)
+                .setAccentColor("#d14a3a"));
+
+        SectionDTO intro = new SectionDTO();
+        intro.setId("sec_intro");
+        intro.setType("introduction");
+        intro.setTitle("自我介绍");
+        intro.setOrder(0);
+        intro.setVisible(true);
+        intro.setData(Map.of("content", "内容"));
+        resume.setSections(List.of(intro));
+
+        Template template = new Template();
+        template.setHtmlTemplate(null);
+        template.setConfig("{}");
+
+        String html = renderService.render(resume, template);
+
+        assertAll(
+                () -> assertTrue(html.contains("data-auto-one-page=\"true\"")),
+                () -> assertTrue(html.contains("font-family: Arial, sans-serif")),
+                () -> assertTrue(html.contains("font-size: 9.5pt")),
+                () -> assertTrue(html.contains("line-height: 1.25")),
+                () -> assertTrue(html.contains("padding: 12mm")),
+                () -> assertTrue(html.contains("margin-bottom: 8px")),
+                () -> assertTrue(html.contains("#d14a3a")),
+                () -> assertTrue(html.contains("--resume-fit-scale"))
+        );
+    }
+
+    @Test
+    void render_shouldIgnoreUnsafeRenderSettings() {
+        Resume resume = new Resume();
+        resume.setRenderSettings(new RenderSettings()
+                .setFontFamily("Arial; color: red")
+                .setAccentColor("red; background: url(javascript:alert(1))"));
+        resume.setSections(List.of());
+
+        Template template = new Template();
+        template.setHtmlTemplate(null);
+        template.setConfig("{}");
+
+        String html = renderService.render(resume, template);
+
+        assertFalse(html.contains("javascript:"));
+        assertFalse(html.contains("Arial; color: red"));
+        assertTrue(html.contains("\"Noto Sans SC\""));
     }
 }

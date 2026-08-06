@@ -3,6 +3,7 @@ package com.resume.resume.service;
 import com.resume.avatar.service.AvatarService;
 import com.resume.pdf.service.PdfService;
 import com.resume.resume.dto.DuplicateResumeResponse;
+import com.resume.resume.dto.RenderSettings;
 import com.resume.resume.dto.SectionDTO;
 import com.resume.resume.dto.UpdateResumeRequest;
 import com.resume.resume.entity.Resume;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -123,6 +125,34 @@ class ResumeServiceTest {
 
         assertDoesNotThrow(() -> resumeService.updateResume(userId, resumeId, request));
         verify(resumeMapper).updateById(any(Resume.class));
+    }
+
+    @Test
+    void updateResume_shouldPersistRenderSettings() {
+        String resumeId = "resume_1";
+        String userId = "user_1";
+
+        Resume existing = new Resume();
+        existing.setId(resumeId);
+        existing.setUserId(userId);
+        existing.setTitle("我的简历");
+        existing.setTemplateId("template_1");
+        existing.setSections(List.of());
+        when(resumeMapper.selectById(resumeId)).thenReturn(existing);
+
+        UpdateResumeRequest request = new UpdateResumeRequest();
+        request.setRenderSettings(new RenderSettings()
+                .setAutoOnePage(true)
+                .setBaseFontSize(9.5)
+                .setAccentColor("#2f6fed"));
+
+        resumeService.updateResume(userId, resumeId, request);
+
+        ArgumentCaptor<Resume> captor = ArgumentCaptor.forClass(Resume.class);
+        verify(resumeMapper).updateById(captor.capture());
+        assertEquals(true, captor.getValue().getRenderSettings().getAutoOnePage());
+        assertEquals(9.5, captor.getValue().getRenderSettings().getBaseFontSize());
+        assertEquals("#2f6fed", captor.getValue().getRenderSettings().getAccentColor());
     }
 
     @Test

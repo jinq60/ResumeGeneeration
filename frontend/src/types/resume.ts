@@ -1,3 +1,5 @@
+import type { RenderSettings } from '@/utils/renderSettings'
+
 export type SectionType = 'profile' | 'education' | 'work' | 'project' | 'skill' | 'introduction' | 'custom'
 
 export type Scene = 'campus_recruitment' | 'internship' | 'social_recruitment' | 'postgraduate_reexam' | 'project_application' | 'custom'
@@ -35,6 +37,7 @@ export interface EducationItem {
 export interface WorkItem {
   company: string; position: string; department?: string; type?: string; city?: string
   startDate: string; endDate?: string; description: string[]; achievements?: string[]
+  descriptionHtml?: string; achievementsHtml?: string
   techStack?: string[]; leaveReason?: string; showLeaveReason?: boolean
   techStackText?: string
 }
@@ -43,6 +46,7 @@ export interface ProjectItem {
   name: string; role?: string; type?: string; startDate?: string; endDate?: string
   techStack?: string[]; background?: string; responsibility?: string
   achievements?: string[]; description: string[]; link?: string; github?: string
+  descriptionHtml?: string; achievementsHtml?: string
   techStackText?: string; descriptionText?: string; achievementsText?: string
 }
 
@@ -56,14 +60,15 @@ export type EducationSection = BaseSection<'education', EducationItem[]>
 export type WorkSection = BaseSection<'work', WorkItem[]>
 export type ProjectSection = BaseSection<'project', ProjectItem[]>
 export type SkillSection = BaseSection<'skill', SkillItem[]>
-export type IntroductionSection = BaseSection<'introduction', { content: string; keywords?: string[]; style?: string; maxWords?: number }>
+export type IntroductionSection = BaseSection<'introduction', { content: string; contentHtml?: string; keywords?: string[]; style?: string; maxWords?: number }>
 export type CustomSection = BaseSection<'custom', { content: string }>
 
 export type Section = ProfileSection | EducationSection | WorkSection | ProjectSection | SkillSection | IntroductionSection | CustomSection
 
 export interface Resume {
   id: string; userId: string; title: string; scene: string; targetPosition?: string
-  templateId: string; sections: Section[]; createdAt: string; updatedAt: string
+  templateId: string; sections: Section[]; renderSettings?: RenderSettings | null
+  createdAt: string; updatedAt: string
   exportCount?: number; lastEditedAt?: string
 }
 

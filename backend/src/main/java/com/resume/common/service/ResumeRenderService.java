@@ -3,6 +3,7 @@ package com.resume.common.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.common.constant.BizConstant;
+import com.resume.resume.dto.RenderSettings;
 import com.resume.resume.dto.SectionDTO;
 import com.resume.resume.entity.Resume;
 import com.resume.template.entity.Template;
@@ -78,17 +79,19 @@ public class ResumeRenderService {
     public String render(Resume resume, Template template) {
         List<SectionDTO> sections = resume.getSections() != null ? resume.getSections() : List.of();
         Map<String, Object> config = parseConfig(template.getConfig());
-        String css = buildCss(config);
+        RenderSettings settings = RenderSettings.sanitized(resume.getRenderSettings());
+        String css = buildCss(config, settings);
         String body = renderBody(sections);
 
         // 优先加载 template.htmlTemplate 指定的 HTML 骨架文件，支持后台新增模板。
         String skeleton = loadTemplateSkeleton(template.getHtmlTemplate());
         if (skeleton != null) {
             String resumeTitle = StringUtils.defaultString(resume.getTitle(), "");
-            return skeleton
+            String rendered = skeleton
                     .replace(PLACEHOLDER_RESUME_TITLE, escapeHtml(resumeTitle))
                     .replace(PLACEHOLDER_CSS, css)
                     .replace(PLACEHOLDER_BODY, body);
+            return decoratePage(rendered, settings);
         }
 
         // 回退：内置单栏默认模板，保证旧有内置模板仍可渲染。
@@ -102,7 +105,9 @@ public class ResumeRenderService {
             .append("  </style>\n")
             .append("</head>\n")
             .append("<body>\n")
-            .append("  <div class=\"resume-page\">\n")
+            .append("  <div class=\"resume-page\" data-auto-one-page=\"")
+            .append(Boolean.TRUE.equals(settings.getAutoOnePage()))
+            .append("\">\n")
             .append(body)
             .append("  </div>\n")
             .append("</body>\n")
@@ -152,25 +157,55 @@ public class ResumeRenderService {
         }
     }
 
-    private String buildCss(Map<String, Object> config) {
+    private String buildCss(Map<String, Object> config, RenderSettings settings) {
         Map<String, Object> page = getMap(config, "page");
         Map<String, Object> font = getMap(config, "font");
         Map<String, Object> color = getMap(config, "color");
 
+        String pageWidth = getString(page, "width", "210mm");
+        String pageHeight = getString(page, "height", "297mm");
+        String pageMargin = settings.getPagePadding() != null
+                ? cssNumber(settings.getPagePadding()) + "mm"
+                : getString(page, "margin", "20mm");
+        String fontFamily = settings.getFontFamily() != null
+                ? settings.getFontFamily()
+                : getString(font, "family", RenderSettings.DEFAULT_FONT_FAMILY);
+        String mainFontSize = settings.getBaseFontSize() != null
+                ? cssNumber(settings.getBaseFontSize()) + "pt"
+                : getString(font, "mainSize", "10.5pt");
+        String lineHeight = settings.getLineHeight() != null
+                ? cssNumber(settings.getLineHeight())
+                : getString(font, "lineHeight", "1.5");
+        String accentColor = settings.getAccentColor() != null
+                ? settings.getAccentColor()
+                : getString(color, "accent", "#1a5276");
+        String sectionSpacing = settings.getSectionSpacing() != null
+                ? cssNumber(settings.getSectionSpacing()) + "px"
+                : getString(config, "moduleSpacing", "16px");
+
         StringBuilder css = new StringBuilder();
         css.append("    * { box-sizing: border-box; margin: 0; padding: 0; }\n")
-           .append("    body { font-family: ").append(getString(font, "family", "\"Noto Sans SC\", \"Microsoft YaHei\", sans-serif")).append("; }\n")
-           .append("    .resume-page { width: ").append(getString(page, "width", "210mm")).append(";\n")
-           .append("      min-height: ").append(getString(page, "height", "297mm")).append(";\n")
-           .append("      padding: ").append(getString(page, "margin", "20mm")).append(";\n")
+           .append("    @page { size: A4; margin: 0; }\n")
+           .append("    html, body { margin: 0; padding: 0; }\n")
+           .append("    body { font-family: ").append(fontFamily).append("; line-height: ").append(lineHeight).append("; }\n")
+           .append("    .resume-page { width: ").append(pageWidth).append(";\n")
+           .append("      min-height: ").append(pageHeight).append(";\n")
+           .append("      padding: ").append(pageMargin).append(";\n")
            .append("      margin: 0 auto;\n")
            .append("      background: ").append(getString(color, "background", "#ffffff")).append(";\n")
            .append("      color: ").append(getString(color, "primary", "#333333")).append(";\n")
-           .append("      font-size: ").append(getString(font, "mainSize", "10.5pt")).append("; }\n")
-           .append("    .section { margin-bottom: 16px; }\n")
+           .append("      font-size: ").append(mainFontSize).append("; }\n")
+           .append("    .resume-page[data-auto-one-page=\"true\"] {\n")
+           .append("      --resume-fit-scale: 1;\n")
+           .append("      width: calc(").append(pageWidth).append(" / var(--resume-fit-scale));\n")
+           .append("      min-height: calc(").append(pageHeight).append(" / var(--resume-fit-scale));\n")
+           .append("      transform: scale(var(--resume-fit-scale));\n")
+           .append("      transform-origin: top left;\n")
+           .append("    }\n")
+           .append("    .section { margin-bottom: ").append(sectionSpacing).append("; }\n")
            .append("    .section-title { font-size: 14pt; font-weight: bold;\n")
-           .append("      color: ").append(getString(color, "accent", "#1a5276")).append(";\n")
-           .append("      border-bottom: 1px solid ").append(getString(color, "accent", "#1a5276")).append(";\n")
+           .append("      color: ").append(accentColor).append(";\n")
+           .append("      border-bottom: 1px solid ").append(accentColor).append(";\n")
            .append("      padding-bottom: 4px; margin-bottom: 8px; }\n")
            .append("    .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }\n")
            .append("    .profile-avatar { width: 25mm; height: 25mm; object-fit: cover; border-radius: 4px; flex-shrink: 0; }\n")
@@ -180,11 +215,65 @@ public class ResumeRenderService {
            .append("    .item { margin-bottom: 12px; }\n")
            .append("    .item-header { display: flex; justify-content: space-between; font-weight: bold; }\n")
            .append("    .item-sub { color: ").append(getString(color, "secondary", "#666666")).append("; margin-bottom: 4px; }\n")
+           .append("    .rich-text p { margin: 0 0 6px; }\n")
+           .append("    .rich-text ul, .rich-text ol { padding-left: 20px; margin: 4px 0; }\n")
+           .append("    .rich-text a { color: ").append(accentColor).append("; }\n")
            .append("    ul { padding-left: 20px; }\n")
            .append("    li { margin-bottom: 2px; }\n")
            .append("    .skill-tag { display: inline-block; margin-right: 8px; margin-bottom: 4px;\n")
            .append("      padding: 2px 8px; background: #f0f0f0; border-radius: 4px; }\n");
         return css.toString();
+    }
+
+    /**
+     * 对模板骨架中可能存在的硬编码样式追加用户设置，并标记一页适配开关。
+     */
+    private String decoratePage(String html, RenderSettings settings) {
+        String decorated = html.replace(
+                "<div class=\"resume-page\">",
+                "<div class=\"resume-page\" data-auto-one-page=\""
+                        + Boolean.TRUE.equals(settings.getAutoOnePage()) + "\">");
+        StringBuilder override = new StringBuilder();
+        if (settings.getFontFamily() != null) {
+            override.append("body, .resume-page { font-family: ")
+                    .append(settings.getFontFamily()).append(" !important; }\n");
+        }
+        if (settings.getBaseFontSize() != null) {
+            override.append(".resume-page { font-size: ")
+                    .append(cssNumber(settings.getBaseFontSize())).append("pt !important; }\n");
+        }
+        if (settings.getLineHeight() != null) {
+            override.append("body, .resume-page { line-height: ")
+                    .append(cssNumber(settings.getLineHeight())).append(" !important; }\n");
+        }
+        if (settings.getPagePadding() != null) {
+            override.append(".resume-page { padding: ")
+                    .append(cssNumber(settings.getPagePadding())).append("mm !important; }\n");
+        }
+        if (settings.getSectionSpacing() != null) {
+            override.append(".section { margin-bottom: ")
+                    .append(cssNumber(settings.getSectionSpacing())).append("px !important; }\n");
+        }
+        if (settings.getAccentColor() != null) {
+            override.append(".section-title, .rich-text a { color: ")
+                    .append(settings.getAccentColor()).append(" !important; }\n")
+                    .append(".section-title { border-color: ")
+                    .append(settings.getAccentColor()).append(" !important; }\n")
+                    .append(".resume-page { --resume-accent-color: ")
+                    .append(settings.getAccentColor()).append("; }\n");
+        }
+        if (override.length() == 0) {
+            return decorated;
+        }
+        String style = "<style>\n" + override + "</style>\n";
+        return decorated.replace("</head>", style + "</head>");
+    }
+
+    private String cssNumber(Double value) {
+        if (value == null) {
+            return "0";
+        }
+        return value % 1 == 0 ? String.valueOf(value.intValue()) : String.valueOf(value);
     }
 
     private String renderSection(SectionDTO section) {
@@ -326,8 +415,9 @@ public class ResumeRenderService {
                   .append("          <span>").append(escapeHtml(getString(item, "startDate", ""))).append(" - ")
                   .append(escapeHtml(getString(item, "endDate", ""))).append("</span>\n")
                   .append("        </div>\n")
-                  .append(renderDescriptionList((List<String>) item.get("description")))
-                  .append("      </div>\n");
+                   .append(renderRichTextOrList(item, "descriptionHtml", (List<String>) item.get("description")))
+                   .append(renderRichTextOrList(item, "achievementsHtml", (List<String>) item.get("achievements")))
+                   .append("      </div>\n");
             }
         }
         return sb.toString();
@@ -346,8 +436,9 @@ public class ResumeRenderService {
                   .append(escapeHtml(getString(item, "endDate", ""))).append("</span>\n")
                   .append("        </div>\n")
                   .append("        <div class=\"item-sub\">").append(escapeHtml(getString(item, "role", ""))).append("</div>\n")
-                  .append(renderDescriptionList((List<String>) item.get("description")))
-                  .append("      </div>\n");
+                   .append(renderRichTextOrList(item, "descriptionHtml", (List<String>) item.get("description")))
+                   .append(renderRichTextOrList(item, "achievementsHtml", (List<String>) item.get("achievements")))
+                   .append("      </div>\n");
             }
         }
         return sb.toString();
@@ -377,7 +468,19 @@ public class ResumeRenderService {
 
     private String renderIntroduction(Object data) {
         Map<String, Object> intro = toMap(data);
+        String richContent = getString(intro, "contentHtml", "");
+        if (StringUtils.isNotBlank(richContent)) {
+            return "      <div class=\"rich-text\">" + RichTextSanitizer.sanitize(richContent) + "</div>\n";
+        }
         return "      <p>" + escapeHtml(getString(intro, "content", "")) + "</p>\n";
+    }
+
+    private String renderRichTextOrList(Map<String, Object> item, String htmlKey, List<String> plainText) {
+        String richText = getString(item, htmlKey, "");
+        if (StringUtils.isNotBlank(richText)) {
+            return "        <div class=\"rich-text\">" + RichTextSanitizer.sanitize(richText) + "</div>\n";
+        }
+        return renderDescriptionList(plainText);
     }
 
     private String renderDescriptionList(List<String> descriptions) {

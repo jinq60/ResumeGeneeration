@@ -104,6 +104,21 @@ class ResumeExportServiceTest {
     }
 
     @Test
+    void buildMarkdown_shouldReadRichTextAndDropUnsafeMarkup() {
+        Resume resume = buildResume();
+        Map<String, Object> intro = new HashMap<>();
+        intro.put("content", "纯文本");
+        intro.put("contentHtml", "<p><strong>富文本介绍</strong></p><script>alert(1)</script>");
+        resume.getSections().get(1).setData(intro);
+        when(resumeService.getResumeEntity("user_1", "resume_1")).thenReturn(resume);
+
+        String markdown = exportService.buildMarkdown("user_1", "resume_1");
+
+        assertTrue(markdown.contains("富文本介绍"));
+        assertFalse(markdown.contains("alert(1)"));
+    }
+
+    @Test
     void buildWord_shouldReturnValidDocxBytes() {
         when(resumeService.getResumeEntity("user_1", "resume_1")).thenReturn(buildResume());
 

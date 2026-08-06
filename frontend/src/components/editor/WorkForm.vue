@@ -116,24 +116,22 @@
                 section-type="work"
                 field="description"
                 :get-original-text="() => item.descriptionText"
-                @apply="(content: string) => { item.descriptionText = content }"
+                @apply="(content: string) => applyAiContent(item, content)"
               />
             </div>
-            <el-input
-              v-model="item.descriptionText"
-              type="textarea"
-              :rows="3"
+            <RichTextEditor
+              :model-value="item.descriptionHtml"
               placeholder="请输入工作描述，用换行分隔多个要点"
+              @update:model-value="updateRichText(item, 'description', $event)"
             />
           </div>
         </el-form-item>
 
         <el-form-item label="工作成就">
-          <el-input
-            v-model="item.achievementsText"
-            type="textarea"
-            :rows="3"
+          <RichTextEditor
+            :model-value="item.achievementsHtml"
             placeholder="请输入工作成就，用换行分隔多个要点"
+            @update:model-value="updateRichText(item, 'achievements', $event)"
           />
         </el-form-item>
 
@@ -178,6 +176,8 @@ import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { useSectionSync } from '@/composables/useSectionSync'
 import AiWriterButton from './AiWriterButton.vue'
+import RichTextEditor from './RichTextEditor.vue'
+import { plainTextToRichHtml, richTextToPlainText } from '@/utils/richText'
 
 interface Props {
   sections: any[]
@@ -198,7 +198,9 @@ function extractWork() {
         ...item,
         dateRange: item.startDate && item.endDate ? [item.startDate, item.endDate] : [],
         descriptionText: item.description ? item.description.join('\n') : '',
+        descriptionHtml: item.descriptionHtml || plainTextToRichHtml(item.description ? item.description.join('\n') : ''),
         achievementsText: item.achievements ? item.achievements.join('\n') : '',
+        achievementsHtml: item.achievementsHtml || plainTextToRichHtml(item.achievements ? item.achievements.join('\n') : ''),
         techStackText: item.techStack ? item.techStack.join(', ') : ''
       }))
     }
@@ -223,6 +225,8 @@ function addWork() {
     description: [],
     achievements: [],
     techStack: [],
+    descriptionHtml: '',
+    achievementsHtml: '',
     leaveReason: '',
     showLeaveReason: false,
     descriptionText: '',
@@ -243,6 +247,16 @@ function handleDateRangeChange(item: any) {
     item.startDate = ''
     item.endDate = ''
   }
+}
+
+function updateRichText(item: any, field: 'description' | 'achievements', html: string) {
+  item[`${field}Html`] = html
+  item[`${field}Text`] = richTextToPlainText(html)
+}
+
+function applyAiContent(item: any, content: string) {
+  item.descriptionText = content
+  item.descriptionHtml = plainTextToRichHtml(content)
 }
 
 // 初始化

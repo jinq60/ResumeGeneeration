@@ -80,6 +80,7 @@ private final ResumeMapper resumeMapper;
         resume.setTargetIndustry(request.getTargetIndustry());
         resume.setTemplateId(request.getTemplateId());
         resume.setSections(buildDefaultSections());
+        resume.setRenderSettings(RenderSettings.defaults());
         resume.setStatus(BizConstant.RESUME_STATUS_ACTIVE);
         resume.setDeleted(BizConstant.NOT_DELETED);
         resume.setExportCount(0);
@@ -217,6 +218,9 @@ private final ResumeMapper resumeMapper;
             resumeSectionValidator.validateDraft(request.getSections());
             resume.setSections(request.getSections());
         }
+        if (request.getRenderSettings() != null) {
+            resume.setRenderSettings(RenderSettings.sanitized(request.getRenderSettings()));
+        }
 
         LocalDateTime now = LocalDateTime.now();
         resume.setLastEditedAt(now);
@@ -261,6 +265,7 @@ private final ResumeMapper resumeMapper;
         copy.setTargetIndustry(source.getTargetIndustry());
         copy.setTemplateId(source.getTemplateId());
         copy.setSections(source.getSections());
+        copy.setRenderSettings(RenderSettings.copyOf(source.getRenderSettings()));
         copy.setStatus(BizConstant.RESUME_STATUS_ACTIVE);
         copy.setDeleted(BizConstant.NOT_DELETED);
         copy.setExportCount(0);
@@ -422,6 +427,7 @@ private final ResumeMapper resumeMapper;
         response.setTargetIndustry(resume.getTargetIndustry());
         response.setTemplateId(resume.getTemplateId());
         response.setSections(resume.getSections());
+        response.setRenderSettings(RenderSettings.copyOf(resume.getRenderSettings()));
         response.setExportCount(resume.getExportCount());
         response.setLastEditedAt(resume.getLastEditedAt());
         response.setCreatedAt(resume.getCreatedAt());

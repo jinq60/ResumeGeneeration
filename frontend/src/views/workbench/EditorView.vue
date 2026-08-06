@@ -1,14 +1,20 @@
 <template>
-  <div class="editor">
+  <div
+    class="editor"
+    :class="[
+      editPanelCollapsed ? 'is-edit-panel-collapsed' : '',
+      mobileView === 'edit' ? 'is-mobile-edit' : 'is-mobile-preview'
+    ]"
+  >
     <!-- Secondary Editor Header -->
     <div class="editor-secondary-header">
-      <div class="flex items-center gap-6">
+      <div class="editor-header-leading flex items-center gap-6">
         <button
           class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors"
           @click="handleBack"
         >
           <el-icon><ArrowLeft /></el-icon>
-          <span>返回简历库</span>
+          <span class="header-back-label">返回简历库</span>
         </button>
         <div class="h-6 w-px bg-outline-variant" />
         <div class="flex items-center gap-2">
@@ -22,7 +28,7 @@
             <Edit />
           </el-icon>
         </div>
-        <div class="flex items-center gap-2 text-label-md text-outline">
+        <div class="editor-save-status flex items-center gap-2 text-label-md text-outline">
           <span
             class="w-2 h-2 rounded-full"
             :class="saveStatus === 'saved' ? 'bg-secondary' : 'bg-primary'"
@@ -30,28 +36,85 @@
           <span>{{ saveStatusLabel }}</span>
         </div>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="editor-header-actions flex items-center gap-3">
+        <button
+          class="editor-header-icon panel-toggle-button"
+          :title="editPanelCollapsed ? '展开编辑面板' : '收起编辑面板'"
+          :aria-label="editPanelCollapsed ? '展开编辑面板' : '收起编辑面板'"
+          @click="editPanelCollapsed = !editPanelCollapsed"
+        >
+          <el-icon>
+            <DArrowRight v-if="editPanelCollapsed" />
+            <DArrowLeft v-else />
+          </el-icon>
+        </button>
+        <div class="flex items-center gap-1 border-r border-outline-variant pr-3">
+          <button
+            class="editor-header-icon"
+            :disabled="!canUndo"
+            title="撤销（Ctrl/Cmd + Z）"
+            aria-label="撤销"
+            @click="undoEdit"
+          >
+            <el-icon><RefreshLeft /></el-icon>
+          </button>
+          <button
+            class="editor-header-icon"
+            :disabled="!canRedo"
+            title="重做（Ctrl/Cmd + Shift + Z）"
+            aria-label="重做"
+            @click="redoEdit"
+          >
+            <el-icon><RefreshRight /></el-icon>
+          </button>
+        </div>
         <button
           class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-lg hover:bg-surface-container-high transition-all text-on-surface"
           @click="handlePreview"
         >
           <el-icon><View /></el-icon>
-          <span>预览</span>
+          <span class="header-action-label">预览</span>
         </button>
         <button
           class="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 shadow-sm active:scale-[0.98] transition-transform"
           @click="handleExport"
         >
           <el-icon><Document /></el-icon>
-          <span class="font-bold">导出 PDF</span>
+          <span class="header-action-label font-bold">导出 PDF</span>
         </button>
       </div>
+    </div>
+
+    <div
+      class="editor-mobile-switcher"
+      role="tablist"
+      aria-label="编辑器视图切换"
+    >
+      <button
+        :class="{ 'is-active': mobileView === 'edit' }"
+        role="tab"
+        :aria-selected="mobileView === 'edit'"
+        @click="mobileView = 'edit'"
+      >
+        编辑内容
+      </button>
+      <button
+        :class="{ 'is-active': mobileView === 'preview' }"
+        role="tab"
+        :aria-selected="mobileView === 'preview'"
+        @click="mobileView = 'preview'"
+      >
+        预览简历
+      </button>
     </div>
 
     <!-- Main Workspace -->
     <main class="editor-workspace">
       <!-- Left Edit Panel -->
-      <section class="editor-form-panel">
+      <section
+        class="editor-form-panel"
+        :class="{ 'is-collapsed': editPanelCollapsed }"
+      >
         <div class="editor-tabs custom-scrollbar">
           <button
             v-for="tab in tabs"
@@ -137,24 +200,40 @@
       </section>
 
       <!-- Middle Canvas Area -->
-      <div class="editor-canvas">
-        <div class="canvas-scroll">
-          <div class="a4-page">
-            <ResumePreview
-              v-if="resume"
-              :resume="resume"
-            />
+      <div
+        class="editor-canvas"
+        :class="{ 'is-panel-collapsed': editPanelCollapsed }"
+      >
+        <div
+          ref="canvasScrollRef"
+          class="canvas-scroll"
+          @scroll="handleCanvasScroll"
+        >
+          <div
+            class="a4-page-shell"
+            :style="a4PageShellStyle"
+          >
             <div
-              v-else
-              class="a4-placeholder"
+              class="a4-page"
+              :style="a4PageStyle"
             >
-              <el-icon
-                size="28"
-                class="text-outline"
+              <ResumePreview
+                v-if="resume"
+                :resume="resume"
+                @loaded="handlePreviewLoaded"
+              />
+              <div
+                v-else
+                class="a4-placeholder"
               >
-                <Document />
-              </el-icon>
-              <p>左侧编辑的内容会实时出现在这里</p>
+                <el-icon
+                  size="28"
+                  class="text-outline"
+                >
+                  <Document />
+                </el-icon>
+                <p>左侧编辑的内容会实时出现在这里</p>
+              </div>
             </div>
           </div>
         </div>
@@ -176,8 +255,26 @@
               <el-icon><Plus /></el-icon>
             </button>
           </div>
-          <div class="flex items-center gap-4 text-label-md text-on-surface-variant">
-            第 1 页 / 共 1 页
+          <div class="flex items-center gap-2 text-label-md text-on-surface-variant">
+            <button
+              class="page-button"
+              :disabled="currentPage <= 1"
+              title="上一页"
+              aria-label="上一页"
+              @click="goToPage(-1)"
+            >
+              <el-icon><ArrowLeft /></el-icon>
+            </button>
+            <span>第 {{ currentPage }} 页 / 共 {{ pageCount }} 页</span>
+            <button
+              class="page-button"
+              :disabled="currentPage >= pageCount"
+              title="下一页"
+              aria-label="下一页"
+              @click="goToPage(1)"
+            >
+              <el-icon><ArrowRight /></el-icon>
+            </button>
           </div>
           <div class="h-6 w-px bg-outline-variant" />
           <div
@@ -191,12 +288,30 @@
           </div>
           <div
             class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+            @click="runGrammarCheck"
+          >
+            <el-icon size="14">
+              <DocumentChecked />
+            </el-icon>
+            <span class="text-label-md">语法检查</span>
+          </div>
+          <div
+            class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
             @click="templateDialogVisible = true"
           >
             <span class="text-label-md">模板：{{ templateName(resume?.templateId) }}</span>
             <el-icon size="12">
               <ArrowDown />
             </el-icon>
+          </div>
+          <div
+            class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+            @click="openRenderSettings"
+          >
+            <el-icon size="14">
+              <Setting />
+            </el-icon>
+            <span class="text-label-md">排版</span>
           </div>
         </div>
       </div>
@@ -241,10 +356,10 @@
     >
       <span class="text-xs text-outline w-5 text-center font-mono">{{ idx + 1 }}</span>
       <el-input
-        v-model="sec.title"
+        :model-value="sec.title"
         size="small"
         style="flex: 1"
-        @change="triggerAutoSave()"
+        @update:model-value="updateSectionTitle(sec.id, $event)"
       />
       <span class="text-xs text-outline w-16">
         {{ typeLabel(sec.type) }}
@@ -266,10 +381,10 @@
         <el-icon><ArrowDown /></el-icon>
       </el-button>
       <el-switch
-        v-model="sec.visible"
+        :model-value="sec.visible"
         size="small"
         title="显示/隐藏"
-        @change="triggerAutoSave()"
+        @update:model-value="updateSectionVisibility(sec.id, $event)"
       />
     </div>
     <p class="text-xs text-outline mt-3">
@@ -303,6 +418,116 @@
         </div>
       </div>
     </div>
+  </el-dialog>
+
+  <!-- 排版设置 -->
+  <el-dialog
+    v-model="settingsDialogVisible"
+    title="排版设置"
+    width="460px"
+    align-center
+  >
+    <el-form
+      :model="renderSettingsDraft"
+      label-position="top"
+      class="render-settings-form"
+    >
+      <el-form-item label="一页纸适配">
+        <div class="setting-control-row">
+          <el-switch v-model="renderSettingsDraft.autoOnePage" />
+          <span>内容较长时自动缩小，尽量控制在一张 A4 内</span>
+        </div>
+      </el-form-item>
+      <el-form-item label="正文字体">
+        <el-select
+          v-model="renderSettingsDraft.fontFamily"
+          class="w-full"
+        >
+          <el-option
+            label="思源黑体 / 微软雅黑"
+            value="&quot;Noto Sans SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif"
+          />
+          <el-option
+            label="Arial 无衬线"
+            value="Arial, sans-serif"
+          />
+          <el-option
+            label="思源黑体"
+            value="&quot;Source Han Sans SC&quot;, &quot;Noto Sans SC&quot;, sans-serif"
+          />
+          <el-option
+            label="宋体"
+            value="&quot;SimSun&quot;, serif"
+          />
+        </el-select>
+      </el-form-item>
+      <div class="grid grid-cols-2 gap-3">
+        <el-form-item label="字号（pt）">
+          <el-input-number
+            v-model="renderSettingsDraft.baseFontSize"
+            :min="8"
+            :max="16"
+            :step="0.5"
+            controls-position="right"
+            class="w-full"
+          />
+        </el-form-item>
+        <el-form-item label="行高">
+          <el-input-number
+            v-model="renderSettingsDraft.lineHeight"
+            :min="1"
+            :max="2.2"
+            :step="0.1"
+            :precision="1"
+            controls-position="right"
+            class="w-full"
+          />
+        </el-form-item>
+        <el-form-item label="页面边距（mm）">
+          <el-input-number
+            v-model="renderSettingsDraft.pagePadding"
+            :min="8"
+            :max="30"
+            :step="1"
+            controls-position="right"
+            class="w-full"
+          />
+        </el-form-item>
+        <el-form-item label="模块间距（px）">
+          <el-input-number
+            v-model="renderSettingsDraft.sectionSpacing"
+            :min="4"
+            :max="32"
+            :step="1"
+            controls-position="right"
+            class="w-full"
+          />
+        </el-form-item>
+      </div>
+      <el-form-item label="主题色">
+        <div class="setting-control-row">
+          <el-color-picker v-model="renderSettingsDraft.accentColor" />
+          <span class="font-mono text-sm">{{ renderSettingsDraft.accentColor }}</span>
+        </div>
+      </el-form-item>
+    </el-form>
+    <p class="render-settings-note">
+      设置会同步应用到实时预览、PDF 和 Word 导出。
+    </p>
+    <template #footer>
+      <el-button @click="resetRenderSettings">
+        恢复建议值
+      </el-button>
+      <el-button @click="settingsDialogVisible = false">
+        取消
+      </el-button>
+      <el-button
+        type="primary"
+        @click="confirmRenderSettings"
+      >
+        应用设置
+      </el-button>
+    </template>
   </el-dialog>
 
   <!-- AI 评估抽屉 -->
@@ -360,12 +585,86 @@
       </el-button>
     </div>
   </el-drawer>
+
+  <!-- AI 语法检查抽屉 -->
+  <el-drawer
+    v-model="grammarDrawerVisible"
+    title="语法检查"
+    size="420px"
+  >
+    <div
+      v-if="grammarLoading"
+      class="grammar-loading"
+    >
+      <el-icon class="is-spin">
+        <Loading />
+      </el-icon>
+      <span>正在检查简历表达…</span>
+    </div>
+    <el-alert
+      v-else-if="grammarResult?.status === 'unavailable'"
+      title="语法检查暂不可用"
+      :description="grammarResult.message || '请先配置 AI 供应商。'"
+      type="info"
+      :closable="false"
+      show-icon
+    />
+    <el-empty
+      v-else-if="!grammarResult || grammarResult.issues.length === 0"
+      description="暂未发现明显表达问题"
+      :image-size="90"
+    />
+    <div
+      v-else
+      class="grammar-issues"
+    >
+      <div class="grammar-summary">
+        找到 {{ grammarResult.issues.length }} 处可优化表达
+      </div>
+      <button
+        v-for="(issue, index) in grammarResult.issues"
+        :key="`${issue.sectionType}-${issue.field}-${index}`"
+        class="grammar-issue"
+        type="button"
+        @click="focusGrammarIssue(issue)"
+      >
+        <div class="grammar-issue-head">
+          <span>{{ grammarFieldLabel(issue) }}</span>
+          <el-tag
+            size="small"
+            :type="grammarSeverityType(issue.severity)"
+          >
+            {{ grammarSeverityLabel(issue.severity) }}
+          </el-tag>
+        </div>
+        <p class="grammar-original">
+          “{{ issue.originalText }}”
+        </p>
+        <p class="grammar-suggestion">
+          {{ issue.suggestion }}
+        </p>
+        <p class="grammar-explanation">
+          {{ issue.explanation }}
+        </p>
+      </button>
+    </div>
+    <template #footer>
+      <el-button
+        :loading="grammarLoading"
+        type="primary"
+        plain
+        @click="runGrammarCheck"
+      >
+        重新检查
+      </el-button>
+    </template>
+  </el-drawer>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
   Edit,
@@ -381,17 +680,28 @@ import {
   Minus,
   ArrowDown,
   ArrowUp,
+  ArrowRight,
+  DArrowLeft,
+  DArrowRight,
   Menu,
+  RefreshLeft,
+  RefreshRight,
   WarningFilled,
   Opportunity,
   MagicStick,
-  Loading
+  Loading,
+  Setting
 } from '@element-plus/icons-vue'
-import { resumeApi } from '@/api/resume'
+import { resumeApi, type GrammarCheckResponse, type GrammarIssue } from '@/api/resume'
 import { templateApi } from '@/api/template'
 import { TEMPLATE_PLACEHOLDER } from '@/utils/placeholder'
 import type { Template } from '@/api/template'
-import type { Resume } from '@/types/resume'
+import type { Resume, Section } from '@/types/resume'
+import {
+  DEFAULT_RENDER_SETTINGS,
+  normalizeRenderSettings,
+  type EffectiveRenderSettings
+} from '@/utils/renderSettings'
 import ResumePreview from '@/components/preview/ResumePreview.vue'
 import ProfileForm from '@/components/editor/ProfileForm.vue'
 import EducationForm from '@/components/editor/EducationForm.vue'
@@ -401,6 +711,8 @@ import SkillForm from '@/components/editor/SkillForm.vue'
 import IntroductionForm from '@/components/editor/IntroductionForm.vue'
 import CustomForm from '@/components/editor/CustomForm.vue'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { useResumeDraft } from '@/composables/useResumeDraft'
+import { useResumeHistory } from '@/composables/useResumeHistory'
 
 const router = useRouter()
 const route = useRoute()
@@ -409,12 +721,22 @@ const resume = ref<Resume | null>(null)
 const activeTab = ref('profile')
 const loading = ref(true)
 const zoom = ref(100)
+const editPanelCollapsed = ref(false)
+const mobileView = ref<'edit' | 'preview'>('edit')
+const currentPage = ref(1)
+const pageCount = ref(1)
+const canvasScrollRef = ref<HTMLElement | null>(null)
 const aiScore = ref(82)
 const renameVisible = ref(false)
 const renameTitle = ref('')
 const sectionsDialogVisible = ref(false)
 const templateDialogVisible = ref(false)
 const aiDrawerVisible = ref(false)
+const settingsDialogVisible = ref(false)
+const renderSettingsDraft = ref<EffectiveRenderSettings>({ ...DEFAULT_RENDER_SETTINGS })
+const grammarDrawerVisible = ref(false)
+const grammarLoading = ref(false)
+const grammarResult = ref<GrammarCheckResponse | null>(null)
 const templates = ref<Template[]>([])
 const templateNameMap = ref<Record<string, string>>({})
 
@@ -434,8 +756,22 @@ const tabs: TabDef[] = [
   { name: 'custom', label: '补充信息', icon: CirclePlus }
 ]
 
-const { saveStatus, triggerSave } = useAutoSave()
+const { saveStatus, triggerSave, flush } = useAutoSave()
 const saveError = ref('')
+const { canUndo, canRedo, reset: resetHistory, record, undo, redo } = useResumeHistory<Resume>()
+const draftStorage = useResumeDraft<Resume>()
+
+const A4_PAGE_HEIGHT_PX = 1123
+const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+const a4PageScale = computed(() => zoom.value / 100)
+const a4PageShellStyle = computed(() => ({
+  width: `${210 * a4PageScale.value}mm`,
+  minHeight: `${297 * a4PageScale.value}mm`
+}))
+const a4PageStyle = computed(() => ({
+  transform: `scale(${a4PageScale.value})`
+}))
 
 const saveStatusLabel = computed(() => {
   switch (saveStatus.value) {
@@ -445,6 +781,63 @@ const saveStatusLabel = computed(() => {
     default: return '尚未修改'
   }
 })
+
+function cloneResumeState(value: Resume): Resume {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value)
+  }
+  return JSON.parse(JSON.stringify(value)) as Resume
+}
+
+function applyResumeChange(
+  change: (current: Resume) => void,
+  historyGroup = activeTab.value,
+  shouldSave = true
+) {
+  if (!resume.value) return
+
+  const previous = cloneResumeState(resume.value)
+  change(resume.value)
+
+  if (JSON.stringify(previous) === JSON.stringify(resume.value)) return
+
+  record(previous, historyGroup)
+  draftStorage.save(resume.value.id, cloneResumeState(resume.value))
+  if (shouldSave) triggerAutoSave()
+}
+
+async function restoreDraftIfAvailable(serverResume: Resume) {
+  const draft = draftStorage.load(serverResume.id)
+  if (!draft) return
+
+  if (Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) {
+    draftStorage.clear(serverResume.id)
+    return
+  }
+
+  if (JSON.stringify(draft.data) === JSON.stringify(serverResume)) {
+    draftStorage.clear(serverResume.id)
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      '检测到一份尚未同步到服务器的本地草稿，是否恢复？',
+      '恢复本地草稿',
+      {
+        confirmButtonText: '恢复草稿',
+        cancelButtonText: '使用服务器版本',
+        type: 'warning'
+      }
+    )
+    resume.value = cloneResumeState(draft.data)
+    resetHistory()
+    record(serverResume, 'draft-restore')
+    triggerAutoSave()
+  } catch {
+    draftStorage.clear(serverResume.id)
+  }
+}
 
 async function loadResume() {
   loading.value = true
@@ -465,15 +858,21 @@ async function loadResume() {
         templateId
       })
       resume.value = newResume
+      resetHistory()
       router.replace(`/workbench/editor/${newResume.id}`)
     } catch (e: any) {
       ElMessage.error(e.message || '创建简历失败')
+    } finally {
+      loading.value = false
     }
     return
   }
 
   try {
-    resume.value = await resumeApi.get(id)
+    const serverResume = await resumeApi.get(id)
+    resume.value = serverResume
+    resetHistory()
+    await restoreDraftIfAvailable(serverResume)
   } catch (e: any) {
     ElMessage.error(e.message || '加载简历失败')
   } finally {
@@ -511,8 +910,12 @@ function startRename() {
 async function confirmRename() {
   if (resume.value && renameTitle.value.trim()) {
     try {
-      await resumeApi.rename(resume.value.id, renameTitle.value.trim())
-      resume.value.title = renameTitle.value.trim()
+      const title = renameTitle.value.trim()
+      await resumeApi.rename(resume.value.id, title)
+      applyResumeChange((current) => {
+        current.title = title
+      }, 'title', false)
+      draftStorage.clear(resume.value.id)
       ElMessage.success('重命名成功')
       renameVisible.value = false
     } catch {
@@ -521,33 +924,93 @@ async function confirmRename() {
   }
 }
 
-function handleBasicInfoUpdate(data: { title?: string; targetPosition?: string; sections?: any[] }) {
-  if (resume.value) {
-    if (data.title) resume.value.title = data.title
-    if (data.targetPosition !== undefined) resume.value.targetPosition = data.targetPosition
-    if (data.sections) resume.value.sections = data.sections
-    triggerAutoSave()
+function handleBasicInfoUpdate(data: { title?: string; targetPosition?: string; sections?: Section[] }) {
+  applyResumeChange((current) => {
+    if (data.title) current.title = data.title
+    if (data.targetPosition !== undefined) current.targetPosition = data.targetPosition
+    if (data.sections) current.sections = data.sections
+  }, 'profile')
+}
+
+async function runGrammarCheck() {
+  if (!resume.value) return
+  grammarDrawerVisible.value = true
+  grammarLoading.value = true
+  grammarResult.value = null
+  try {
+    grammarResult.value = await resumeApi.grammarCheck(resume.value.id)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '语法检查失败，请稍后重试')
+  } finally {
+    grammarLoading.value = false
   }
 }
 
-function handleSectionsUpdate(sections: any[]) {
-  if (resume.value) {
-    resume.value.sections = sections
-    triggerAutoSave()
+function focusGrammarIssue(issue: GrammarIssue) {
+  const supportedTabs = tabs.map((tab) => tab.name)
+  if (supportedTabs.includes(issue.sectionType)) {
+    activeTab.value = issue.sectionType
   }
+  grammarDrawerVisible.value = false
+}
+
+function grammarFieldLabel(issue: GrammarIssue) {
+  const sectionLabel = typeLabel(issue.sectionType)
+  return issue.itemIndex === undefined
+    ? `${sectionLabel} · ${issue.field}`
+    : `${sectionLabel} ${issue.itemIndex + 1} · ${issue.field}`
+}
+
+function grammarSeverityLabel(severity: string) {
+  return severity === 'high' ? '重点' : severity === 'low' ? '轻微' : '建议'
+}
+
+function grammarSeverityType(severity: string) {
+  return severity === 'high' ? 'danger' : severity === 'low' ? 'info' : 'warning'
+}
+
+function handleSectionsUpdate(sections: Section[]) {
+  applyResumeChange((current) => {
+    current.sections = sections
+  })
+}
+
+function openRenderSettings() {
+  if (!resume.value) return
+  renderSettingsDraft.value = normalizeRenderSettings(resume.value.renderSettings)
+  settingsDialogVisible.value = true
+}
+
+function resetRenderSettings() {
+  renderSettingsDraft.value = { ...DEFAULT_RENDER_SETTINGS }
+}
+
+function confirmRenderSettings() {
+  if (!resume.value) return
+  const settings = { ...renderSettingsDraft.value }
+  applyResumeChange((current) => {
+    current.renderSettings = settings
+  }, 'render-settings')
+  settingsDialogVisible.value = false
+  ElMessage.success('排版设置已应用')
 }
 
 function triggerAutoSave() {
   if (resume.value) {
     triggerSave(async () => {
       saveError.value = ''
+      const snapshot = cloneResumeState(resume.value!)
       try {
-        await resumeApi.update(resume.value!.id, {
-          title: resume.value!.title,
-          targetPosition: resume.value!.targetPosition,
-          templateId: resume.value!.templateId,
-          sections: resume.value!.sections
+        await resumeApi.update(snapshot.id, {
+          title: snapshot.title,
+          targetPosition: snapshot.targetPosition,
+          templateId: snapshot.templateId,
+          sections: snapshot.sections,
+          renderSettings: snapshot.renderSettings || undefined
         })
+        if (resume.value && JSON.stringify(resume.value) === JSON.stringify(snapshot)) {
+          draftStorage.clear(snapshot.id)
+        }
       } catch (e: any) {
         saveError.value = e.message || '未知错误'
         throw e
@@ -562,6 +1025,97 @@ function zoomIn() {
 
 function zoomOut() {
   if (zoom.value > 60) zoom.value -= 10
+}
+
+function handlePreviewLoaded(contentHeight: number) {
+  pageCount.value = Math.max(1, Math.ceil(contentHeight / A4_PAGE_HEIGHT_PX))
+  currentPage.value = 1
+}
+
+function handleCanvasScroll(event: Event) {
+  const target = event.currentTarget as HTMLElement
+  const pageHeight = A4_PAGE_HEIGHT_PX * a4PageScale.value
+  currentPage.value = Math.min(
+    pageCount.value,
+    Math.max(1, Math.floor((target.scrollTop + pageHeight / 2) / pageHeight) + 1)
+  )
+}
+
+function goToPage(delta: number) {
+  const nextPage = Math.min(pageCount.value, Math.max(1, currentPage.value + delta))
+  if (nextPage === currentPage.value) return
+
+  currentPage.value = nextPage
+  canvasScrollRef.value?.scrollTo({
+    top: (nextPage - 1) * A4_PAGE_HEIGHT_PX * a4PageScale.value,
+    behavior: 'smooth'
+  })
+}
+
+function updateSectionTitle(sectionId: string, title: string) {
+  applyResumeChange((current) => {
+    const section = current.sections.find((item) => item.id === sectionId)
+    if (section) section.title = title
+  }, 'section-title')
+}
+
+function updateSectionVisibility(sectionId: string, visible: boolean) {
+  if (sectionId === 'profile') return
+  applyResumeChange((current) => {
+    const section = current.sections.find((item) => item.id === sectionId)
+    if (section) section.visible = visible
+  }, 'section-visibility')
+}
+
+function undoEdit() {
+  if (!resume.value) return
+  const snapshot = undo(resume.value)
+  if (!snapshot) return
+  resume.value = snapshot
+  draftStorage.save(snapshot.id, cloneResumeState(snapshot))
+  triggerAutoSave()
+}
+
+function redoEdit() {
+  if (!resume.value) return
+  const snapshot = redo(resume.value)
+  if (!snapshot) return
+  resume.value = snapshot
+  draftStorage.save(snapshot.id, cloneResumeState(snapshot))
+  triggerAutoSave()
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false
+  return Boolean(
+    target.isContentEditable ||
+    target.closest('[contenteditable="true"]') ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  )
+}
+
+function handleEditorKeydown(event: KeyboardEvent) {
+  const modifierPressed = event.ctrlKey || event.metaKey
+  if (!modifierPressed) return
+
+  const key = event.key.toLowerCase()
+  if (key === 's') {
+    event.preventDefault()
+    flush()
+    return
+  }
+
+  if (isEditableTarget(event.target)) return
+
+  if (key === 'z' && !event.shiftKey) {
+    event.preventDefault()
+    undoEdit()
+  } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
+    event.preventDefault()
+    redoEdit()
+  }
 }
 
 function typeLabel(type: string): string {
@@ -604,10 +1158,11 @@ async function loadTemplates() {
 
 function selectTemplate(t: Template) {
   if (!resume.value) return
-  resume.value.templateId = t.id
+  applyResumeChange((current) => {
+    current.templateId = t.id
+  }, 'template')
   templateDialogVisible.value = false
   ElMessage.success(`已切换模板：${t.name}`)
-  triggerAutoSave()
 }
 
 function onThumbnailError(event: Event) {
@@ -618,8 +1173,13 @@ function onThumbnailError(event: Event) {
 }
 
 onMounted(() => {
+  window.addEventListener('keydown', handleEditorKeydown)
   loadResume()
   loadTemplates()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleEditorKeydown)
 })
 </script>
 
@@ -644,6 +1204,44 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.editor-header-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--st-on-surface-variant);
+  transition: background-color 160ms ease, color 160ms ease;
+
+  &:hover:not(:disabled) {
+    background: var(--st-surface-container-high);
+    color: var(--st-primary);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.editor-header-leading,
+.editor-header-actions {
+  min-width: 0;
+}
+
+.editor-header-leading {
+  flex: 1;
+}
+
+.editor-header-actions {
+  flex-shrink: 0;
+}
+
+.editor-mobile-switcher {
+  display: none;
 }
 
 .editor-workspace {
@@ -672,6 +1270,15 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  transition: width 180ms ease, opacity 180ms ease;
+
+  &.is-collapsed {
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
+    border-right: 0;
+    pointer-events: none;
+  }
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -704,13 +1311,132 @@ onMounted(() => {
   justify-content: center;
 }
 
+.a4-page-shell {
+  flex: 0 0 auto;
+  transition: width 160ms ease, min-height 160ms ease;
+}
+
 .a4-page {
   width: 210mm;
   min-height: 297mm;
-  padding: 20mm;
+  box-sizing: border-box;
+  padding: 0;
   background: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform-origin: top center;
+  transition: transform 160ms ease;
+}
+
+.page-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--st-on-surface-variant);
+
+  &:hover:not(:disabled) {
+    background: var(--st-surface-container-high);
+    color: var(--st-primary);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.grammar-loading {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--st-on-surface-variant);
+}
+
+.setting-control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--st-on-surface-variant);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.render-settings-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.render-settings-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-container-low);
+  color: var(--st-on-surface-variant);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.grammar-summary {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: var(--st-radius-md);
+  color: var(--st-on-surface-variant);
+  background: var(--st-surface-container-low);
+  font-size: 13px;
+}
+
+.grammar-issues {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.grammar-issue {
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--st-outline-variant);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-bright);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+
+  &:hover {
+    border-color: var(--st-primary-fixed-dim);
+    box-shadow: var(--st-shadow-sm);
+  }
+}
+
+.grammar-issue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--st-on-surface);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.grammar-original,
+.grammar-suggestion,
+.grammar-explanation {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.grammar-original {
+  color: var(--st-error);
+}
+
+.grammar-suggestion {
+  color: var(--st-secondary);
+}
+
+.grammar-explanation {
+  color: var(--st-on-surface-variant);
 }
 
 .a4-placeholder {
@@ -756,16 +1482,129 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .editor-form-panel {
-    position: absolute;
-    inset: 0;
+  .editor {
+    margin: -12px;
+    height: calc(100vh - 24px);
+  }
+
+  .editor-secondary-header {
+    min-height: 56px;
+    height: auto;
+    padding: 8px 12px 8px 56px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .editor-header-leading {
+    gap: 8px;
     width: 100%;
-    z-index: 30;
+  }
+
+  .editor-header-leading > .h-6 {
+    display: none;
+  }
+
+  .editor-header-leading h1 {
+    max-width: 32vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .editor-save-status {
+    margin-left: auto;
+  }
+
+  .editor-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .panel-toggle-button {
+    display: none;
+  }
+
+  .header-back-label,
+  .header-action-label {
+    display: none;
+  }
+
+  .editor-mobile-switcher {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    background: var(--st-surface);
+    border-bottom: 1px solid var(--st-outline-variant);
+
+    button {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: var(--st-radius-md);
+      color: var(--st-on-surface-variant);
+      font-size: 13px;
+      font-weight: 600;
+
+      &.is-active {
+        color: var(--st-primary);
+        background: var(--st-primary-container);
+      }
+    }
+  }
+
+  .editor-workspace {
+    position: relative;
+  }
+
+  .editor-form-panel {
+    display: none;
+    position: static;
+    width: 100%;
+    border-right: 0;
+
+    &.is-collapsed {
+      width: 100%;
+      opacity: 1;
+      overflow: visible;
+      pointer-events: auto;
+    }
+  }
+
+  .editor-canvas {
+    display: none;
+    width: 100%;
+  }
+
+  .editor.is-mobile-edit .editor-form-panel {
+    display: flex;
+  }
+
+  .editor.is-mobile-preview .editor-canvas {
+    display: flex;
+  }
+
+  .a4-page-shell {
+    width: 100% !important;
+    min-height: auto !important;
   }
   .a4-page {
     width: 100%;
     min-height: auto;
     padding: 16px;
+    transform: scale(1) !important;
+  }
+
+  .floating-toolbar {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    transform: none;
+    max-width: none;
+    padding: 8px 12px;
+    gap: 10px;
+    overflow-x: auto;
+    justify-content: flex-start;
+    white-space: nowrap;
   }
 }
 </style>
