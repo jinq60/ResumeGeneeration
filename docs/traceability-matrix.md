@@ -97,7 +97,8 @@
 
 | PRD 需求 | 范围对齐 | 数据模型 | API 规范 | 校验规则 | TDD 计划 | 代码位置 |
 |---|---|---|---|---|---|---|
-| 公开分享链接 | 业务线 v1.1 Phase 2 | `resume_share` 表（V8） | `api-changelog.md` v1.4 | token、状态、过期校验 | `ShareServiceTest`（控制层测试待补） | `backend/src/main/java/com/resume/resume/share/` |
+| 公开分享链接 | 业务线 v1.1 Phase 2 | `resume_share` 表（V8） | `api-changelog.md` v1.4 | token、状态、过期校验 | `ShareServiceTest`, `ShareControllerTest` | `backend/src/main/java/com/resume/resume/share/` |
+| 分享隐私与有效期 | 业务线 v1.1 §5 P1 | `resume_share.hide_contact`（V11） | `api-changelog.md` v1.7 | hideContact 渲染、过期时间校验 | `ShareServiceTest`, `ShareControllerTest`, `ResumeRenderServiceTest` | `ShareService`, `ShareController`, `ResumeRenderService.RenderOptions`, `frontend/src/views/workbench/ResumeDetailView.vue` |
 | Markdown 导出 | 业务线 v1.1 Phase 3 | `resume` 表 | `api-changelog.md` v1.4 | 导出前姓名/联系方式校验 | `ResumeExportServiceTest`（控制层测试待补） | `ResumeExportService`, `frontend/src/api/export.ts` |
 | Word 导出 | 业务线 v1.1 Phase 3 | `resume` 表、`resume.render_settings` | `api-changelog.md` v1.5 | 导出前姓名/联系方式校验 | `ResumeExportServiceTest`（控制层测试待补） | `ResumeExportService`, `frontend/src/api/export.ts` |
 

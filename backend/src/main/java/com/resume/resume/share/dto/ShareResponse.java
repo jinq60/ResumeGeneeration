@@ -13,6 +13,7 @@ public class ShareResponse {
     private String token;
     private String url;
     private String status;
+    private Boolean hideContact;
     private LocalDateTime expiresAt;
     private LocalDateTime createdAt;
 }

@@ -22,6 +22,7 @@ public class ResumeShare {
     private String userId;
     private String token;
     private String status;
+    private Boolean hideContact;
     private LocalDateTime expiresAt;
     private LocalDateTime revokedAt;
 

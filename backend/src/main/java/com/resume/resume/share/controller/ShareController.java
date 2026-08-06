@@ -3,9 +3,11 @@ package com.resume.resume.share.controller;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.entity.R;
 import com.resume.common.exception.BusinessException;
+import com.resume.resume.share.dto.CreateShareRequest;
 import com.resume.resume.share.dto.ShareResponse;
 import com.resume.resume.share.service.ShareService;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -32,8 +35,11 @@ public class ShareController {
      */
     @PostMapping("/resumes/{resumeId}/share")
     public R<ShareResponse> create(@AuthenticationPrincipal String userId,
-                                   @PathVariable String resumeId) {
-        return R.success(shareService.createShare(userId, resumeId));
+                                   @PathVariable String resumeId,
+                                   @Valid @RequestBody(required = false) CreateShareRequest request) {
+        boolean hideContact = request != null && Boolean.TRUE.equals(request.getHideContact());
+        return R.success(shareService.createShare(userId, resumeId, hideContact,
+                request == null ? null : request.getExpiresAt()));
     }
 
     /**

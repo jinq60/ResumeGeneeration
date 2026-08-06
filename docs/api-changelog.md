@@ -2,6 +2,15 @@
 
 > 记录 `docs/superpowers/specs/2026-07-03-api-spec.md` 的所有变更，便于前后端联调与版本管理。
 
+## v1.7（2026-08-06）
+
+### 新增
+
+- `POST /resumes/{id}/share` 支持请求体 `hideContact`（分享页隐藏手机号/邮箱/个人链接）与 `expiresAt`（自定义过期时间，晚于当前时间，缺省永久）；响应新增 `hideContact` 字段。
+- `resume_share` 表新增 `hide_contact` 字段（V11 迁移）；分享页渲染支持隐藏联系方式选项。
+
+---
+
 ## v1.6（2026-08-06）
 
 ### 新增

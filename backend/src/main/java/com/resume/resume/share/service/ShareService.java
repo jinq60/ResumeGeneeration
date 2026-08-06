@@ -46,9 +46,13 @@ public class ShareService {
 
     /**
      * 创建或轮换分享（同一简历只保留一条有效分享）。
+     *
+     * @param hideContact 分享页是否隐藏联系方式
+     * @param expiresAt   过期时间；为空表示永久有效
      */
     @Transactional(rollbackFor = Exception.class)
-    public ShareResponse createShare(String userId, String resumeId) {
+    public ShareResponse createShare(String userId, String resumeId, boolean hideContact, LocalDateTime expiresAt) {
+        validateExpiresAt(expiresAt);
         resumeServiceAccessCheck(userId, resumeId);
         // 关闭旧的分享
         revokeShareRecords(userId, resumeId);
@@ -58,12 +62,21 @@ public class ShareService {
         share.setUserId(userId);
         share.setToken(generateToken());
         share.setStatus(SHARE_STATUS_ACTIVE);
+        share.setHideContact(hideContact);
+        share.setExpiresAt(expiresAt);
         share.setDeleted(BizConstant.NOT_DELETED);
         share.setCreatedAt(LocalDateTime.now());
         share.setUpdatedAt(LocalDateTime.now());
         resumeShareMapper.insert(share);
-        log.info("Resume share created: resumeId={}, shareId={}", resumeId, share.getId());
+        log.info("Resume share created: resumeId={}, shareId={}, hideContact={}, expiresAt={}",
+                resumeId, share.getId(), hideContact, expiresAt);
         return toResponse(share);
+    }
+
+    private void validateExpiresAt(LocalDateTime expiresAt) {
+        if (expiresAt != null && !expiresAt.isAfter(LocalDateTime.now())) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "过期时间必须晚于当前时间。");
+        }
     }
 
     /**
@@ -100,7 +113,9 @@ public class ShareService {
             throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "简历不存在或已被删除。");
         }
         Template template = templateService.getTemplateEntity(resume.getTemplateId());
-        String body = resumeRenderService.render(resume, template);
+        String body = Boolean.TRUE.equals(share.getHideContact())
+                ? resumeRenderService.render(resume, template, ResumeRenderService.RenderOptions.withHiddenContact())
+                : resumeRenderService.render(resume, template);
         return wrapSharePage(resume.getTitle(), body);
     }
 
@@ -212,6 +227,7 @@ public class ShareService {
         response.setToken(share.getToken());
         response.setUrl("/share/" + share.getToken());
         response.setStatus(share.getStatus());
+        response.setHideContact(Boolean.TRUE.equals(share.getHideContact()));
         response.setExpiresAt(share.getExpiresAt());
         response.setCreatedAt(share.getCreatedAt());
         return response;

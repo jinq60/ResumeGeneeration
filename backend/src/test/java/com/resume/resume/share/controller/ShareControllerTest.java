@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -61,14 +62,50 @@ class ShareControllerTest {
     @Test
     @WithMockJwt(userId = "user123")
     void createShare_shouldReturnTokenAndUrl() throws Exception {
-        when(shareService.createShare(eq("user123"), eq("resume_1")))
+        when(shareService.createShare(eq("user123"), eq("resume_1"), eq(false), eq(null)))
                 .thenReturn(buildShareResponse());
 
-        mockMvc.perform(post("/resumes/resume_1/share"))
+        mockMvc.perform(post("/resumes/resume_1/share")
+                        .contentType("application/json")
+                        .content("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.token").value("share_token_1"))
                 .andExpect(jsonPath("$.data.url").value("/share/share_token_1"));
+    }
+
+    @Test
+    @WithMockJwt(userId = "user123")
+    void createShare_withoutBody_shouldDefaultToVisibleContact() throws Exception {
+        when(shareService.createShare(eq("user123"), eq("resume_1"), eq(false), eq(null)))
+                .thenReturn(buildShareResponse());
+
+        mockMvc.perform(post("/resumes/resume_1/share"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
+    @WithMockJwt(userId = "user123")
+    void createShare_withHideContact_shouldPassFlag() throws Exception {
+        when(shareService.createShare(eq("user123"), eq("resume_1"), eq(true), eq(null)))
+                .thenReturn(buildShareResponse());
+
+        mockMvc.perform(post("/resumes/resume_1/share")
+                        .contentType("application/json")
+                        .content("{\"hideContact\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
+    @WithMockJwt(userId = "user123")
+    void createShare_withPastExpiresAt_shouldReturn400() throws Exception {
+        mockMvc.perform(post("/resumes/resume_1/share")
+                        .contentType("application/json")
+                        .content("{\"expiresAt\":\"2020-01-01T00:00:00\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(ResultCode.PARAM_INVALID));
     }
 
     @Test
@@ -132,10 +169,12 @@ class ShareControllerTest {
     @Test
     @WithMockJwt(userId = "user123")
     void createShare_otherUsersResume_shouldReturn403() throws Exception {
-        when(shareService.createShare(eq("user123"), any()))
+        when(shareService.createShare(eq("user123"), any(), anyBoolean(), any()))
                 .thenThrow(new BusinessException(ResultCode.ACCESS_DENIED, "无权访问该资源。"));
 
-        mockMvc.perform(post("/resumes/resume_other/share"))
+        mockMvc.perform(post("/resumes/resume_other/share")
+                        .contentType("application/json")
+                        .content("{}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(ResultCode.ACCESS_DENIED));
     }

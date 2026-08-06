@@ -124,8 +124,23 @@
             </el-button>
           </template>
         </el-input>
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-on-surface-variant">隐藏联系方式</span>
+          <el-switch
+            v-model="shareForm.hideContact"
+            @change="handleShareToggle(true)"
+          />
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-on-surface-variant">过期时间</span>
+          <span class="text-on-surface">
+            {{ shareExpiryLabel }}
+          </span>
+        </div>
         <div class="text-xs text-on-surface-variant">
-          链接对所有人可见，包含简历中的联系方式。关闭分享后链接立即失效。
+          {{ shareForm.hideContact
+            ? '分享页将隐藏手机号、邮箱和个人链接，仅展示简历正文。'
+            : '链接对所有人可见，包含简历中的联系方式。关闭分享或到期后链接立即失效。' }}
         </div>
         <RouterLink
           :to="`/share/${shareInfo.token}`"
@@ -134,6 +149,34 @@
         >
           预览分享页 →
         </RouterLink>
+      </template>
+      <template v-else>
+        <el-switch
+          v-model="shareForm.hideContact"
+          active-text="隐藏联系方式"
+          inactive-text="展示联系方式"
+        />
+        <el-select
+          v-model="shareForm.expiryOption"
+          class="w-full"
+          placeholder="过期时间"
+        >
+          <el-option
+            label="永久有效"
+            value="forever"
+          />
+          <el-option
+            label="7 天后过期"
+            value="7d"
+          />
+          <el-option
+            label="30 天后过期"
+            value="30d"
+          />
+        </el-select>
+        <div class="text-xs text-on-surface-variant">
+          开启分享后，链接对所有人可见。可选择隐藏联系方式或设置有效期。
+        </div>
       </template>
     </div>
     <div
@@ -165,10 +208,20 @@ const resume = ref<Resume | null>(null)
 const shareDialogVisible = ref(false)
 const shareLoading = ref(false)
 const shareInfo = ref<ShareInfo | null>(null)
+const shareForm = ref<{ hideContact: boolean; expiryOption: 'forever' | '7d' | '30d' }>({
+  hideContact: false,
+  expiryOption: 'forever'
+})
 
 const shareEnabled = computed({
   get: () => !!shareInfo.value && shareInfo.value.status === 'active',
   set: () => { /* 由 handleShareToggle 处理 */ }
+})
+
+const shareExpiryLabel = computed(() => {
+  if (!shareInfo.value?.expiresAt) return '永久有效'
+  const days = Math.max(0, Math.ceil((new Date(shareInfo.value.expiresAt).getTime() - Date.now()) / 86400000))
+  return `${days} 天后过期`
 })
 
 const shareUrl = computed(() => {
@@ -176,11 +229,22 @@ const shareUrl = computed(() => {
   return `${window.location.origin}${shareInfo.value.url}`
 })
 
+function resolveExpiresAt(option: 'forever' | '7d' | '30d'): string | undefined {
+  if (option === 'forever') return undefined
+  const days = option === '7d' ? 7 : 30
+  return new Date(Date.now() + days * 86400000).toISOString()
+}
+
 async function openShareDialog() {
   shareDialogVisible.value = true
   shareLoading.value = true
+  shareForm.value = { hideContact: false, expiryOption: 'forever' }
   try {
     shareInfo.value = await shareApi.get(resumeId)
+    if (shareInfo.value) {
+      shareForm.value.hideContact = !!shareInfo.value.hideContact
+      shareForm.value.expiryOption = shareInfo.value.expiresAt ? '7d' : 'forever'
+    }
   } catch (e: any) {
     shareInfo.value = null
     ElMessage.error(e.message || '查询分享状态失败')
@@ -192,7 +256,10 @@ async function openShareDialog() {
 async function handleShareToggle(enabled: boolean) {
   try {
     if (enabled) {
-      shareInfo.value = await shareApi.create(resumeId)
+      shareInfo.value = await shareApi.create(resumeId, {
+        hideContact: shareForm.value.hideContact,
+        expiresAt: resolveExpiresAt(shareForm.value.expiryOption)
+      })
       ElMessage.success('分享已开启')
     } else {
       await shareApi.revoke(resumeId)

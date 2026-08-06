@@ -49,6 +49,16 @@ public class ResumeRenderService {
     private final ObjectMapper objectMapper;
 
     /**
+     * 渲染选项。
+     */
+    public record RenderOptions(boolean hideContact) {
+
+        public static RenderOptions withHiddenContact() {
+            return new RenderOptions(true);
+        }
+    }
+
+    /**
      * 站内资源（/uploads/**）在 PDF/独立页面渲染时的外部可访问前缀。
      * 配置后（如 http://localhost），相对路径会被拼成绝对 URL，否则保持原样。
      */
@@ -70,18 +80,30 @@ public class ResumeRenderService {
     }
 
     /**
-     * 将简历与模板渲染为完整 HTML 页面。
+     * 将简历与模板渲染为完整 HTML 页面（默认渲染选项）。
      *
      * @param resume   简历实体
      * @param template 模板实体
      * @return HTML 字符串
      */
     public String render(Resume resume, Template template) {
+        return render(resume, template, new RenderOptions(false));
+    }
+
+    /**
+     * 将简历与模板渲染为完整 HTML 页面。
+     *
+     * @param resume   简历实体
+     * @param template 模板实体
+     * @param options  渲染选项（如分享页隐藏联系方式）
+     * @return HTML 字符串
+     */
+    public String render(Resume resume, Template template, RenderOptions options) {
         List<SectionDTO> sections = resume.getSections() != null ? resume.getSections() : List.of();
         Map<String, Object> config = parseConfig(template.getConfig());
         RenderSettings settings = RenderSettings.sanitized(resume.getRenderSettings());
         String css = buildCss(config, settings);
-        String body = renderBody(sections);
+        String body = renderBody(sections, options);
 
         // 优先加载 template.htmlTemplate 指定的 HTML 骨架文件，支持后台新增模板。
         String skeleton = loadTemplateSkeleton(template.getHtmlTemplate());
@@ -118,11 +140,11 @@ public class ResumeRenderService {
     /**
      * 渲染简历所有可见 Section，返回可嵌入骨架的 HTML 片段。
      */
-    private String renderBody(List<SectionDTO> sections) {
+    private String renderBody(List<SectionDTO> sections, RenderOptions options) {
         StringBuilder body = new StringBuilder();
         for (SectionDTO section : sections) {
             if (Boolean.TRUE.equals(section.getVisible())) {
-                body.append(renderSection(section));
+                body.append(renderSection(section, options));
             }
         }
         return body.toString();
@@ -276,14 +298,14 @@ public class ResumeRenderService {
         return value % 1 == 0 ? String.valueOf(value.intValue()) : String.valueOf(value);
     }
 
-    private String renderSection(SectionDTO section) {
+    private String renderSection(SectionDTO section, RenderOptions options) {
         StringBuilder sb = new StringBuilder();
         sb.append("    <div class=\"section\">\n")
           .append("      <div class=\"section-title\">").append(escapeHtml(section.getTitle())).append("</div>\n");
 
         Object data = section.getData();
         switch (section.getType()) {
-            case BizConstant.SECTION_TYPE_PROFILE -> sb.append(renderProfile(data));
+            case BizConstant.SECTION_TYPE_PROFILE -> sb.append(renderProfile(data, options));
             case BizConstant.SECTION_TYPE_EDUCATION -> sb.append(renderEducation(data));
             case BizConstant.SECTION_TYPE_WORK -> sb.append(renderWork(data));
             case BizConstant.SECTION_TYPE_PROJECT -> sb.append(renderProject(data));
@@ -296,7 +318,7 @@ public class ResumeRenderService {
         return sb.toString();
     }
 
-    private String renderProfile(Object data) {
+    private String renderProfile(Object data, RenderOptions options) {
         Map<String, Object> profile = toMap(data);
         boolean showAvatar = getBoolean(profile, "showAvatar", true);
         String avatarUrl = getString(profile, "avatarUrl", "");
@@ -315,6 +337,15 @@ public class ResumeRenderService {
         String personalWebsite = getString(profile, "personalWebsite", "");
         String github = getString(profile, "github", "");
         String portfolio = getString(profile, "portfolio", "");
+
+        // 分享页隐私：隐藏联系方式（手机/邮箱/个人链接）
+        if (options != null && options.hideContact()) {
+            phone = "";
+            email = "";
+            personalWebsite = "";
+            github = "";
+            portfolio = "";
+        }
 
         StringBuilder sb = new StringBuilder();
         sb.append("      <div class=\"profile-header\">\n");
