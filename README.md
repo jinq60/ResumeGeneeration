@@ -10,7 +10,7 @@
 - **CI/CD**：GitHub Actions 已启用，覆盖 `production`、`develop`、`stable`。
 - **分支模型**：`production`（默认）/ `develop` / `stable`，详见 `docs/development-workflow.md`。
 - **测试环境**：`docker compose -f ops/docker-compose.test.yml -p resume-test up -d`，MySQL 暴露 `3307`，MinIO API 暴露 `9002`。
-- **当前边界**：头像真实 AI 优化、真实短信/邮件验证码、AI 按日配额、分享隐私字段控制和导入/富文本编辑仍属于后续迭代；未配置 AI Key 时按设计回退到占位结果。
+- **当前边界**：头像真实 AI 优化、真实短信/邮件验证码、分享隐私字段控制和导入/富文本编辑仍属于后续迭代；未配置 AI Key 时按设计回退到占位结果。AI 写作按日配额（游客 3/天、登录 30/天）已启用。
 
 ## 项目结构
 

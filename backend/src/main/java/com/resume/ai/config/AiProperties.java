@@ -21,6 +21,7 @@ public class AiProperties {
     private ErnieConfig ernie;
     private ThreadPoolConfig threadPool = new ThreadPoolConfig();
     private RateLimitConfig rateLimit = new RateLimitConfig();
+    private DailyQuotaConfig dailyQuota = new DailyQuotaConfig();
     private Map<String, String> prompts;
 
     @Data
@@ -60,5 +61,11 @@ public class AiProperties {
     @Data
     public static class RateLimitConfig {
         private int maxConcurrentPerUser = 3;
+    }
+
+    @Data
+    public static class DailyQuotaConfig {
+        private int guest = 3;
+        private int user = 30;
     }
 }

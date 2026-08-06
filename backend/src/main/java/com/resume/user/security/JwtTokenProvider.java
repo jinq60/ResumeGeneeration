@@ -143,10 +143,26 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 从 Token 中解析用户角色。
+     * 从 Token 中解析角色。
      */
     public String getRole(String token) {
         return parseClaims(token).get(CLAIM_ROLE, String.class);
+    }
+
+    /**
+     * 从 Token 中解析游客标志；解析失败（含 null/损坏 token）时按非游客处理。
+     */
+    public boolean getGuest(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        try {
+            Boolean guest = parseClaims(token).get(CLAIM_GUEST, Boolean.class);
+            return Boolean.TRUE.equals(guest);
+        } catch (Exception e) {
+            log.warn("Failed to read guest claim from token: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**

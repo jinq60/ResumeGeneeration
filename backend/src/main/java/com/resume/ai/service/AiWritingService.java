@@ -3,6 +3,7 @@ package com.resume.ai.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.ai.config.AiPromptTemplates;
+import com.resume.ai.config.AiProperties;
 import com.resume.ai.dto.AiChatRequest;
 import com.resume.ai.dto.AiChatResponse;
 import com.resume.ai.dto.ResumeAiWriteRequest;
@@ -34,7 +35,7 @@ import reactor.core.publisher.Flux;
  * 行内 AI 写作服务：对简历指定字段执行生成/润色/缩短/扩写/翻译。
  * <p>
  * 同步执行（用户等待结果），复用多厂商 LLM 路由与调用审计；
- * 每用户并发上限防止接口被刷爆 LLM 配额。
+ * 每用户并发上限防止接口被刷爆 LLM 配额；按日配额区分游客与登录用户。
  * </p>
  */
 @Slf4j
@@ -44,7 +45,6 @@ public class AiWritingService {
 
     public static final String FEATURE_KEY = "resume-writing";
 
-    private static final int MAX_CONCURRENT_PER_USER = 10;
     private static final int MAX_TEXT_LENGTH = 2000;
     private static final int MAX_PROMPT_TOKENS = 1500;
 
@@ -67,6 +67,8 @@ public class AiWritingService {
     private final AiPromptTemplates promptTemplates;
     private final AiCallLogMapper aiCallLogMapper;
     private final AuditLogService auditLogService;
+    private final AiDailyQuotaService aiDailyQuotaService;
+    private final AiProperties aiProperties;
     private final ObjectMapper objectMapper;
 
     /** 每用户进行中请求计数（内存实现，单实例部署适用） */
@@ -75,8 +77,10 @@ public class AiWritingService {
     /**
      * 执行行内 AI 写作。
      */
-    public ResumeAiWriteResponse write(String userId, String resumeId, ResumeAiWriteRequest request) {
+    public ResumeAiWriteResponse write(String userId, boolean guest, String resumeId,
+                                       ResumeAiWriteRequest request) {
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
+        checkQuota(userId, guest);
 
         // 白名单校验
         if (!FIELD_WHITELIST.containsKey(request.getSectionType())
@@ -102,7 +106,7 @@ public class AiWritingService {
         }
 
         AtomicInteger counter = inFlight.computeIfAbsent(userId, k -> new AtomicInteger());
-        if (counter.incrementAndGet() > MAX_CONCURRENT_PER_USER) {
+        if (counter.incrementAndGet() > aiProperties.getRateLimit().getMaxConcurrentPerUser()) {
             counter.decrementAndGet();
             throw new BusinessException(ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED,
                     "同时进行的 AI 请求过多，请稍后再试。");
@@ -118,15 +122,17 @@ public class AiWritingService {
      * Stream generated content as text deltas. The same validation and quota
      * rules as the synchronous endpoint apply.
      */
-    public Flux<String> stream(String userId, String resumeId, ResumeAiWriteRequest request) {
+    public Flux<String> stream(String userId, boolean guest, String resumeId,
+                               ResumeAiWriteRequest request) {
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
+        checkQuota(userId, guest);
         validateRequest(request);
 
         String originalText = StringUtils.defaultString(request.getOriginalText());
         validateOriginalText(request, originalText);
 
         AtomicInteger counter = inFlight.computeIfAbsent(userId, k -> new AtomicInteger());
-        if (counter.incrementAndGet() > MAX_CONCURRENT_PER_USER) {
+        if (counter.incrementAndGet() > aiProperties.getRateLimit().getMaxConcurrentPerUser()) {
             counter.decrementAndGet();
             throw new BusinessException(ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED,
                     "同时进行的 AI 请求过多，请稍后再试。");
@@ -240,8 +246,17 @@ public class AiWritingService {
         }
     }
 
-    private void validateRequest(ResumeAiWriteRequest request) {
-        if (!FIELD_WHITELIST.containsKey(request.getSectionType())
+    /**
+     * 按日配额校验：游客与登录用户使用不同上限，超限直接拒绝。
+     */
+    private void checkQuota(String userId, boolean guest) {
+        int dailyLimit = guest
+                ? aiProperties.getDailyQuota().getGuest()
+                : aiProperties.getDailyQuota().getUser();
+        aiDailyQuotaService.consume(userId, FEATURE_KEY, dailyLimit);
+    }
+
+    private void validateRequest(ResumeAiWriteRequest request) {        if (!FIELD_WHITELIST.containsKey(request.getSectionType())
                 || !FIELD_WHITELIST.get(request.getSectionType()).contains(request.getField())) {
             throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "该字段暂不支持 AI 写作。");
         }

@@ -4,11 +4,13 @@ import com.resume.ai.dto.ResumeAiWriteRequest;
 import com.resume.ai.dto.ResumeAiWriteResponse;
 import com.resume.ai.service.AiWritingService;
 import com.resume.common.entity.R;
+import com.resume.user.security.JwtTokenProvider;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,19 +27,22 @@ import reactor.core.publisher.Flux;
 public class AiWritingController {
 
     private final AiWritingService aiWritingService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @PostMapping("/{resumeId}/ai/write")
     public R<ResumeAiWriteResponse> write(@AuthenticationPrincipal String userId,
+                                          Authentication authentication,
                                           @PathVariable String resumeId,
                                           @Valid @RequestBody ResumeAiWriteRequest request) {
-        return R.success(aiWritingService.write(userId, resumeId, request));
+        return R.success(aiWritingService.write(userId, resolveGuest(authentication), resumeId, request));
     }
 
     @PostMapping(value = "/{resumeId}/ai/write/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> stream(@AuthenticationPrincipal String userId,
+                                                Authentication authentication,
                                                 @PathVariable String resumeId,
                                                 @Valid @RequestBody ResumeAiWriteRequest request) {
-        return aiWritingService.stream(userId, resumeId, request)
+        return aiWritingService.stream(userId, resolveGuest(authentication), resumeId, request)
                 .map(content -> ServerSentEvent.<String>builder()
                         .event("delta")
                         .data(content)
@@ -47,5 +52,17 @@ public class AiWritingController {
                         .event("error")
                         .data(error.getMessage() == null ? "AI 写作失败，请稍后重试。" : error.getMessage())
                         .build()));
+    }
+
+    /**
+     * 从 Authentication 的 credentials（原始 JWT）解析游客标志；
+     * 拿不到 token（如测试场景）时按非游客处理。
+     */
+    private boolean resolveGuest(Authentication authentication) {
+        if (authentication == null) {
+            return false;
+        }
+        Object credentials = authentication.getCredentials();
+        return credentials instanceof String token && jwtTokenProvider.getGuest(token);
     }
 }

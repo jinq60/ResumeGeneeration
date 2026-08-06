@@ -334,6 +334,9 @@ public void validateAvatarFile(MultipartFile file) {
 | 越权访问 | `ACCESS_DENIED` | `403` | “无权访问该资源。” |
 | 资源不存在 | `RESOURCE_NOT_FOUND` | `404` | “请求的资源不存在。” |
 | 参数校验失败 | `PARAM_INVALID` | `400` | “请求参数不正确，请检查。” |
+| AI 写作字段不支持 | `AI_WRITING_FIELD_INVALID` | `6007` | “该字段暂不支持 AI 写作。” |
+| AI 写作原文过长 | `AI_WRITING_CONTENT_TOO_LONG` | `6008` | “原文过长，AI 写作单次最多支持 2000 字符。” |
+| AI 每日配额用尽 | `AI_DAILY_QUOTA_EXCEEDED` | `6009` | “今日 AI 写作次数已用完，请明天再来。” |
 
 > **说明**：数字错误码与 `backend/src/main/java/com/resume/common/constant/ResultCode.java` 保持一致。新增错误码（如 `2007`/`2008`/`2009`/`2010`）需在 ResultCode 中同步补充。
 

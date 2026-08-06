@@ -72,6 +72,9 @@ app:
       queue-capacity: 50
     rate-limit:
       max-concurrent-per-user: 3
+    daily-quota:
+      guest: 3
+      user: 30
     prompts:
       resume-review: "Test prompt {resumeContent} {jobDescription}"
       resume-optimize: "Test prompt {resumeContent} {jobDescription}"

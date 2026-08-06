@@ -86,4 +86,5 @@ public final class ResultCode {
     public static final int AI_CONTENT_TOO_LONG = 6006;
     public static final int AI_WRITING_FIELD_INVALID = 6007;
     public static final int AI_WRITING_CONTENT_TOO_LONG = 6008;
+    public static final int AI_DAILY_QUOTA_EXCEEDED = 6009;
 }

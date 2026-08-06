@@ -88,6 +88,7 @@
 | 获取最新点评 | `scope-alignment.md` §2.1 | `resume_review` 表 | `api-spec.md` §7.9 | — | `tdd-test-plan.md` §2.3 | `ResumeController`, `ResumeReviewService` |
 | JD 简历优化 | 业务线 v1.1 Phase 1 | `resume_optimize_task` 表 | `api-changelog.md` v1.3 | — | `AiResumeControllerTest` | `AiResumeController`, `AiResumeOptimizeService` |
 | 编辑器内 AI 写作 | 业务线 v1.1 Phase 1 | `ai_call_log` 表 | `api-changelog.md` v1.4 | 字段白名单、长度限制 | `AiWritingServiceTest`, `AiWritingControllerTest` | `AiWritingController`, `AiWritingService`, `frontend/src/components/editor/AiWriterButton.vue` |
+| AI 写作按日配额 | 业务线 v1.1 §5 P1 | `ai_daily_quota` 表（V10） | `api-changelog.md` v1.6 | 游客 3/天、登录 30/天 | `AiDailyQuotaServiceTest`, `AiWritingServiceTest`, `AiWritingControllerTest` | `AiDailyQuotaService`, `AiWritingService`, `AiWritingController` |
 | AI 流式写作 | 编辑器体验 2.0 | `ai_call_log` 表 | `api-changelog.md` v1.4 | SSE delta/done/error 事件 | `AiWritingServiceTest`, `AiWritingControllerTest`, `resumeApiStream.test.ts` | `AiWritingController`, `LlmProvider.stream`, `frontend/src/api/resume.ts` |
 | AI 语法检查 | 编辑器体验 2.0 | `ai_call_log` 表 | `api-spec.md` §7.13 | status、severity、字段定位 | `AiGrammarServiceTest`, `AiGrammarControllerTest` | `AiGrammarService`, `AiGrammarController`, `EditorView.vue` 语法检查抽屉 |
 | 富文本字段 | 编辑器体验 2.0 | `contentHtml` / `descriptionHtml` JSON 字段 | `api-spec.md` §7.10 | 前后端 HTML 白名单清洗 | `RichTextSanitizerTest`, `richText.test.ts`, `RichTextEditor.test.ts` | `RichTextSanitizer`, `ResumeRenderService`, `ResumeExportService`, `RichTextEditor.vue` |

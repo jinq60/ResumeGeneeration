@@ -1,6 +1,7 @@
 package com.resume.ai.service;
 
 import com.resume.ai.config.AiPromptTemplates;
+import com.resume.ai.config.AiProperties;
 import com.resume.ai.dto.AiChatRequest;
 import com.resume.ai.dto.AiChatResponse;
 import com.resume.ai.dto.ResumeAiWriteRequest;
@@ -30,6 +31,9 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,14 +56,21 @@ class AiWritingServiceTest {
     private AuditLogService auditLogService;
 
     @Mock
+    private AiDailyQuotaService aiDailyQuotaService;
+
+    @Mock
     private LlmProvider llmProvider;
+
+    private AiProperties aiProperties;
 
     private AiWritingService service;
 
     @BeforeEach
     void setUp() {
+        aiProperties = new AiProperties();
         service = new AiWritingService(resumeService, providerRouter, promptTemplates,
-                aiCallLogMapper, auditLogService, new ObjectMapper());
+                aiCallLogMapper, auditLogService, aiDailyQuotaService, aiProperties,
+                new ObjectMapper());
         when(providerRouter.resolve(anyString())).thenReturn(llmProvider);
         when(providerRouter.resolveModel(anyString())).thenReturn("qwen-turbo");
         when(promptTemplates.render(anyString(), any())).thenReturn("prompt");
@@ -105,7 +116,7 @@ class AiWritingServiceTest {
         response.setSuccess(true);
         when(llmProvider.chat(any(AiChatRequest.class))).thenReturn(response);
 
-        var result = service.write("user_1", "resume_1", buildRequest("polish"));
+        var result = service.write("user_1", false, "resume_1", buildRequest("polish"));
 
         assertEquals("优化后的自我介绍", result.getContent());
     }
@@ -118,7 +129,7 @@ class AiWritingServiceTest {
         request.setField("hackerField");
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.write("user_1", "resume_1", request));
+                () -> service.write("user_1", false, "resume_1", request));
         assertEquals(ResultCode.AI_WRITING_FIELD_INVALID, ex.getErrorCode());
     }
 
@@ -130,7 +141,7 @@ class AiWritingServiceTest {
         request.setAction("hack");
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.write("user_1", "resume_1", request));
+                () -> service.write("user_1", false, "resume_1", request));
         assertEquals(ResultCode.AI_WRITING_FIELD_INVALID, ex.getErrorCode());
     }
 
@@ -142,7 +153,7 @@ class AiWritingServiceTest {
         request.setTargetLang(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.write("user_1", "resume_1", request));
+                () -> service.write("user_1", false, "resume_1", request));
         assertEquals(ResultCode.AI_WRITING_FIELD_INVALID, ex.getErrorCode());
     }
 
@@ -154,7 +165,7 @@ class AiWritingServiceTest {
         request.setOriginalText("x".repeat(2001));
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.write("user_1", "resume_1", request));
+                () -> service.write("user_1", false, "resume_1", request));
         assertEquals(ResultCode.AI_WRITING_CONTENT_TOO_LONG, ex.getErrorCode());
     }
 
@@ -164,7 +175,7 @@ class AiWritingServiceTest {
                 .thenThrow(new BusinessException(ResultCode.ACCESS_DENIED, "无权访问该资源。"));
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.write("user_2", "resume_1", buildRequest("polish")));
+                () -> service.write("user_2", false, "resume_1", buildRequest("polish")));
         assertEquals(ResultCode.ACCESS_DENIED, ex.getErrorCode());
     }
 
@@ -178,7 +189,7 @@ class AiWritingServiceTest {
         when(llmProvider.chat(any(AiChatRequest.class))).thenReturn(response);
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.write("user_1", "resume_1", buildRequest("polish")));
+                () -> service.write("user_1", false, "resume_1", buildRequest("polish")));
         assertEquals(ResultCode.AI_MODEL_CALL_FAILED, ex.getErrorCode());
     }
 
@@ -192,8 +203,48 @@ class AiWritingServiceTest {
         when(llmProvider.chat(any(AiChatRequest.class))).thenReturn(response);
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.write("user_1", "resume_1", buildRequest("polish")));
+                () -> service.write("user_1", false, "resume_1", buildRequest("polish")));
         assertEquals(ResultCode.AI_RESPONSE_PARSE_FAILED, ex.getErrorCode());
+    }
+
+    @Test
+    void write_shouldRejectWhenDailyQuotaExceeded() {
+        when(resumeService.getResumeEntity("user_1", "resume_1"))
+                .thenReturn(buildResume("user_1", "resume_1"));
+        doThrow(new BusinessException(ResultCode.AI_DAILY_QUOTA_EXCEEDED, "今日 AI 写作次数已用完，请明天再来。"))
+                .when(aiDailyQuotaService).consume(anyString(), anyString(), any(Integer.class));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.write("user_1", false, "resume_1", buildRequest("polish")));
+        assertEquals(ResultCode.AI_DAILY_QUOTA_EXCEEDED, ex.getErrorCode());
+    }
+
+    @Test
+    void write_shouldUseGuestQuotaForGuests() {
+        when(resumeService.getResumeEntity("user_1", "resume_1"))
+                .thenReturn(buildResume("user_1", "resume_1"));
+        AiChatResponse response = new AiChatResponse();
+        response.setContent("游客的自我介绍");
+        response.setSuccess(true);
+        when(llmProvider.chat(any(AiChatRequest.class))).thenReturn(response);
+
+        service.write("user_1", true, "resume_1", buildRequest("polish"));
+
+        verify(aiDailyQuotaService).consume(eq("user_1"), eq("resume-writing"), eq(3));
+    }
+
+    @Test
+    void write_shouldUseUserQuotaForRegisteredUsers() {
+        when(resumeService.getResumeEntity("user_1", "resume_1"))
+                .thenReturn(buildResume("user_1", "resume_1"));
+        AiChatResponse response = new AiChatResponse();
+        response.setContent("登录用户的自我介绍");
+        response.setSuccess(true);
+        when(llmProvider.chat(any(AiChatRequest.class))).thenReturn(response);
+
+        service.write("user_1", false, "resume_1", buildRequest("polish"));
+
+        verify(aiDailyQuotaService).consume(eq("user_1"), eq("resume-writing"), eq(30));
     }
 
     @Test
@@ -203,7 +254,7 @@ class AiWritingServiceTest {
         when(llmProvider.stream(any(AiChatRequest.class)))
                 .thenReturn(Flux.just("第一段", "第二段"));
 
-        List<String> result = service.stream("user_1", "resume_1", buildRequest("polish"))
+        List<String> result = service.stream("user_1", false, "resume_1", buildRequest("polish"))
                 .collectList()
                 .block();
 

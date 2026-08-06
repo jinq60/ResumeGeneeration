@@ -178,6 +178,7 @@ app.ai.thread-pool:
 | 6006 | AI_CONTENT_TOO_LONG | 内容过长超出 token 限制 |
 | 6007 | AI_WRITING_FIELD_INVALID | 行内写作字段不在白名单 |
 | 6008 | AI_WRITING_CONTENT_TOO_LONG | 行内写作原文超过长度限制 |
+| 6009 | AI_DAILY_QUOTA_EXCEEDED | 当日 AI 写作配额用尽 |
 
 ---
 

@@ -2,6 +2,16 @@
 
 > 记录 `docs/superpowers/specs/2026-07-03-api-spec.md` 的所有变更，便于前后端联调与版本管理。
 
+## v1.6（2026-08-06）
+
+### 新增
+
+- AI 写作按日配额：游客 3 次/天、登录用户 30 次/天（`app.ai.daily-quota.guest/user` 可配置），`ai_daily_quota` 表（V10 迁移）持久化计数，同步与流式接口均受配额约束。
+- 错误码：`AI_DAILY_QUOTA_EXCEEDED`(6009)。
+- `POST /resumes/{id}/ai/write` 与 `POST /resumes/{id}/ai/write/stream` 依据 JWT `guest` claim 区分配额上限。
+
+---
+
 ## v1.5（2026-08-06）
 
 ### 新增
