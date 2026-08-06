@@ -204,7 +204,7 @@
               >
                 <BrandIcon
                   name="google"
-                  :size="20"
+                  :size="26"
                 />
               </button>
               <button
@@ -215,7 +215,7 @@
               >
                 <BrandIcon
                   name="github"
-                  :size="20"
+                  :size="26"
                 />
               </button>
               <button
@@ -226,7 +226,7 @@
               >
                 <BrandIcon
                   name="qq"
-                  :size="20"
+                  :size="26"
                 />
               </button>
               <button
@@ -235,7 +235,7 @@
                 class="w-11 h-11 flex items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-outline opacity-60 cursor-not-allowed"
                 title="手机验证码登录即将上线"
               >
-                <el-icon :size="20">
+                <el-icon :size="26">
                   <Iphone />
                 </el-icon>
               </button>
