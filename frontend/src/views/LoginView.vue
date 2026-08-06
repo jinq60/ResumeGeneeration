@@ -58,11 +58,6 @@
             </div>
           </div>
         </div>
-
-        <div class="relative z-10 mt-auto pt-4 border-t border-white/10 text-white/60 text-body-md flex items-center gap-2">
-          <span>📁</span>
-          <span>从第一条经历开始 —— 在线极速排版</span>
-        </div>
       </aside>
 
       <!-- 右：纸白登录面 -->
@@ -95,11 +90,6 @@
             <h2 class="text-headline-md font-headline-md text-on-surface">
               {{ activeTab === 'login' ? '欢迎回来' : '创建账号' }}
             </h2>
-            <p class="text-body-md text-on-surface-variant mt-2">
-              {{ activeTab === 'login'
-                ? '登录你的账号，继续完善你的职业档案'
-                : '注册后即可开始制作你的第一份简历' }}
-            </p>
           </header>
 
           <div
@@ -206,9 +196,6 @@
                   {{ countdown > 0 ? `${countdown}s 后重发` : codeSending ? '发送中…' : '获取验证码' }}
                 </button>
               </div>
-              <p class="text-label-md text-on-surface-variant">
-                未注册的邮箱将自动创建账号
-              </p>
             </template>
 
             <button
@@ -228,7 +215,7 @@
 
             <div class="relative flex items-center my-5">
               <div class="flex-1 h-px bg-outline-variant" />
-              <span class="px-3 text-label-md text-on-surface-variant">其他方式</span>
+              <span class="px-3 text-label-md text-on-surface-variant">或</span>
               <div class="flex-1 h-px bg-outline-variant" />
             </div>
 
@@ -239,7 +226,7 @@
                 title="使用 Google 账号登录"
                 @click="handleOAuth('google')"
               >
-                <span class="text-lg leading-none">G</span>
+                <BrandIcon name="google" />
                 <span class="text-label-md">Google</span>
               </button>
               <button
@@ -248,7 +235,7 @@
                 title="使用 GitHub 账号登录"
                 @click="handleOAuth('github')"
               >
-                <span class="text-lg leading-none">GH</span>
+                <BrandIcon name="github" />
                 <span class="text-label-md">GitHub</span>
               </button>
               <button
@@ -257,8 +244,8 @@
                 title="使用 QQ 扫码登录"
                 @click="handleOAuth('qq')"
               >
-                <span class="text-lg leading-none">QQ</span>
-                <span class="text-label-md">QQ 登录</span>
+                <BrandIcon name="qq" />
+                <span class="text-label-md">QQ</span>
               </button>
               <button
                 type="button"
@@ -266,8 +253,10 @@
                 class="flex flex-col items-center gap-1.5 py-2.5 rounded-lg border border-outline-variant text-outline opacity-60 cursor-not-allowed"
                 title="手机验证码登录即将上线"
               >
-                <span class="text-lg leading-none"><el-icon><Iphone /></el-icon></span>
-                <span class="text-label-md">短信登录</span>
+                <el-icon :size="18">
+                  <Iphone />
+                </el-icon>
+                <span class="text-label-md">短信</span>
               </button>
             </div>
 
@@ -282,9 +271,6 @@
               </el-icon>
               <span>以游客身份体验</span>
             </button>
-            <p class="text-center text-label-md text-on-surface-variant mt-3">
-              可创建临时简历，随时注册保存。
-            </p>
           </form>
 
           <!-- 注册表单 -->
@@ -350,57 +336,6 @@
             </button>
           </form>
         </div>
-
-        <footer class="mt-6 pt-5 border-t border-outline-variant/30 grid grid-cols-3 gap-3">
-          <div class="flex flex-col items-center text-center gap-1">
-            <el-icon
-              size="14"
-              class="text-primary"
-            >
-              <Lock />
-            </el-icon>
-            <div class="mt-1">
-              <div class="text-label-md font-medium text-on-surface">
-                数据安全
-              </div>
-              <div class="text-label-md text-on-surface-variant">
-                银行级加密保护
-              </div>
-            </div>
-          </div>
-          <div class="flex flex-col items-center text-center gap-1">
-            <el-icon
-              size="14"
-              class="text-secondary"
-            >
-              <Hide />
-            </el-icon>
-            <div class="mt-1">
-              <div class="text-label-md font-medium text-on-surface">
-                隐私保障
-              </div>
-              <div class="text-label-md text-on-surface-variant">
-                简历仅你可见
-              </div>
-            </div>
-          </div>
-          <div class="flex flex-col items-center text-center gap-1">
-            <el-icon
-              size="14"
-              class="text-on-surface"
-            >
-              <Download />
-            </el-icon>
-            <div class="mt-1">
-              <div class="text-label-md font-medium text-on-surface">
-                随时导出
-              </div>
-              <div class="text-label-md text-on-surface-variant">
-                支持 PDF 格式
-              </div>
-            </div>
-          </div>
-        </footer>
       </section>
     </div>
   </div>
@@ -411,7 +346,8 @@ import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { authApi, oauthAuthorizeUrl } from '@/api/auth'
-import { User, Lock, View, Hide, Loading, Iphone, Message, Download, WarningFilled } from '@element-plus/icons-vue'
+import BrandIcon from '@/components/common/BrandIcon.vue'
+import { User, Lock, View, Hide, Loading, Iphone, Message, WarningFilled } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
