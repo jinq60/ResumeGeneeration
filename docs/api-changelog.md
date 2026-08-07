@@ -2,6 +2,18 @@
 
 > 记录 `docs/superpowers/specs/2026-07-03-api-spec.md` 的所有变更，便于前后端联调与版本管理。
 
+## v2.1（2026-08-06）
+
+### 完善（多方式登录）
+
+- 邮箱验证码存储升级：优先 Redis（`email-code:{email}`，多实例安全），未配置 Redis 时降级进程内存（单实例）；内存模式惰性清理过期条目。
+- 验证码防爆破：连续 5 次校验失败后验证码作废。
+- OAuth 回调响应增加 `Cache-Control: no-store`（防止 JWT 落入中间缓存）。
+- OAuth state 存储惰性清理过期条目。
+- `docs/environment.md` 补全认证配置项与密钥获取清单（Google/GitHub/QQ/SMTP）。
+
+---
+
 ## v2.0（2026-08-06）
 
 ### 移除

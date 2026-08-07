@@ -56,11 +56,42 @@
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |---|---|---|---|
 | `app.cors.allowed-origins` | `CORS_ALLOWED_ORIGINS`（dev）/ `APP_CORS_ALLOWED_ORIGINS`（prod） | `http://localhost:5173` | 允许的前端来源，逗号分隔 |
-| `app.auth.verify-code.mode` | `VERIFY_CODE_MODE` | `placeholder` | dev/test 可用占位验证码；生产必须 `strict` |
+| `app.auth.verify-code.mode` | `VERIFY_CODE_MODE` | `placeholder` | 已随注册功能移除，保留配置项向后兼容 |
 | `app.admin.bootstrap.phone` | `ADMIN_BOOTSTRAP_PHONE` | 空 | 首个管理员引导手机号 |
 | `app.admin.bootstrap.password` | `ADMIN_BOOTSTRAP_PASSWORD` | 空 | 首个管理员引导密码 |
 | `app.render.public-base-url` | `APP_PUBLIC_BASE_URL` | 空 | PDF/分享渲染时的外部访问前缀 |
 | `app.ai.*` | `OPENAI_API_KEY`、`DASHSCOPE_API_KEY`、`ERNIE_API_KEY` 等 | 空 | AI 供应商配置；未配置时按功能降级 |
+
+### 1.7 多方式登录（邮箱验证码 / 第三方 OAuth / SMTP）
+
+| 配置项 | 环境变量 | 默认值 | 说明 |
+|---|---|---|---|
+| `app.auth.email-code.ttl-minutes` | — | `5` | 邮箱验证码有效期（分钟） |
+| `app.auth.email-code.resend-interval-seconds` | — | `60` | 重发间隔（秒） |
+| `app.auth.oauth.base-url` | `AUTH_OAUTH_BASE_URL` | `http://localhost:8080/api` | 后端对外地址，回调 = base-url + `/auth/oauth/{provider}/callback` |
+| `app.auth.oauth.frontend-redirect` | `AUTH_OAUTH_FRONTEND_REDIRECT` | `http://localhost:5173/login` | OAuth 登录成功后的前端跳转地址 |
+| `app.auth.oauth.google.client-id` | `GOOGLE_CLIENT_ID` | 空 | Google OAuth 客户端 ID |
+| `app.auth.oauth.google.client-secret` | `GOOGLE_CLIENT_SECRET` | 空 | Google OAuth 客户端密钥 |
+| `app.auth.oauth.github.client-id` | `GITHUB_CLIENT_ID` | 空 | GitHub OAuth 客户端 ID |
+| `app.auth.oauth.github.client-secret` | `GITHUB_CLIENT_SECRET` | 空 | GitHub OAuth 客户端密钥 |
+| `app.auth.oauth.qq.app-id` | `QQ_APP_ID` | 空 | QQ 互联 APP ID |
+| `app.auth.oauth.qq.app-key` | `QQ_APP_KEY` | 空 | QQ 互联 APP KEY |
+| `app.auth.smtp.host` | `SMTP_HOST` | 空 | SMTP 服务器；留空时验证码降级为日志输出（仅限开发） |
+| `app.auth.smtp.port` | `SMTP_PORT` | `587` | SMTP 端口 |
+| `app.auth.smtp.username` | `SMTP_USERNAME` | 空 | SMTP 账号（通常是邮箱） |
+| `app.auth.smtp.password` | `SMTP_PASSWORD` | 空 | SMTP 密码/授权码 |
+| `app.auth.smtp.from` | `SMTP_FROM` | 空 | 发件人地址，缺省用 username |
+
+#### 需要获取的密钥/API 配置单
+
+| 用途 | 需要获取 | 获取入口 | 回调地址（回填到平台） | 填到环境变量 |
+|---|---|---|---|---|
+| 邮箱验证码发送 | 任意邮箱的 SMTP 授权码（如 QQ 邮箱/163/Outlook 开启 SMTP 服务） | 邮箱服务商设置页 | — | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` |
+| Google 登录 | OAuth 客户端 ID + 密钥 | https://console.cloud.google.com → 凭据 → OAuth 客户端 ID（Web 应用） | `http://localhost:8080/api/auth/oauth/google/callback`（生产换成域名） | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` |
+| GitHub 登录 | OAuth App Client ID + Secret | https://github.com/settings/developers → OAuth Apps | `http://localhost:8080/api/auth/oauth/github/callback` | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` |
+| QQ 扫码登录 | APP ID + APP Key（需实名开发者 + 应用审核） | https://connect.qq.com | `http://localhost:8080/api/auth/oauth/qq/callback` | `QQ_APP_ID` / `QQ_APP_KEY` |
+
+> 部署提示：回调地址中的 `localhost:8080` 需替换为生产环境对外域名（与 `AUTH_OAUTH_BASE_URL` 一致）。
 
 ---
 

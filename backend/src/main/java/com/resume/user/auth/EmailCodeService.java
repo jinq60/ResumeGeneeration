@@ -3,23 +3,26 @@ package com.resume.user.auth;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.user.config.AuthProperties;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 邮箱验证码服务：生成、校验（一次性、5 分钟过期）与发送。
+ * 邮箱验证码服务：生成、校验（一次性、5 分钟过期、5 次错误作废）与发送。
  * <p>
+ * 存储策略：优先使用 Redis（key {@code email-code:{email}}，多实例安全）；
+ * 未配置 Redis 时降级为进程内存 Map（单实例适用，重启即失效）。
  * 未配置 SMTP 时降级为日志输出验证码（仅限本地开发演示），
  * 生产环境必须配置 {@code app.auth.smtp.*}。
  * </p>
@@ -30,9 +33,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class EmailCodeService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String REDIS_KEY_PREFIX = "email-code:";
+    private static final int MAX_ATTEMPTS = 5;
 
     private final AuthProperties authProperties;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
+    private final ObjectProvider<RedisTemplate<String, String>> redisTemplateProvider;
 
     private final Map<String, Entry> codes = new ConcurrentHashMap<>();
 
@@ -41,31 +47,129 @@ public class EmailCodeService {
      */
     public void send(String email) {
         String key = normalizeEmail(email);
-        Entry existing = codes.get(key);
-        if (existing != null && existing.lastSentAt != null
-                && existing.lastSentAt.plusSeconds(authProperties.getEmailCode().getResendIntervalSeconds())
-                .isAfter(LocalDateTime.now())) {
+        if (isInCooldown(key)) {
             throw new BusinessException(ResultCode.AUTH_EMAIL_CODE_TOO_FREQUENT,
                     "发送过于频繁，请稍后再试。");
         }
 
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-        codes.put(key, new Entry(code, LocalDateTime.now().plusMinutes(
-                authProperties.getEmailCode().getTtlMinutes()), LocalDateTime.now()));
+        store(key, code);
         sendMail(email, code);
     }
 
     /**
-     * 校验验证码（一次性：成功后立即删除）。
+     * 校验验证码（一次性：成功或超过尝试次数后立即删除）。
      */
     public boolean verify(String email, String code) {
         String key = normalizeEmail(email);
-        Entry entry = codes.get(key);
-        if (entry == null || !entry.code.equals(code)) {
+        String stored = load(key);
+        if (stored == null) {
             return false;
         }
+        if (!stored.equals(code)) {
+            int attempts = incrementAttempts(key);
+            if (attempts >= MAX_ATTEMPTS) {
+                remove(key);
+            }
+            return false;
+        }
+        remove(key);
+        return true;
+    }
+
+    private boolean isInCooldown(String key) {
+        LocalDateTime lastSent = readLastSentAt(key);
+        return lastSent != null
+                && lastSent.plusSeconds(authProperties.getEmailCode().getResendIntervalSeconds())
+                .isAfter(LocalDateTime.now());
+    }
+
+    private void store(String key, String code) {
+        RedisTemplate<String, String> redis = redis();
+        if (redis != null) {
+            try {
+                redis.opsForValue().set(REDIS_KEY_PREFIX + key, code,
+                        Duration.ofMinutes(authProperties.getEmailCode().getTtlMinutes()));
+                redis.opsForValue().set(REDIS_KEY_PREFIX + key + ":sent", LocalDateTime.now().toString(),
+                        Duration.ofMinutes(authProperties.getEmailCode().getTtlMinutes()));
+                redis.delete(REDIS_KEY_PREFIX + key + ":attempts");
+                return;
+            } catch (Exception e) {
+                log.warn("Redis store email code failed, fallback to memory: {}", e.getMessage());
+            }
+        }
+        // 惰性清理过期条目，避免内存无限增长
+        codes.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(LocalDateTime.now()));
+        codes.put(key, new Entry(code, LocalDateTime.now().plusMinutes(
+                authProperties.getEmailCode().getTtlMinutes()), LocalDateTime.now(), 0));
+    }
+
+    private String load(String key) {
+        RedisTemplate<String, String> redis = redis();
+        if (redis != null) {
+            try {
+                return redis.opsForValue().get(REDIS_KEY_PREFIX + key);
+            } catch (Exception e) {
+                log.warn("Redis read email code failed, fallback to memory: {}", e.getMessage());
+            }
+        }
+        Entry entry = codes.get(key);
+        if (entry == null || entry.expiresAt().isBefore(LocalDateTime.now())) {
+            codes.remove(key);
+            return null;
+        }
+        return entry.code();
+    }
+
+    private LocalDateTime readLastSentAt(String key) {
+        RedisTemplate<String, String> redis = redis();
+        if (redis != null) {
+            try {
+                String raw = redis.opsForValue().get(REDIS_KEY_PREFIX + key + ":sent");
+                return raw == null ? null : LocalDateTime.parse(raw);
+            } catch (Exception e) {
+                log.warn("Redis read email code sentAt failed: {}", e.getMessage());
+            }
+        }
+        Entry entry = codes.get(key);
+        return entry == null ? null : entry.lastSentAt();
+    }
+
+    private int incrementAttempts(String key) {
+        RedisTemplate<String, String> redis = redis();
+        if (redis != null) {
+            try {
+                Long attempts = redis.opsForValue().increment(REDIS_KEY_PREFIX + key + ":attempts");
+                return attempts == null ? 1 : attempts.intValue();
+            } catch (Exception e) {
+                log.warn("Redis increment attempts failed: {}", e.getMessage());
+            }
+        }
+        Entry entry = codes.get(key);
+        if (entry == null) {
+            return 0;
+        }
+        codes.put(key, new Entry(entry.code(), entry.expiresAt(), entry.lastSentAt(), entry.attempts() + 1));
+        return entry.attempts() + 1;
+    }
+
+    private void remove(String key) {
+        RedisTemplate<String, String> redis = redis();
+        if (redis != null) {
+            try {
+                redis.delete(REDIS_KEY_PREFIX + key);
+                redis.delete(REDIS_KEY_PREFIX + key + ":sent");
+                redis.delete(REDIS_KEY_PREFIX + key + ":attempts");
+                return;
+            } catch (Exception e) {
+                log.warn("Redis delete email code failed: {}", e.getMessage());
+            }
+        }
         codes.remove(key);
-        return entry.expiresAt.isAfter(LocalDateTime.now());
+    }
+
+    private RedisTemplate<String, String> redis() {
+        return redisTemplateProvider.getIfAvailable();
     }
 
     private void sendMail(String email, String code) {
@@ -76,7 +180,6 @@ public class EmailCodeService {
             return;
         }
         try {
-            MimeMessage message = mailSender.createMimeMessage();
             SimpleMailMessage mail = new SimpleMailMessage();
             mail.setFrom(StringUtils.defaultString(smtp.getFrom(), smtp.getUsername()));
             mail.setTo(email);
@@ -96,6 +199,6 @@ public class EmailCodeService {
         return StringUtils.trim(email).toLowerCase();
     }
 
-    private record Entry(String code, LocalDateTime expiresAt, LocalDateTime lastSentAt) {
+    private record Entry(String code, LocalDateTime expiresAt, LocalDateTime lastSentAt, int attempts) {
     }
 }

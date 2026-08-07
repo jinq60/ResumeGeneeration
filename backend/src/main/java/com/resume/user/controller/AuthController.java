@@ -122,6 +122,8 @@ public class AuthController {
                          @RequestParam(required = false) String state,
                          jakarta.servlet.http.HttpServletResponse response) throws IOException {
         String frontend = authProperties.getOauth().getFrontendRedirect();
+        // 回调 URL 携带 JWT：禁止缓存，防止 token 落入中间缓存/代理
+        response.setHeader("Cache-Control", "no-store");
         try {
             OAuthProvider oauth = authProviderRegistry.getOAuthProvider(provider);
             if (!oauthStateStore.consume(state, provider)) {

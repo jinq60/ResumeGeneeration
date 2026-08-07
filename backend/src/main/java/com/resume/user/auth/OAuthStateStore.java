@@ -21,9 +21,10 @@ public class OAuthStateStore {
     private final Map<String, Entry> states = new ConcurrentHashMap<>();
 
     /**
-     * 生成并记录 state。
+     * 生成并记录 state（顺带惰性清理过期条目）。
      */
     public String create(String provider) {
+        states.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(LocalDateTime.now()));
         byte[] bytes = new byte[32];
         secureRandom.nextBytes(bytes);
         String state = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
