@@ -180,7 +180,7 @@ class PdfServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> pdfService.exportPdf("user_1", "resume_1", null));
-        assertEquals(ResultCode.PDF_EXPORT_NAME_REQUIRED, ex.getErrorCode());
+        assertEquals(ResultCode.RESUME_PROFILE_NAME_REQUIRED, ex.getErrorCode());
     }
 
     @Test
@@ -190,7 +190,7 @@ class PdfServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> pdfService.exportPdf("user_1", "resume_1", null));
-        assertEquals(ResultCode.PDF_EXPORT_CONTACT_REQUIRED, ex.getErrorCode());
+        assertEquals(ResultCode.RESUME_PROFILE_CONTACT_REQUIRED, ex.getErrorCode());
     }
 
     @Test

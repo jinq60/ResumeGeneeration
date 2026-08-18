@@ -3,6 +3,7 @@ package com.resume.avatar.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.resume.ai.service.AiAvatarService;
 import com.resume.avatar.dto.AvatarTaskResponse;
 import com.resume.avatar.dto.AvatarUploadResponse;
 import com.resume.avatar.dto.OptimizeAvatarRequest;
@@ -12,10 +13,12 @@ import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.common.service.MinioStorageService;
+import com.resume.common.util.ImageMagicUtil;
 import com.resume.resume.service.ResumeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,17 +42,18 @@ public class AvatarService {
     private final MinioStorageService minioStorageService;
     private final ObjectMapper objectMapper;
     private final ResumeService resumeService;
+    @Lazy
+    private final AiAvatarService aiAvatarService;
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final String[] ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"};
-    private static final String[] ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"};
 
     /**
      * 上传自拍照。
      */
     @Transactional(rollbackFor = Exception.class)
     public AvatarUploadResponse uploadAvatar(String userId, MultipartFile file, String resumeId) {
-        validateAvatarFile(file);
+        String imageFormat = validateAvatarFile(file);
 
         // 校验简历归属：非空时必须属于当前用户，防止把他人简历与本次头像关联
         if (StringUtils.isNotBlank(resumeId)) {
@@ -57,7 +61,9 @@ public class AvatarService {
         }
 
         String originalFilename = StringUtils.defaultString(file.getOriginalFilename(), "avatar.png");
-        String ext = getExtension(originalFilename);
+        // 扩展名与 Content-Type 均由魔数识别结果决定，避免伪造文件名/Content-Type 造成后缀与内容不一致
+        String ext = "." + imageFormat;
+        String contentType = "image/" + ("jpg".equals(imageFormat) ? "jpeg" : imageFormat);
         // 先预生成任务 ID，用于拼对象名与在插入前完成 MinIO 上传（source_image_url 为 NOT NULL）
         String taskId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getIdStr();
         String objectName = userId + "/avatars/" + taskId + "_source" + ext;
@@ -65,7 +71,7 @@ public class AvatarService {
 
         try {
             minioStorageService.upload(minioStorageService.getBucketAvatars(), objectName,
-                    file.getInputStream(), file.getSize(), file.getContentType());
+                    file.getInputStream(), file.getSize(), contentType);
         } catch (IOException e) {
             // 失败时主动删除已上传对象避免孤儿文件
             minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
@@ -116,7 +122,7 @@ public class AvatarService {
             resumeService.getResumeEntity(userId, request.getResumeId());
         }
 
-        // P0 占位：直接复用原图作为结果。
+        // 创建待处理任务，异步交由 AI 多模态分析；前端通过 GET /avatars/tasks/{taskId} 轮询结果
         AvatarTask task = new AvatarTask();
         task.setUserId(userId);
         task.setResumeId(request.getResumeId());
@@ -131,30 +137,11 @@ public class AvatarService {
         task.setUpdatedAt(LocalDateTime.now());
         avatarTaskMapper.insert(task);
 
-        // P0 占位：同步完成优化，状态机从 pending -> processing -> success。
-        transitionStatus(task, BizConstant.TASK_STATUS_PROCESSING);
-        task.setUpdatedAt(LocalDateTime.now());
-        avatarTaskMapper.updateById(task);
-
-        transitionStatus(task, BizConstant.TASK_STATUS_SUCCESS);
-        task.setCompletedAt(LocalDateTime.now());
-        task.setUpdatedAt(LocalDateTime.now());
-        avatarTaskMapper.updateById(task);
-
-        // 优化成功后，若传入 resumeId 则把一寸照地址回填到简历 profile.avatarUrl
-        if (StringUtils.isNotBlank(request.getResumeId())) {
-            try {
-                resumeService.fillAvatarUrl(userId, request.getResumeId(), task.getResultImageUrl());
-            } catch (Exception e) {
-                // 回填失败不影响头像优化任务本身的成功状态，仅记录日志
-                log.warn("fillAvatarUrl failed for userId={}, resumeId={}: {}",
-                        userId, request.getResumeId(), e.getMessage());
-            }
-        }
+        aiAvatarService.executeOptimize(task.getId());
 
         Map<String, Object> result = new HashMap<>();
         result.put("taskId", task.getId());
-        result.put("status", BizConstant.TASK_STATUS_SUCCESS);
+        result.put("status", BizConstant.TASK_STATUS_PENDING);
         return result;
     }
 
@@ -241,42 +228,29 @@ public class AvatarService {
     }
 
     /**
-     * 校验头像 URL 属于当前用户（对象路径以 {userId}/ 开头）。
+     * 校验头像 URL 属于当前用户（对象路径第一段必须精确等于 userId）。
      */
     private void assertOwnAvatarUrl(String userId, String sourceImageUrl) {
         String objectName = extractObjectName(sourceImageUrl);
-        if (StringUtils.isBlank(objectName) || !objectName.startsWith(userId + "/")) {
+        if (!isOwnedObject(userId, objectName)) {
             throw new BusinessException(ResultCode.ACCESS_DENIED, "无权引用该头像资源。");
         }
     }
 
     /**
      * 判断对象路径是否属于当前用户，防止跨用户删除 MinIO 对象。
+     * 精确比较第一段（不以 startsWith 前缀判断，避免等长 ID 之外的前缀误判）。
      */
     private boolean isOwnedObject(String userId, String objectName) {
-        return objectName != null && objectName.startsWith(userId + "/");
+        if (objectName == null || StringUtils.isBlank(userId)) {
+            return false;
+        }
+        int idx = objectName.indexOf('/');
+        String owner = idx < 0 ? objectName : objectName.substring(0, idx);
+        return userId.equals(owner);
     }
 
-    private void transitionStatus(AvatarTask task, String newStatus) {
-        String current = task.getStatus();
-        if (BizConstant.TASK_STATUS_SUCCESS.equals(current) || BizConstant.TASK_STATUS_FAILED.equals(current)) {
-            throw new BusinessException(ResultCode.AVATAR_OPTIMIZE_FAILED, "任务已结束，不可变更状态。");
-        }
-        if (BizConstant.TASK_STATUS_PENDING.equals(current)
-                && !BizConstant.TASK_STATUS_PROCESSING.equals(newStatus)) {
-            throw new BusinessException(ResultCode.AVATAR_OPTIMIZE_FAILED,
-                    "仅允许从 pending 转为 processing。");
-        }
-        if (BizConstant.TASK_STATUS_PROCESSING.equals(current)
-                && !BizConstant.TASK_STATUS_SUCCESS.equals(newStatus)
-                && !BizConstant.TASK_STATUS_FAILED.equals(newStatus)) {
-            throw new BusinessException(ResultCode.AVATAR_OPTIMIZE_FAILED,
-                    "仅允许从 processing 转为 success 或 failed。");
-        }
-        task.setStatus(newStatus);
-    }
-
-    private void validateAvatarFile(MultipartFile file) {
+    private String validateAvatarFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ResultCode.AVATAR_FILE_EMPTY, "请上传头像图片。");
         }
@@ -286,47 +260,25 @@ public class AvatarService {
         if (file.getSize() > MAX_FILE_SIZE) {
             throw new BusinessException(ResultCode.AVATAR_FILE_TOO_LARGE, "图片大小不能超过 10MB。");
         }
-        if (!isValidImageMagic(file)) {
+        String format = detectImageFormat(file);
+        if (format == null) {
             throw new BusinessException(ResultCode.AVATAR_FORMAT_UNSUPPORTED, "图片内容校验失败，请上传 JPG、PNG 或 WEBP 格式图片。");
         }
+        return format;
     }
 
     /**
-     * 通过文件头魔数校验真实图片格式，防止伪造 Content-Type 上传任意内容。
+     * 通过文件头魔数识别真实图片格式，返回 jpg/png/webp；非法返回 null。
+     * 防止伪造 Content-Type 上传任意内容。
      */
-    private boolean isValidImageMagic(MultipartFile file) {
+    private String detectImageFormat(MultipartFile file) {
         try (java.io.InputStream in = file.getInputStream()) {
-            byte[] header = in.readNBytes(12);
-            if (header.length < 4) {
-                return false;
-            }
-            if (header[0] == (byte) 0xFF && header[1] == (byte) 0xD8 && header[2] == (byte) 0xFF) {
-                return true;
-            }
-            if ((header[0] & 0xFF) == 0x89 && header[1] == (byte) 0x50 && header[2] == (byte) 0x4E
-                    && header[3] == (byte) 0x47) {
-                return true;
-            }
-            if (header[0] == (byte) 0x52 && header[1] == (byte) 0x49 && header[2] == (byte) 0x46
-                    && header[3] == (byte) 0x46 && header.length >= 12
-                    && header[8] == (byte) 0x57 && header[9] == (byte) 0x45
-                    && header[10] == (byte) 0x42 && header[11] == (byte) 0x50) {
-                return true;
-            }
-            return false;
+            String format = ImageMagicUtil.detectFormat(in);
+            // 头像仅允许 jpg/png/webp，gif 等其它格式视为不支持
+            return "jpg".equals(format) || "png".equals(format) || "webp".equals(format) ? format : null;
         } catch (IOException e) {
-            return false;
+            return null;
         }
-    }
-
-    private String getExtension(String filename) {
-        String lower = filename.toLowerCase();
-        for (String ext : ALLOWED_EXTENSIONS) {
-            if (lower.endsWith(ext)) {
-                return ext;
-            }
-        }
-        return ".png";
     }
 
     private Map<String, Object> defaultOptions() {

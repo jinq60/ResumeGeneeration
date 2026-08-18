@@ -50,17 +50,17 @@ app:
   playwright:
     chromium-args: --no-sandbox,--disable-setuid-sandbox
   render:
-    # PDF/独立页面渲染�?/uploads/** 相对路径的外部前缀（如 http://your-domain），留空则保持相对路�?
+    # PDF/独立页面渲染时 /uploads/** 相对路径的外部前缀（如 http://your-domain），留空则保持相对路径
     public-base-url: ${APP_PUBLIC_BASE_URL:}
   admin:
     bootstrap:
-      # 首个管理员初始化：仅当系统尚无任�?ADMIN 角色用户时生效（详见 AdminBootstrapRunner�?
+      # 首个管理员初始化：仅当系统尚无任何 ADMIN 角色用户时生效（详见 AdminBootstrapRunner）
       phone: ${ADMIN_BOOTSTRAP_PHONE:}
       password: ${ADMIN_BOOTSTRAP_PASSWORD:}
       nickname: ${ADMIN_BOOTSTRAP_NICKNAME:管理员}
   auth:
     verify-code:
-      # 验证码模式：placeholder=任意 6 位数字（仅限开�?测试）；strict=未配置真实验证码服务时拒绝注�?
+      # 验证码模式：placeholder=任意 6 位数字（仅限开发测试）；strict=未配置真实验证码服务时拒绝注册
       mode: ${VERIFY_CODE_MODE:placeholder}
     email-code:
       # 邮箱验证码有效期与重发间隔
@@ -88,7 +88,7 @@ app:
       password: ${SMTP_PASSWORD:}
       from: ${SMTP_FROM:}
     guest:
-      # �?IP 每天可创建的游客会话上限（防刷号�?
+      # 每 IP 每天可创建的游客会话上限（防刷号）
       max-per-ip-per-day: ${GUEST_MAX_PER_IP_PER_DAY:50}
     login:
       # 连续登录失败锁定
@@ -145,12 +145,12 @@ app:
       user: 30
     prompts:
       resume-review: |
-        你是一位资深HR和简历优化专家。请对以下简历进行全面点评�?
+        你是一位资深HR和简历优化专家。请对以下简历进行全面点评：
 
         简历内容：
         {resumeContent}
 
-        岗位描述�?
+        岗位描述：
         {jobDescription}
 
         请以JSON格式返回，严格遵循以下结构（不要输出其他内容）：
@@ -175,15 +175,15 @@ app:
           "highlights": ["<亮点1>", "<亮点2>"]
         }
       resume-optimize: |
-        你是一位资深简历优化专家。用户希望针对以下岗位JD优化简历，你需要逐模块分析差距并给出修改建议�?
+        你是一位资深简历优化专家。用户希望针对以下岗位JD优化简历，你需要逐模块分析差距并给出修改建议：
 
         简历内容：
         {resumeContent}
 
-        目标岗位JD�?
+        目标岗位JD：
         {jobDescription}
 
-        请以JSON格式返回（不要输出其他内容）�?
+        请以JSON格式返回（不要输出其他内容）：
         {
           "matchScore": <0-100整数>,
           "dimensionScores": {
@@ -201,17 +201,17 @@ app:
               "reasoning": "<修改原因>"
             }
           ],
-          "missingSkills": ["<缺失技�?"],
+          "missingSkills": ["<缺失技能>"],
           "recommendations": ["<整体建议>"]
         }
       avatar-optimize: |
-        你是一位专业证件照处理专家。请分析这张用户自拍照，描述如何将其优化为一寸证件照�?
-        要求：背景替换为指定颜色，保持面部特征一致，提升画质，自然美颜�?
+        你是一位专业证件照处理专家。请分析这张用户自拍照，描述如何将其优化为一寸证件照：
+        要求：背景替换为指定颜色，保持面部特征一致，提升画质，自然美颜。
 
         目标背景色：{backgroundType}
         风格要求：{style}
       resume-writing: |
-        你是一位资深简历写作专家。请根据要求对简历内容进行写作或改写�?
+        你是一位资深简历写作专家。请根据要求对简历内容进行写作或改写：
 
         简历整体内容：
         {resumeContent}
@@ -219,28 +219,29 @@ app:
         目标岗位：{jobDescription}
 
         当前模块：{sectionType} / 字段：{field}
-        操作要求�?
+        操作要求：
         - generate：根据简历上下文与目标岗位，为该字段生成合适的内容
-        - polish：润色原文，保持事实与要点不变，表达更专�?
+        - polish：润色原文，保持事实与要点不变，表达更专业
         - shorten：精简原文，保留关键信息，去除冗余
-        - expand：扩写原文，补充量化数据与细节，提升说服�?
-        - translate：将原文翻译�?{targetLang} 语言
+        - expand：扩写原文，补充量化数据与细节，提升说服力
+        - translate：将原文翻译为 {targetLang} 语言
 
         待处理原文：
         {originalText}
 
-        要求：只输出最终文本本身，不要任何解释、标题、引号或前后缀�?      resume-grammar: |
-        你是一位专业简历校对专家。请检查以下简历中的错别字、语法问题、表达不专业、主谓不一致和明显冗余�?
-        目标岗位�?        {targetPosition}
+        要求：只输出最终文本本身，不要任何解释、标题、引号或前后缀。
+      resume-grammar: |
+        你是一位专业简历校对专家。请检查以下简历中的错别字、语法问题、表达不专业、主谓不一致和明显冗余。
+        目标岗位：{targetPosition}
 
-        简历结构化内容�?        {resumeContent}
+        简历结构化内容：{resumeContent}
 
-        只返回合�?JSON，不�?Markdown 或解释，结构必须是：
+        只返回合法 JSON，不包含 Markdown 或解释，结构必须是：
         {
           "issues": [
             {
               "sectionType": "introduction|work|project|education|profile|skill|custom",
-              "field": "字段�?,
+              "field": "字段名",
               "itemIndex": 0,
               "severity": "high|medium|low",
               "originalText": "原文片段",
@@ -249,4 +250,4 @@ app:
             }
           ]
         }
-        没有问题时返�?{"issues": []}。不要虚构事实，不要改变数字和技术名称�?
+        没有问题时返回 {"issues": []}。不要虚构事实，不要改变数字和技术名称。

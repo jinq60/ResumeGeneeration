@@ -9,7 +9,7 @@ import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -73,7 +73,9 @@ public class AiDailyQuotaService {
         try {
             aiDailyQuotaMapper.insert(quota);
             return true;
-        } catch (DataIntegrityViolationException e) {
+        } catch (DuplicateKeyException e) {
+            // 仅唯一索引冲突（并发插入同一 user+feature+date）走更新路径，
+            // 其它数据完整性错误（如字段超长）继续抛出，避免被误判为并发冲突
             log.debug("AiDailyQuota insert race, retry via update: user={}, date={}", userId, quotaDate);
             return false;
         }

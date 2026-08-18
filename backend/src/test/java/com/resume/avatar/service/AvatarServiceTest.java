@@ -2,6 +2,7 @@ package com.resume.avatar.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.resume.ai.service.AiAvatarService;
 import com.resume.avatar.dto.OptimizeAvatarRequest;
 import com.resume.avatar.entity.AvatarTask;
 import com.resume.avatar.mapper.AvatarTaskMapper;
@@ -23,6 +24,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,13 +40,17 @@ class AvatarServiceTest {
     @Mock
     private ResumeService resumeService;
 
+    @Mock
+    private AiAvatarService aiAvatarService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private AvatarService avatarService;
 
     @BeforeEach
     void setUp() {
-        avatarService = new AvatarService(avatarTaskMapper, minioStorageService, objectMapper, resumeService);
+        avatarService = new AvatarService(avatarTaskMapper, minioStorageService, objectMapper,
+                resumeService, aiAvatarService);
     }
 
     @Test
@@ -93,7 +99,7 @@ class AvatarServiceTest {
     }
 
     @Test
-    void optimizeAvatar_shouldTransitionFromPendingToSuccess() {
+    void optimizeAvatar_shouldCreatePendingTaskAndSubmitAsync() {
         OptimizeAvatarRequest request = new OptimizeAvatarRequest();
         request.setSourceImageUrl("/uploads/avatars/user_1/avatars/avatar_1_source.png");
         request.setResumeId("resume_1");
@@ -105,18 +111,18 @@ class AvatarServiceTest {
             task.setId("avatar_task_1");
             return 1;
         });
-        when(avatarTaskMapper.updateById(any(AvatarTask.class))).thenReturn(1);
 
         Map<String, Object> result = avatarService.optimizeAvatar("user_1", request);
 
         String taskId = (String) result.get("taskId");
         assertNotNull(taskId);
-        assertEquals(BizConstant.TASK_STATUS_SUCCESS, result.get("status"));
+        assertEquals(BizConstant.TASK_STATUS_PENDING, result.get("status"));
+
+        // 异步任务已提交
+        verify(aiAvatarService).executeOptimize("avatar_task_1");
 
         ArgumentCaptor<AvatarTask> captor = ArgumentCaptor.forClass(AvatarTask.class);
-        verify(avatarTaskMapper, times(2)).updateById(captor.capture());
-        AvatarTask finalTask = captor.getValue();
-        assertEquals(BizConstant.TASK_STATUS_SUCCESS, finalTask.getStatus());
-        assertNotNull(finalTask.getCompletedAt());
+        verify(avatarTaskMapper).insert(captor.capture());
+        assertEquals(BizConstant.TASK_STATUS_PENDING, captor.getValue().getStatus());
     }
 }

@@ -39,6 +39,9 @@ class UserAuthServiceTest {
     private EmailCodeService emailCodeService;
 
     @Mock
+    private SmsCodeService smsCodeService;
+
+    @Mock
     private AuditLogService auditLogService;
 
     private UserAuthService service;
@@ -46,7 +49,7 @@ class UserAuthServiceTest {
     @BeforeEach
     void setUp() {
         service = new UserAuthService(userMapper, userAuthMapper, userService,
-                emailCodeService, auditLogService);
+                emailCodeService, smsCodeService, auditLogService);
     }
 
     private User buildUser(String id, String email) {
@@ -105,12 +108,40 @@ class UserAuthServiceTest {
     }
 
     @Test
+    void smsCodeLogin_shouldRejectInvalidPhone() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.authenticateBySmsCode("12345", "123456"));
+        assertEquals(ResultCode.PARAM_INVALID, ex.getErrorCode());
+    }
+
+    @Test
+    void smsCodeLogin_shouldRejectWrongCode() {
+        when(smsCodeService.verify("13800138000", "000000")).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.authenticateBySmsCode("13800138000", "000000"));
+        assertEquals(ResultCode.AUTH_SMS_CODE_INVALID, ex.getErrorCode());
+    }
+
+    @Test
+    void smsCodeLogin_shouldCreateUserOnFirstLogin() {
+        when(smsCodeService.verify("13800138000", "123456")).thenReturn(true);
+        when(userMapper.selectOne(any())).thenReturn(null);
+        stubAuthResponse();
+
+        AuthResponse response = service.authenticateBySmsCode("13800138000", "123456");
+
+        assertEquals("token_1", response.getAccessToken());
+        verify(userMapper).insert(any(User.class));
+    }
+
+    @Test
     void oauthLogin_shouldCreateAndBindNewUser() {
         when(userMapper.selectOne(any())).thenReturn(null);
         stubAuthResponse();
 
         AuthResponse response = service.authenticateByOAuth(
-                new OAuthUserInfo("google", "sub_1", "oauth@example.com", "OAuth用户", null));
+                new OAuthUserInfo("google", "sub_1", "oauth@example.com", "OAuth用户", null, true));
 
         assertEquals("token_1", response.getAccessToken());
         verify(userMapper).insert(any(User.class));
@@ -126,7 +157,7 @@ class UserAuthServiceTest {
         stubAuthResponse();
 
         AuthResponse response = service.authenticateByOAuth(
-                new OAuthUserInfo("github", "gh_1", null, null, null));
+                new OAuthUserInfo("github", "gh_1", null, null, null, false));
 
         assertEquals("token_1", response.getAccessToken());
     }
@@ -135,7 +166,7 @@ class UserAuthServiceTest {
     void oauthLogin_shouldRejectMissingAccountId() {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.authenticateByOAuth(
-                        new OAuthUserInfo("google", "  ", null, null, null)));
+                        new OAuthUserInfo("google", "  ", null, null, null, false)));
         assertEquals(ResultCode.AUTH_OAUTH_EXCHANGE_FAILED, ex.getErrorCode());
     }
 
@@ -146,7 +177,7 @@ class UserAuthServiceTest {
         stubAuthResponse();
 
         service.authenticateByOAuth(
-                new OAuthUserInfo("qq", "qq_1", "oauth@example.com", "QQ用户", null));
+                new OAuthUserInfo("qq", "qq_1", "oauth@example.com", "QQ用户", null, true));
 
         verify(userAuthMapper).insert(any(UserAuth.class));
         verify(userService).buildAuthResponse(any(User.class));

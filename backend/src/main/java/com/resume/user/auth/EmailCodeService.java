@@ -139,18 +139,25 @@ public class EmailCodeService {
         RedisTemplate<String, String> redis = redis();
         if (redis != null) {
             try {
-                Long attempts = redis.opsForValue().increment(REDIS_KEY_PREFIX + key + ":attempts");
+                String attemptsKey = REDIS_KEY_PREFIX + key + ":attempts";
+                Long attempts = redis.opsForValue().increment(attemptsKey);
+                // 首次创建时设置过期时间，避免 attempts 计数 key 残留
+                if (attempts != null && attempts == 1L) {
+                    redis.expire(attemptsKey,
+                            Duration.ofMinutes(authProperties.getEmailCode().getTtlMinutes()));
+                }
                 return attempts == null ? 1 : attempts.intValue();
             } catch (Exception e) {
                 log.warn("Redis increment attempts failed: {}", e.getMessage());
             }
         }
-        Entry entry = codes.get(key);
-        if (entry == null) {
-            return 0;
-        }
-        codes.put(key, new Entry(entry.code(), entry.expiresAt(), entry.lastSentAt(), entry.attempts() + 1));
-        return entry.attempts() + 1;
+        Entry updated = codes.compute(key, (k, entry) -> {
+            if (entry == null) {
+                return null;
+            }
+            return new Entry(entry.code(), entry.expiresAt(), entry.lastSentAt(), entry.attempts() + 1);
+        });
+        return updated == null ? 0 : updated.attempts();
     }
 
     private void remove(String key) {
@@ -176,7 +183,8 @@ public class EmailCodeService {
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         AuthProperties.SmtpConfig smtp = authProperties.getSmtp();
         if (mailSender == null || StringUtils.isBlank(smtp.getHost())) {
-            log.warn("[DEV] Email verify code for {}: {}", email, code);
+            // 验证码属敏感凭据，禁止写入日志；未配置 SMTP 时仅记录发送失败告警
+            log.warn("SMTP not configured, email verify code not sent to {}", email);
             return;
         }
         try {

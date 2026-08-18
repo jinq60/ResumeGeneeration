@@ -82,6 +82,7 @@ public class GlobalExceptionHandler {
             case ResultCode.ACCESS_DENIED -> 403;
             case ResultCode.RESOURCE_NOT_FOUND,
                  ResultCode.RESUME_NOT_FOUND,
+                 ResultCode.RESUME_TEMPLATE_NOT_FOUND,
                  ResultCode.TEMPLATE_NOT_FOUND,
                  ResultCode.AVATAR_TASK_NOT_FOUND,
                  ResultCode.PDF_TASK_NOT_FOUND -> 404;

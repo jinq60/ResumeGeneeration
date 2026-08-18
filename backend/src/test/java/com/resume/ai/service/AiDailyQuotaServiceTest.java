@@ -9,7 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -76,7 +76,7 @@ class AiDailyQuotaServiceTest {
     void consume_shouldRetryViaUpdateWhenInsertRaces() {
         when(aiDailyQuotaMapper.selectOne(any())).thenReturn(null);
         when(aiDailyQuotaMapper.insert(any()))
-                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+                .thenThrow(new DuplicateKeyException("duplicate key"));
         when(aiDailyQuotaMapper.update(any(), any())).thenReturn(1);
 
         assertDoesNotThrow(() -> service.consume("user_1", "resume-writing", 3));

@@ -1,6 +1,7 @@
 package com.resume.resume.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.resume.avatar.service.AvatarService;
 import com.resume.common.constant.BizConstant;
@@ -132,8 +133,15 @@ private final ResumeMapper resumeMapper;
         Page<Resume> pageParam = new Page<>(page, size);
         Page<Resume> result = resumeMapper.selectPage(pageParam, wrapper);
 
+        // 批量查询模板名称，避免逐条 N+1 查询
+        Map<String, String> templateNameMap = templateService.getTemplateNameMap(
+                result.getRecords().stream()
+                        .map(Resume::getTemplateId)
+                        .filter(StringUtils::isNotBlank)
+                        .collect(java.util.stream.Collectors.toSet()));
+
         List<AdminResumeListItemResponse> list = result.getRecords().stream()
-                .map(this::toAdminListItemResponse)
+                .map(r -> toAdminListItemResponse(r, templateNameMap))
                 .toList();
         Page<AdminResumeListItemResponse> responsePage = new Page<>();
         responsePage.setRecords(list);
@@ -303,15 +311,15 @@ private final ResumeMapper resumeMapper;
     }
 
     /**
-     * 递增简历导出次数。
+     * 递增简历导出次数（原子更新，避免并发导出时计数丢失）。
      */
     public void incrementExportCount(String resumeId) {
-        Resume resume = resumeMapper.selectById(resumeId);
-        if (resume != null && BizConstant.NOT_DELETED.equals(resume.getDeleted())) {
-            resume.setExportCount(resume.getExportCount() != null ? resume.getExportCount() + 1 : 1);
-            resume.setUpdatedAt(LocalDateTime.now());
-            resumeMapper.updateById(resume);
-        }
+        LambdaUpdateWrapper<Resume> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(Resume::getId, resumeId)
+                .eq(Resume::getDeleted, BizConstant.NOT_DELETED)
+                .setSql("export_count = COALESCE(export_count, 0) + 1")
+                .set(Resume::getUpdatedAt, LocalDateTime.now());
+        resumeMapper.update(null, wrapper);
     }
 
     public Resume getResumeEntity(String userId, String resumeId) {
@@ -355,9 +363,7 @@ private final ResumeMapper resumeMapper;
         for (SectionDTO section : sections) {
             if (BizConstant.SECTION_TYPE_PROFILE.equals(section.getType())
                     && section.getData() instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> profile = (Map<String, Object>) section.getData();
-                profile.put("avatarUrl", avatarUrl);
+                section.dataAsMap().put("avatarUrl", avatarUrl);
                 updated = true;
                 break;
             }
@@ -448,7 +454,7 @@ private final ResumeMapper resumeMapper;
         return response;
     }
 
-    private AdminResumeListItemResponse toAdminListItemResponse(Resume resume) {
+    private AdminResumeListItemResponse toAdminListItemResponse(Resume resume, Map<String, String> templateNameMap) {
         AdminResumeListItemResponse response = new AdminResumeListItemResponse();
         response.setId(resume.getId());
         response.setUserId(resume.getUserId());
@@ -461,11 +467,8 @@ private final ResumeMapper resumeMapper;
         response.setLastEditedAt(resume.getLastEditedAt());
         response.setCreatedAt(resume.getCreatedAt());
         response.setUpdatedAt(resume.getUpdatedAt());
-        try {
-            response.setTemplateName(templateService.getTemplate(resume.getTemplateId()).getName());
-        } catch (Exception e) {
-            response.setTemplateName("未知模板");
-        }
+        response.setTemplateName(StringUtils.defaultIfBlank(
+                templateNameMap.get(resume.getTemplateId()), "未知模板"));
         return response;
     }
 }

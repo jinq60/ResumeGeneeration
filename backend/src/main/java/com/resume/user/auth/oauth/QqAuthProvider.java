@@ -51,7 +51,8 @@ public class QqAuthProvider extends BaseOAuthProvider {
         JsonNode userInfo = fetchUserInfo(accessToken, openId);
         return new OAuthUserInfo(AuthMethod.QQ, openId, null,
                 userInfo.path("nickname").asText(null),
-                userInfo.path("figureurl_qq_2").asText(null));
+                userInfo.path("figureurl_qq_2").asText(null),
+                false);
     }
 
     /**

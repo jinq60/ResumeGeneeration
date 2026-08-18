@@ -80,7 +80,7 @@ class ResumeSectionValidatorTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> validator.validateForExport(List.of(profile)));
-        assertEquals(ResultCode.PDF_EXPORT_NAME_REQUIRED, ex.getErrorCode());
+        assertEquals(ResultCode.RESUME_PROFILE_NAME_REQUIRED, ex.getErrorCode());
     }
 
     @Test
@@ -91,7 +91,7 @@ class ResumeSectionValidatorTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> validator.validateForExport(List.of(profile)));
-        assertEquals(ResultCode.PDF_EXPORT_CONTACT_REQUIRED, ex.getErrorCode());
+        assertEquals(ResultCode.RESUME_PROFILE_CONTACT_REQUIRED, ex.getErrorCode());
     }
 
     @Test

@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Component("qwenLlmProvider")
@@ -45,6 +46,8 @@ public class QwenLlmProvider implements LlmProvider {
     @Override
     public AiChatResponse chat(AiChatRequest request) {
         long start = System.currentTimeMillis();
+        Duration timeout = request.getTimeout() != null ? request.getTimeout() : Duration.ofSeconds(120);
+        int retry = request.getRetry() != null ? request.getRetry() : 2;
         try {
             Map<String, Object> body = buildRequestBody(request);
             String raw = getClient().post()
@@ -53,13 +56,19 @@ public class QwenLlmProvider implements LlmProvider {
                     .retrieve()
                     .bodyToMono(String.class)
                     // 仅对 5xx（服务端/网络瞬时故障）重试，4xx（参数/鉴权错误）直接失败
-                    .retryWhen(Retry.backoff(2, Duration.ofSeconds(1))
+                    .retryWhen(Retry.backoff(retry, Duration.ofSeconds(1))
                             .filter(e -> e instanceof org.springframework.web.reactive.function.client.WebClientResponseException w
                                     && w.getStatusCode().is5xxServerError()))
-                    .block(Duration.ofSeconds(120));
+                    .block(timeout);
 
             return parseResponse(raw, start);
         } catch (WebClientRequestException e) {
+            throw new BusinessException(ResultCode.AI_MODEL_CALL_FAILED,
+                    "Qwen 调用失败: " + e.getMessage());
+        } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+            throw new BusinessException(ResultCode.AI_MODEL_CALL_FAILED,
+                    "Qwen 调用失败: HTTP " + e.getStatusCode().value());
+        } catch (RuntimeException e) {
             throw new BusinessException(ResultCode.AI_MODEL_CALL_FAILED,
                     "Qwen 调用失败: " + e.getMessage());
         }
@@ -69,14 +78,18 @@ public class QwenLlmProvider implements LlmProvider {
     public Flux<String> stream(AiChatRequest request) {
         Map<String, Object> body = buildRequestBody(request);
         body.put("stream", true);
+        Duration timeout = request.getTimeout() != null ? request.getTimeout() : Duration.ofSeconds(120);
+        int retry = request.getRetry() != null ? request.getRetry() : 2;
+        // 跨 chunk 行缓冲：网络 chunk 边界不等于 SSE 行边界，需拼接残行再按行解析
+        AtomicReference<String> pending = new AtomicReference<>("");
         return getClient().post()
                 .uri("/compatible-mode/v1/chat/completions")
                 .bodyValue(body)
                 .retrieve()
                 .bodyToFlux(String.class)
-                .flatMapIterable(this::parseStreamChunk)
-                .timeout(Duration.ofSeconds(120))
-                .retryWhen(Retry.backoff(2, Duration.ofSeconds(1))
+                .concatMapIterable(chunk -> parseStreamChunk(chunk, pending))
+                .timeout(timeout)
+                .retryWhen(Retry.backoff(retry, Duration.ofSeconds(1))
                         .filter(e -> e instanceof org.springframework.web.reactive.function.client.WebClientResponseException w
                                 && w.getStatusCode().is5xxServerError()));
     }
@@ -114,15 +127,15 @@ public class QwenLlmProvider implements LlmProvider {
     }
 
     private Map<String, Object> buildRequestBody(AiChatRequest request) {
-        List<Map<String, String>> messages;
+        List<Map<String, Object>> messages;
         if (request.getMessages() != null && !request.getMessages().isEmpty()) {
             messages = request.getMessages().stream()
-                    .map(m -> message(m.getRole(), m.getContent()))
+                    .map(this::buildMessage)
                     .toList();
         } else {
             messages = List.of(
-                    message("system", request.getSystemPrompt()),
-                    message("user", request.getUserPrompt())
+                    buildTextMessage("system", request.getSystemPrompt()),
+                    buildTextMessage("user", request.getUserPrompt())
             );
         }
 
@@ -139,10 +152,35 @@ public class QwenLlmProvider implements LlmProvider {
         return body;
     }
 
-    private Map<String, String> message(String role, String content) {
-        Map<String, String> m = new java.util.HashMap<>();
+    private Map<String, Object> buildTextMessage(String role, String content) {
+        Map<String, Object> m = new java.util.HashMap<>();
         m.put("role", role);
         m.put("content", content != null ? content : "");
+        return m;
+    }
+
+    /**
+     * 构建消息：支持多模态（contents 非空时按 content 数组序列化），否则用纯文本。
+     */
+    private Map<String, Object> buildMessage(AiChatRequest.Message message) {
+        Map<String, Object> m = new java.util.HashMap<>();
+        m.put("role", message.getRole());
+        if (message.getContents() != null && !message.getContents().isEmpty()) {
+            List<Map<String, Object>> parts = new java.util.ArrayList<>();
+            for (AiChatRequest.ContentPart part : message.getContents()) {
+                Map<String, Object> p = new java.util.HashMap<>();
+                p.put("type", part.getType());
+                if ("text".equals(part.getType())) {
+                    p.put("text", part.getText());
+                } else if ("image_url".equals(part.getType())) {
+                    p.put("image_url", Map.of("url", part.getImageUrl() == null ? "" : part.getImageUrl()));
+                }
+                parts.add(p);
+            }
+            m.put("content", parts);
+        } else {
+            m.put("content", message.getContent() != null ? message.getContent() : "");
+        }
         return m;
     }
 
@@ -174,8 +212,16 @@ public class QwenLlmProvider implements LlmProvider {
         return response;
     }
 
-    private List<String> parseStreamChunk(String chunk) {
-        return Arrays.stream(chunk.split("\\r?\\n"))
+    private List<String> parseStreamChunk(String chunk, AtomicReference<String> pending) {
+        String buffer = pending.get() + chunk;
+        int lastNewline = buffer.lastIndexOf('\n');
+        if (lastNewline < 0) {
+            pending.set(buffer);
+            return List.of();
+        }
+        String complete = buffer.substring(0, lastNewline + 1);
+        pending.set(buffer.substring(lastNewline + 1));
+        return Arrays.stream(complete.split("\\r?\\n"))
                 .map(String::trim)
                 .filter(line -> line.startsWith("data:"))
                 .map(line -> line.substring(5).trim())

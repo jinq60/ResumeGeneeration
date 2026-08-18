@@ -8,6 +8,7 @@ import com.resume.common.security.IdempotencyFilter;
 import com.resume.common.security.JwtAuthenticationEntryPoint;
 import com.resume.common.security.JwtAuthenticationFilter;
 import com.resume.common.security.RateLimitFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -51,6 +52,32 @@ public class SecurityConfig {
     @Bean
     public IdempotencyFilter idempotencyFilter(IdempotencyRecordMapper idempotencyRecordMapper) {
         return new IdempotencyFilter(idempotencyRecordMapper);
+    }
+
+    /**
+     * 关闭 Spring Boot 对安全过滤器的自动注册，避免其既作为全局 Servlet Filter 执行、
+     * 又被加入 Security 链导致双重注册（OncePerRequestFilter 虽防重复执行，但实际执行
+     * 顺序会依赖容器 filter order，使幂等过滤器可能在 JWT 认证之前执行）。
+     */
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtAuthenticationFilterRegistration(JwtAuthenticationFilter filter) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
+        FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<IdempotencyFilter> idempotencyFilterRegistration(IdempotencyFilter filter) {
+        FilterRegistrationBean<IdempotencyFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean

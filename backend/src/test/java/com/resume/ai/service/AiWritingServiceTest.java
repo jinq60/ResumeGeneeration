@@ -73,6 +73,12 @@ class AiWritingServiceTest {
                 new ObjectMapper());
         when(providerRouter.resolve(anyString())).thenReturn(llmProvider);
         when(providerRouter.resolveModel(anyString())).thenReturn("qwen-turbo");
+        AiProperties.FeatureConfig featureConfig = new AiProperties.FeatureConfig();
+        featureConfig.setProvider("qwen");
+        featureConfig.setModel("qwen-turbo");
+        featureConfig.setTimeout(java.time.Duration.ofSeconds(60));
+        featureConfig.setRetry(2);
+        when(providerRouter.getFeatureConfig(anyString())).thenReturn(featureConfig);
         when(promptTemplates.render(anyString(), any())).thenReturn("prompt");
         when(llmProvider.getProviderName()).thenReturn("qwen");
     }

@@ -70,38 +70,16 @@ class UserServiceTest {
     }
 
     @Test
-    void login_shouldAutoCreateEmailAccountWhenMissing() {
+    void login_shouldRejectUnknownEmailInsteadOfAutoCreate() {
         LoginRequest request = new LoginRequest();
         request.setAccount("newbie@example.com");
         request.setPassword("Passw0rd123");
         request.setLoginType("email");
 
         when(userMapper.selectOne(any())).thenReturn(null);
-        when(passwordEncoder.encode("Passw0rd123")).thenReturn("hashed_new");
-        when(passwordEncoder.matches("Passw0rd123", "hashed_new")).thenReturn(true);
-        when(userMapper.insert(any(User.class))).thenAnswer(inv -> {
-            User u = inv.getArgument(0);
-            u.setId("user_new");
-            return 1;
-        });
-
-        AuthResponse response = userService.login(request);
-
-        assertEquals("user_new", response.getUserId());
-        verify(userMapper).insert(argThat(u -> "newbie@example.com".equals(((User) u).getEmail())));
-    }
-
-    @Test
-    void login_shouldRejectWeakPasswordWhenAutoCreating() {
-        LoginRequest request = new LoginRequest();
-        request.setAccount("newbie@example.com");
-        request.setPassword("12");
-        request.setLoginType("email");
-
-        when(userMapper.selectOne(any())).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> userService.login(request));
-        assertEquals(ResultCode.AUTH_PASSWORD_TOO_WEAK, ex.getErrorCode());
+        assertEquals(ResultCode.AUTH_ACCOUNT_NOT_FOUND, ex.getErrorCode());
         verify(userMapper, never()).insert(any(User.class));
     }
 

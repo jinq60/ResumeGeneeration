@@ -88,8 +88,8 @@ public class ResumeExportService {
      */
     public String buildExportFileName(String userId, String resumeId, String extension) {
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
-        String name = profileValue(resume, "name");
-        String targetPosition = resume.getTargetPosition();
+        String name = sanitizeFileName(profileValue(resume, "name"));
+        String targetPosition = sanitizeFileName(resume.getTargetPosition());
         String base;
         if (StringUtils.isNotBlank(name) && StringUtils.isNotBlank(targetPosition)) {
             base = name + "_" + targetPosition + "_简历";
@@ -102,6 +102,16 @@ public class ResumeExportService {
             base = base.substring(0, 97);
         }
         return base + "." + extension;
+    }
+
+    /**
+     * 清理文件名中的路径分隔符与控制字符，避免拼接进下载文件名 / MinIO 对象键时产生歧义。
+     */
+    private String sanitizeFileName(String name) {
+        if (name == null) {
+            return "";
+        }
+        return name.replaceAll("[\\\\/:*?\"<>|\\r\\n\\t]", "_").trim();
     }
 
     /**
@@ -145,13 +155,11 @@ public class ResumeExportService {
         return sb.toString();
     }
 
-    @SuppressWarnings("unchecked")
     private void appendSectionMarkdown(StringBuilder sb, SectionDTO section) {
-        Object data = section.getData();
         switch (section.getType()) {
-            case "profile" -> appendProfileMarkdown(sb, toMap(data));
+            case "profile" -> appendProfileMarkdown(sb, section.dataAsMap());
             case "introduction" -> {
-                Map<String, Object> intro = toMap(data);
+                Map<String, Object> intro = section.dataAsMap();
                 String richContent = getString(intro, "contentHtml");
                 sb.append(StringUtils.isNotBlank(richContent)
                         ? RichTextSanitizer.toPlainText(richContent)
@@ -159,24 +167,19 @@ public class ResumeExportService {
                   .append("\n\n");
             }
             case "education", "work", "project", "skill" -> {
-                if (data instanceof List<?> items) {
-                    for (Object obj : items) {
-                        if (obj instanceof Map<?, ?> item) {
-                            Map<String, Object> map = (Map<String, Object>) item;
-                            sb.append("- **").append(firstNonBlank(getString(map, "school"),
-                                    getString(map, "company"), getString(map, "name"), getString(map, "category")))
-                              .append("**");
-                            String sub = firstNonBlank(getString(map, "degree"), getString(map, "position"),
-                                    getString(map, "role"));
-                            if (StringUtils.isNotBlank(sub)) {
-                                sb.append(" · ").append(sub);
-                            }
-                            sb.append("\n");
-                             appendRichTextMarkdown(sb, map, "descriptionHtml", "description");
-                             appendRichTextMarkdown(sb, map, "achievementsHtml", "achievements");
-                             appendListMarkdown(sb, map, "items");
-                        }
+                for (Map<String, Object> map : section.dataAsItems()) {
+                    sb.append("- **").append(firstNonBlank(getString(map, "school"),
+                            getString(map, "company"), getString(map, "name"), getString(map, "category")))
+                      .append("**");
+                    String sub = firstNonBlank(getString(map, "degree"), getString(map, "position"),
+                            getString(map, "role"));
+                    if (StringUtils.isNotBlank(sub)) {
+                        sb.append(" · ").append(sub);
                     }
+                    sb.append("\n");
+                     appendRichTextMarkdown(sb, map, "descriptionHtml", "description");
+                     appendRichTextMarkdown(sb, map, "achievementsHtml", "achievements");
+                     appendListMarkdown(sb, map, "items");
                 }
                 sb.append("\n");
             }
@@ -184,13 +187,11 @@ public class ResumeExportService {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private void appendSectionHtml(StringBuilder sb, SectionDTO section) {
-        Object data = section.getData();
         switch (section.getType()) {
             case "profile" -> { /* 已在头部输出 */ }
             case "introduction" -> {
-                Map<String, Object> intro = toMap(data);
+                Map<String, Object> intro = section.dataAsMap();
                 String richContent = getString(intro, "contentHtml");
                 if (StringUtils.isNotBlank(richContent)) {
                     sb.append(RichTextSanitizer.sanitize(richContent)).append("\n");
@@ -199,24 +200,19 @@ public class ResumeExportService {
                 }
             }
             case "education", "work", "project", "skill" -> {
-                if (data instanceof List<?> items) {
-                    for (Object obj : items) {
-                        if (obj instanceof Map<?, ?> item) {
-                            Map<String, Object> map = (Map<String, Object>) item;
-                            String title = firstNonBlank(getString(map, "school"), getString(map, "company"),
-                                    getString(map, "name"), getString(map, "category"));
-                            String sub = firstNonBlank(getString(map, "degree"), getString(map, "position"),
-                                    getString(map, "role"));
-                            sb.append("<p><strong>").append(escapeHtml(title)).append("</strong>");
-                            if (StringUtils.isNotBlank(sub)) {
-                                sb.append(" · ").append(escapeHtml(sub));
-                            }
-                            sb.append("</p>\n");
-                             appendRichTextHtml(sb, map, "descriptionHtml", "description");
-                             appendRichTextHtml(sb, map, "achievementsHtml", "achievements");
-                             appendListHtml(sb, map, "items");
-                        }
+                for (Map<String, Object> map : section.dataAsItems()) {
+                    String title = firstNonBlank(getString(map, "school"), getString(map, "company"),
+                            getString(map, "name"), getString(map, "category"));
+                    String sub = firstNonBlank(getString(map, "degree"), getString(map, "position"),
+                            getString(map, "role"));
+                    sb.append("<p><strong>").append(escapeHtml(title)).append("</strong>");
+                    if (StringUtils.isNotBlank(sub)) {
+                        sb.append(" · ").append(escapeHtml(sub));
                     }
+                    sb.append("</p>\n");
+                     appendRichTextHtml(sb, map, "descriptionHtml", "description");
+                     appendRichTextHtml(sb, map, "achievementsHtml", "achievements");
+                     appendListHtml(sb, map, "items");
                 }
             }
             default -> { }
@@ -309,25 +305,16 @@ public class ResumeExportService {
         return getString(findProfile(resume.getSections()), key);
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> findProfile(List<SectionDTO> sections) {
         if (sections == null) {
             return Map.of();
         }
         return sections.stream()
                 .filter(s -> "profile".equals(s.getType()))
-                .filter(s -> s.getData() instanceof Map)
-                .map(s -> (Map<String, Object>) s.getData())
+                .map(SectionDTO::dataAsMap)
+                .filter(m -> !m.isEmpty())
                 .findFirst()
                 .orElse(Map.of());
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> toMap(Object data) {
-        if (data instanceof Map) {
-            return (Map<String, Object>) data;
-        }
-        return Map.of();
     }
 
     private String getString(Map<String, Object> map, String key) {

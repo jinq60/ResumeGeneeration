@@ -105,7 +105,13 @@ public class PreviewController {
         response.setHeader("X-Content-Type-Options", "nosniff");
         // iframe 内以 sandbox=allow-same-origin 加载，禁脚本执行；CSP 兜底
         response.setHeader("Content-Security-Policy",
-                "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; frame-ancestors 'self' http://localhost:5173");
+                "default-src 'none'; " + buildImgSrcCsp()
+                        + "; style-src 'unsafe-inline'; frame-ancestors 'self' http://localhost:5173");
         response.getWriter().write(html);
+    }
+
+    private String buildImgSrcCsp() {
+        String origin = resumeRenderService.publicBaseOrigin();
+        return "img-src 'self' data:" + (origin != null ? " " + origin : "");
     }
 }

@@ -58,7 +58,8 @@ public class GoogleAuthProvider extends BaseOAuthProvider {
             return new OAuthUserInfo(AuthMethod.GOOGLE, sub,
                     node.path("email").asText(null),
                     node.path("name").asText(null),
-                    node.path("picture").asText(null));
+                    node.path("picture").asText(null),
+                    node.path("email_verified").asBoolean(false));
         } catch (Exception e) {
             log.warn("Parse Google user info failed: {}", e.getMessage());
             throw new com.resume.common.exception.BusinessException(

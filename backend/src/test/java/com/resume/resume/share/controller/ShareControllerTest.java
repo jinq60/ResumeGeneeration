@@ -5,6 +5,7 @@ import com.resume.common.exception.BusinessException;
 import com.resume.common.mapper.IdempotencyRecordMapper;
 import com.resume.common.security.WithMockJwt;
 import com.resume.common.service.RateLimiter;
+import com.resume.common.service.ResumeRenderService;
 import com.resume.resume.share.dto.ShareResponse;
 import com.resume.resume.share.service.ShareService;
 import com.resume.user.security.JwtTokenProvider;
@@ -49,6 +50,9 @@ class ShareControllerTest {
 
     @MockBean
     private RateLimiter rateLimiter;
+
+    @MockBean
+    private ResumeRenderService resumeRenderService;
 
     private ShareResponse buildShareResponse() {
         ShareResponse response = new ShareResponse();

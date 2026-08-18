@@ -28,11 +28,13 @@ import java.util.regex.Pattern;
 public class UserAuthService {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
 
     private final UserMapper userMapper;
     private final UserAuthMapper userAuthMapper;
     private final UserService userService;
     private final EmailCodeService emailCodeService;
+    private final SmsCodeService smsCodeService;
     private final AuditLogService auditLogService;
 
     /**
@@ -60,6 +62,30 @@ public class UserAuthService {
     }
 
     /**
+     * 短信验证码登录：校验验证码后按手机号查找用户，不存在则自动创建。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public com.resume.user.dto.AuthResponse authenticateBySmsCode(String phone, String code) {
+        if (StringUtils.isBlank(phone) || !PHONE_PATTERN.matcher(phone.trim()).matches()) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "手机号格式不正确。");
+        }
+        if (!smsCodeService.verify(phone, code)) {
+            throw new BusinessException(ResultCode.AUTH_SMS_CODE_INVALID, "验证码不正确或已过期。");
+        }
+        String normalized = phone.trim();
+        User user = findByPhone(normalized);
+        if (user == null) {
+            user = createUserByPhone(normalized);
+            log.info("SMS-code login auto-created user: userId={}", user.getId());
+        }
+        if (BizConstant.USER_STATUS_DISABLED.equals(user.getStatus())) {
+            throw new BusinessException(ResultCode.AUTH_ACCOUNT_LOCKED, "账号已被锁定，请稍后再试。");
+        }
+        auditLogService.record(user.getId(), "login", user.getId(), "loginType=sms_code");
+        return userService.buildAuthResponse(user);
+    }
+
+    /**
      * OAuth 登录：按 provider+accountId 查找绑定，未绑定则创建用户并绑定。
      */
     @Transactional(rollbackFor = Exception.class)
@@ -76,8 +102,8 @@ public class UserAuthService {
             user = null;
         }
         if (user == null || BizConstant.DELETED.equals(user.getDeleted())) {
-            // 尝试按邮箱关联既有账号；邮箱也冲突时以第三方资料为准新建
-            user = StringUtils.isNotBlank(info.email())
+            // 仅当第三方邮箱已验证时才按邮箱关联既有账号，防止攻击者用未验证邮箱接管他人账号
+            user = info.emailVerified() && StringUtils.isNotBlank(info.email())
                     ? findByEmail(info.email().trim().toLowerCase())
                     : null;
             if (user == null) {
@@ -98,7 +124,7 @@ public class UserAuthService {
     private User createUser(String email, String nickname, String avatarUrl) {
         User user = new User();
         user.setEmail(StringUtils.isBlank(email) ? null : email.trim().toLowerCase());
-        user.setNickname(StringUtils.defaultString(nickname, "用户"));
+        user.setNickname(StringUtils.defaultIfBlank(nickname, "用户"));
         user.setAvatarUrl(avatarUrl);
         user.setIsGuest(BizConstant.IS_NOT_GUEST);
         user.setRole(BizConstant.USER_ROLE_USER);
@@ -116,6 +142,28 @@ public class UserAuthService {
                 .eq(User::getDeleted, BizConstant.NOT_DELETED)
                 .last("LIMIT 1");
         return userMapper.selectOne(wrapper);
+    }
+
+    private User findByPhone(String phone) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getPhone, phone)
+                .eq(User::getDeleted, BizConstant.NOT_DELETED)
+                .last("LIMIT 1");
+        return userMapper.selectOne(wrapper);
+    }
+
+    private User createUserByPhone(String phone) {
+        User user = new User();
+        user.setPhone(phone);
+        user.setNickname("用户" + phone.substring(phone.length() - 4));
+        user.setIsGuest(BizConstant.IS_NOT_GUEST);
+        user.setRole(BizConstant.USER_ROLE_USER);
+        user.setStatus(BizConstant.USER_STATUS_ACTIVE);
+        user.setDeleted(BizConstant.NOT_DELETED);
+        user.setCreatedAt(LocalDateTime.now());
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.insert(user);
+        return user;
     }
 
     private UserAuth findBinding(String provider, String account) {

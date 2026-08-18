@@ -4,6 +4,7 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -28,7 +29,7 @@ public class AiProperties {
     public static class FeatureConfig {
         private String provider;
         private String model;
-        private String timeout = "60s";
+        private Duration timeout = Duration.ofSeconds(60);
         private int retry = 2;
     }
 

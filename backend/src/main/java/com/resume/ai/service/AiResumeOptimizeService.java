@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.ai.config.AiPromptTemplates;
+import com.resume.ai.config.AiProperties;
 import com.resume.ai.dto.AiChatRequest;
 import com.resume.ai.dto.AiChatResponse;
 import com.resume.ai.dto.ResumeOptimizeResponse.SectionOptimization;
@@ -23,7 +24,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -132,18 +135,21 @@ public class AiResumeOptimizeService {
                     "jobDescription", jobDescription
             ));
 
+            AiProperties.FeatureConfig featureConfig = providerRouter.getFeatureConfig(FEATURE_KEY);
             AiChatRequest request = AiChatRequest.builder()
                     .model(model)
                     .userPrompt(prompt)
                     .temperature(0.3)
                     .maxTokens(4096)
+                    .timeout(featureConfig.getTimeout())
+                    .retry(featureConfig.getRetry())
                     .build();
 
             AiChatResponse response = provider.chat(request);
 
             callLog.setProviderName(provider.getProviderName());
             callLog.setModelName(model);
-            callLog.setRequestHash(String.valueOf(prompt.hashCode()));
+            callLog.setRequestHash(DigestUtils.md5DigestAsHex(prompt.getBytes(StandardCharsets.UTF_8)));
             callLog.setPromptTokens(response.getPromptTokens());
             callLog.setCompletionTokens(response.getCompletionTokens());
             callLog.setTotalTokens(response.getTotalTokens());

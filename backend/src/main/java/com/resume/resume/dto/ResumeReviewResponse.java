@@ -18,6 +18,7 @@ public class ResumeReviewResponse {
     private Map<String, Integer> dimensionScores;
     private List<SuggestionDTO> suggestions;
     private List<String> highlights;
+    private String modelName;
     private LocalDateTime createdAt;
 
     @Data

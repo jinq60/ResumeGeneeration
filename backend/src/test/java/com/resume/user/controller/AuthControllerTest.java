@@ -8,6 +8,7 @@ import com.resume.user.auth.EmailCodeService;
 import com.resume.user.auth.OAuthProvider;
 import com.resume.user.auth.OAuthStateStore;
 import com.resume.user.auth.OAuthUserInfo;
+import com.resume.user.auth.SmsCodeService;
 import com.resume.user.auth.UserAuthService;
 import com.resume.user.config.AuthProperties;
 import com.resume.user.dto.AuthResponse;
@@ -54,6 +55,9 @@ class AuthControllerTest {
 
     @MockBean
     private EmailCodeService emailCodeService;
+
+    @MockBean
+    private SmsCodeService smsCodeService;
 
     @MockBean
     private OAuthStateStore oauthStateStore;
@@ -182,7 +186,7 @@ class AuthControllerTest {
         when(authProviderRegistry.getOAuthProvider("google")).thenReturn(oauth);
         when(oauthStateStore.consume("state123", "google")).thenReturn(true);
         when(oauth.exchangeAndFetch("code123"))
-                .thenReturn(new OAuthUserInfo("google", "sub_1", "demo@example.com", "Demo", null));
+                .thenReturn(new OAuthUserInfo("google", "sub_1", "demo@example.com", "Demo", null, true));
         when(userAuthService.authenticateByOAuth(any())).thenReturn(buildAuthResponse());
 
         mockMvc.perform(get("/auth/oauth/google/callback")

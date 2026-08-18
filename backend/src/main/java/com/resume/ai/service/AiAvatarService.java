@@ -1,6 +1,9 @@
 package com.resume.ai.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.ai.config.AiPromptTemplates;
+import com.resume.ai.config.AiProperties;
 import com.resume.ai.dto.AiChatRequest;
 import com.resume.ai.dto.AiChatResponse;
 import com.resume.ai.entity.AiCallLog;
@@ -13,18 +16,29 @@ import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.common.service.MinioStorageService;
+import com.resume.common.util.ImageMagicUtil;
+import com.resume.resume.service.ResumeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 /**
- * AI 头像一寸照优化服务 —— 异步调用多模态 LLM。
+ * AI 头像一寸照优化服务 —— 异步调用多模态 LLM 分析自拍照。
  * <p>
- * P0 占位：同步复制原图。P1 异步调用真实 AI 模型。
+ * 流程：读取任务 → 下载原图 → 转 base64 → 多模态分析 → 落库结果。
+ * 当前阶段多模态 LLM 返回「优化描述」，真实的一寸照图像生成需接入专门的图像生成模型
+ * （如通义万相 / DALL-E），生成后回写 {@code resultImageUrl}。
+ * 未配置多模态供应商时降级为复用原图（保持 P0 占位行为）。
  * </p>
  */
 @Slf4j
@@ -39,13 +53,10 @@ public class AiAvatarService {
     private final ProviderRouter providerRouter;
     private final AiPromptTemplates promptTemplates;
     private final MinioStorageService minioStorageService;
+    private final ObjectMapper objectMapper;
+    @Lazy
+    private final ResumeService resumeService;
 
-    /**
-     * P1：异步执行真实 AI 头像优化。
-     * <p>
-     * 当前 P0 阶段保持同步占位逻辑，此方法留作 P1 接入。
-     * </p>
-     */
     @Async("aiTaskExecutor")
     public void executeOptimize(String taskId) {
         AvatarTask task = avatarTaskMapper.selectById(taskId);
@@ -67,24 +78,36 @@ public class AiAvatarService {
         try {
             LlmProvider provider = providerRouter.resolve(FEATURE_KEY);
             String model = providerRouter.resolveModel(FEATURE_KEY);
+            AiProperties.FeatureConfig featureConfig = providerRouter.getFeatureConfig(FEATURE_KEY);
 
+            String dataUrl = toDataUrl(task.getSourceImageUrl());
             String prompt = promptTemplates.render(FEATURE_KEY, Map.of(
-                    "backgroundType", task.getBackgroundType(),
-                    "style", task.getStyle()
+                    "backgroundType", StringUtils.defaultString(task.getBackgroundType()),
+                    "style", StringUtils.defaultString(task.getStyle())
             ));
 
             AiChatRequest request = AiChatRequest.builder()
                     .model(model)
-                    .userPrompt(prompt)
-                    .temperature(0.2)
+                    .messages(List.of(
+                            AiChatRequest.Message.builder()
+                                    .role("user")
+                                    .contents(List.of(
+                                            AiChatRequest.ContentPart.builder().type("text").text(prompt).build(),
+                                            AiChatRequest.ContentPart.builder().type("image_url").imageUrl(dataUrl).build()
+                                    ))
+                                    .build()
+                    ))
+                    .temperature(0.3)
                     .maxTokens(1024)
+                    .timeout(featureConfig.getTimeout())
+                    .retry(featureConfig.getRetry())
                     .build();
 
             AiChatResponse response = provider.chat(request);
 
             callLog.setProviderName(provider.getProviderName());
             callLog.setModelName(model);
-            callLog.setRequestHash(String.valueOf(prompt.hashCode()));
+            callLog.setRequestHash(DigestUtils.md5DigestAsHex(prompt.getBytes(StandardCharsets.UTF_8)));
             callLog.setPromptTokens(response.getPromptTokens());
             callLog.setCompletionTokens(response.getCompletionTokens());
             callLog.setTotalTokens(response.getTotalTokens());
@@ -92,13 +115,25 @@ public class AiAvatarService {
             callLog.setSuccess(response.isSuccess());
 
             if (response.isSuccess()) {
-                // P1: 解析 AI 返回的图像 URL 或 base64，上传到 MinIO
+                mergeAiDescription(task, response.getContent());
+                // 真实图像生成待接入专门模型，当前复用原图作为结果
+                task.setResultImageUrl(task.getSourceImageUrl());
                 task.setStatus(BizConstant.TASK_STATUS_SUCCESS);
+                task.setCompletedAt(LocalDateTime.now());
             } else {
                 task.setStatus(BizConstant.TASK_STATUS_FAILED);
                 task.setErrorMsg(response.getErrorMsg());
                 callLog.setErrorMsg(response.getErrorMsg());
             }
+        } catch (BusinessException e) {
+            // 多模态供应商未配置：降级为复用原图，保持 P0 占位行为
+            log.warn("AI avatar optimize provider not configured, fallback to source image: {}", e.getMessage());
+            task.setResultImageUrl(task.getSourceImageUrl());
+            task.setStatus(BizConstant.TASK_STATUS_SUCCESS);
+            task.setCompletedAt(LocalDateTime.now());
+            callLog.setSuccess(false);
+            callLog.setErrorMsg("fallback: " + e.getMessage());
+            callLog.setLatencyMs(System.currentTimeMillis() - start);
         } catch (Exception e) {
             log.error("AI avatar optimize failed for taskId={}", taskId, e);
             task.setStatus(BizConstant.TASK_STATUS_FAILED);
@@ -106,13 +141,76 @@ public class AiAvatarService {
             callLog.setSuccess(false);
             callLog.setErrorMsg(e.getMessage());
             callLog.setLatencyMs(System.currentTimeMillis() - start);
-        }
+        } finally {
+            task.setUpdatedAt(LocalDateTime.now());
+            avatarTaskMapper.updateById(task);
 
-        if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
-            task.setCompletedAt(LocalDateTime.now());
+            // 成功后回填一寸照地址到简历 profile.avatarUrl（失败不影响任务结果）
+            if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())
+                    && StringUtils.isNotBlank(task.getResumeId())
+                    && StringUtils.isNotBlank(task.getResultImageUrl())) {
+                try {
+                    resumeService.fillAvatarUrl(task.getUserId(), task.getResumeId(), task.getResultImageUrl());
+                } catch (Exception e) {
+                    log.warn("fillAvatarUrl failed for userId={}, resumeId={}: {}",
+                            task.getUserId(), task.getResumeId(), e.getMessage());
+                }
+            }
+
+            try {
+                aiCallLogMapper.insert(callLog);
+            } catch (Exception logEx) {
+                log.warn("Insert AiCallLog failed for taskId={}: {}", taskId, logEx.getMessage());
+            }
         }
-        task.setUpdatedAt(LocalDateTime.now());
-        avatarTaskMapper.updateById(task);
-        aiCallLogMapper.insert(callLog);
+    }
+
+    /**
+     * 下载原图并转为 data URL，供多模态模型读取。
+     */
+    private String toDataUrl(String sourceImageUrl) {
+        String objectName = extractObjectName(sourceImageUrl);
+        if (StringUtils.isBlank(objectName)) {
+            throw new BusinessException(ResultCode.AVATAR_SOURCE_NOT_FOUND, "头像原图不存在。");
+        }
+        byte[] image = minioStorageService.download(minioStorageService.getBucketAvatars(), objectName);
+        String format = ImageMagicUtil.detectFormat(image);
+        String contentType = ImageMagicUtil.toContentType(format);
+        if (contentType == null) {
+            contentType = "image/jpeg";
+        }
+        return "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(image);
+    }
+
+    private String extractObjectName(String sourceImageUrl) {
+        if (StringUtils.isBlank(sourceImageUrl)) {
+            return null;
+        }
+        String prefix = "/uploads/avatars/";
+        if (sourceImageUrl.startsWith(prefix)) {
+            return sourceImageUrl.substring(prefix.length());
+        }
+        return null;
+    }
+
+    /**
+     * 将 AI 返回的优化描述合并进任务 options JSON，供前端展示。
+     */
+    private void mergeAiDescription(AvatarTask task, String description) {
+        Map<String, Object> options;
+        try {
+            options = StringUtils.isNotBlank(task.getOptions())
+                    ? objectMapper.readValue(task.getOptions(), new TypeReference<Map<String, Object>>() {
+                    })
+                    : new java.util.HashMap<>();
+        } catch (Exception e) {
+            options = new java.util.HashMap<>();
+        }
+        options.put("aiDescription", description == null ? "" : description);
+        try {
+            task.setOptions(objectMapper.writeValueAsString(options));
+        } catch (Exception e) {
+            log.warn("Serialize avatar options failed: {}", e.getMessage());
+        }
     }
 }

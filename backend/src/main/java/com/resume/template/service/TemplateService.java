@@ -21,7 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 模板业务服务。
@@ -65,6 +68,20 @@ public class TemplateService {
             throw new BusinessException(ResultCode.TEMPLATE_NOT_FOUND, "模板不存在。");
         }
         return template;
+    }
+
+    /**
+     * 批量获取模板 ID -> 名称映射（供后台简历列表避免 N+1 查询）。
+     */
+    public Map<String, String> getTemplateNameMap(Collection<String> templateIds) {
+        if (templateIds == null || templateIds.isEmpty()) {
+            return Map.of();
+        }
+        LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(Template::getId, templateIds)
+                .eq(Template::getDeleted, BizConstant.NOT_DELETED);
+        return templateMapper.selectList(wrapper).stream()
+                .collect(Collectors.toMap(Template::getId, Template::getName, (a, b) -> a));
     }
 
     /**
@@ -252,13 +269,6 @@ public class TemplateService {
         } catch (JsonProcessingException e) {
             throw new BusinessException(ResultCode.TEMPLATE_CONFIG_INVALID, "模板配置格式不正确。", e);
         }
-    }
-
-    private Template findByCode(String code) {
-        LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Template::getCode, code)
-                .eq(Template::getDeleted, BizConstant.NOT_DELETED);
-        return templateMapper.selectOne(wrapper);
     }
 
     private Template findByCodeIncludingDeleted(String code) {

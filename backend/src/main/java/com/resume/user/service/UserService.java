@@ -43,8 +43,6 @@ public class UserService {
     private static final int MAX_PASSWORD_LENGTH = 32;
     private static final Pattern PASSWORD_COMPLEXITY =
             Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).+$");
-    private static final Pattern EMAIL_PATTERN =
-            Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     /**
      * 登录。当 loginType 未传时自动识别账号类型。
@@ -72,13 +70,13 @@ public class UserService {
         }
 
         if (user == null) {
-            // 登录即注册：邮箱账号不存在时自动创建（含密码校验）
             if (!"email".equals(loginType)) {
                 throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND, "账号不存在。");
             }
-            user = createEmailAccount(request.getAccount(), request.getPassword());
-            log.info("login auto-created account: userId={}, email={}", user.getId(),
-                    maskEmail(user.getEmail()));
+            // 邮箱不存在时不再"登录即注册"（存在账号抢占风险），
+            // 引导用户走邮箱验证码登录，由验证码校验邮箱所有权后再自动创建账号
+            throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND,
+                    "该邮箱尚未注册，请使用邮箱验证码登录。");
         } else if (BizConstant.IS_GUEST.equals(user.getIsGuest())) {
             throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND, "账号不存在。");
         }
@@ -139,8 +137,7 @@ public class UserService {
 
         LambdaQueryWrapper<RefreshToken> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(RefreshToken::getUserId, userId)
-                .eq(RefreshToken::getTokenHash, tokenHash)
-                .eq(RefreshToken::getDeleted, BizConstant.NOT_DELETED);
+                .eq(RefreshToken::getTokenHash, tokenHash);
         RefreshToken stored = refreshTokenMapper.selectOne(wrapper);
         if (stored == null || stored.getExpiresAt() == null
                 || stored.getExpiresAt().isBefore(LocalDateTime.now())) {
@@ -268,7 +265,6 @@ public class UserService {
         record.setUserId(userId);
         record.setTokenHash(TokenHashUtil.hash(refreshToken));
         record.setExpiresAt(LocalDateTime.now().plus(Duration.ofMillis(jwtTokenProvider.getRefreshTokenExpiration())));
-        record.setDeleted(BizConstant.NOT_DELETED);
         record.setCreatedAt(LocalDateTime.now());
         refreshTokenMapper.insert(record);
     }
@@ -298,36 +294,6 @@ public class UserService {
         wrapper.eq(User::getEmail, email)
                 .eq(User::getDeleted, BizConstant.NOT_DELETED);
         return userMapper.selectOne(wrapper);
-    }
-
-    /**
-     * 登录即注册：邮箱不存在时创建正式账号（密码作为初始密码）。
-     */
-    private User createEmailAccount(String account, String password) {
-        String email = StringUtils.trim(account).toLowerCase();
-        if (!EMAIL_PATTERN.matcher(email).matches()) {
-            throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND, "账号不存在。");
-        }
-        if (StringUtils.isBlank(password)
-                || password.length() < MIN_PASSWORD_LENGTH
-                || password.length() > MAX_PASSWORD_LENGTH
-                || !PASSWORD_COMPLEXITY.matcher(password).matches()) {
-            throw new BusinessException(ResultCode.AUTH_PASSWORD_TOO_WEAK,
-                    "密码长度应为 " + MIN_PASSWORD_LENGTH + "–" + MAX_PASSWORD_LENGTH + " 位，且需同时包含字母和数字。");
-        }
-        User user = new User();
-        user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(password));
-        user.setIsGuest(BizConstant.IS_NOT_GUEST);
-        user.setRole(BizConstant.USER_ROLE_USER);
-        user.setStatus(BizConstant.USER_STATUS_ACTIVE);
-        user.setDeleted(BizConstant.NOT_DELETED);
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(LocalDateTime.now());
-        userMapper.insert(user);
-        auditLogService.record(user.getId(), "auto_create", user.getId(),
-                "email=" + maskEmail(email));
-        return user;
     }
 
     private String maskPhone(String phone) {

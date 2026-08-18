@@ -80,6 +80,26 @@ public class ResumeRenderService {
     }
 
     /**
+     * 返回站外资源前缀的 origin（scheme://host[:port]），未配置或格式非法返回 null。
+     * 供预览/分享页 CSP 的 img-src 放行站外头像/图片，避免与 publicBaseUrl 冲突。
+     */
+    public String publicBaseOrigin() {
+        if (StringUtils.isBlank(publicBaseUrl)) {
+            return null;
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(publicBaseUrl.trim());
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                return null;
+            }
+            int port = uri.getPort();
+            return uri.getScheme() + "://" + uri.getHost() + (port > 0 ? ":" + port : "");
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
      * 将简历与模板渲染为完整 HTML 页面（默认渲染选项）。
      *
      * @param resume   简历实体
@@ -249,12 +269,29 @@ public class ResumeRenderService {
 
     /**
      * 对模板骨架中可能存在的硬编码样式追加用户设置，并标记一页适配开关。
+     * <p>
+     * 使用 Jsoup 解析 DOM 后按选择器设置属性、追加样式，避免依赖骨架中
+     * {@code <div class="resume-page">} / {@code </head>} 字面量的字符串替换。
+     * </p>
      */
     private String decoratePage(String html, RenderSettings settings) {
-        String decorated = html.replace(
-                "<div class=\"resume-page\">",
-                "<div class=\"resume-page\" data-auto-one-page=\""
-                        + Boolean.TRUE.equals(settings.getAutoOnePage()) + "\">");
+        org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse(html);
+        org.jsoup.nodes.Element page = doc.selectFirst("div.resume-page");
+        if (page != null) {
+            page.attr("data-auto-one-page", String.valueOf(Boolean.TRUE.equals(settings.getAutoOnePage())));
+        }
+        String override = buildOverrideCss(settings);
+        if (StringUtils.isNotBlank(override)) {
+            org.jsoup.nodes.Element head = doc.head();
+            if (head != null) {
+                head.append("<style>\n" + override + "</style>\n");
+            }
+        }
+        doc.outputSettings().prettyPrint(false);
+        return doc.html();
+    }
+
+    private String buildOverrideCss(RenderSettings settings) {
         StringBuilder override = new StringBuilder();
         if (settings.getFontFamily() != null) {
             override.append("body, .resume-page { font-family: ")
@@ -284,11 +321,7 @@ public class ResumeRenderService {
                     .append(".resume-page { --resume-accent-color: ")
                     .append(settings.getAccentColor()).append("; }\n");
         }
-        if (override.length() == 0) {
-            return decorated;
-        }
-        String style = "<style>\n" + override + "</style>\n";
-        return decorated.replace("</head>", style + "</head>");
+        return override.toString();
     }
 
     private String cssNumber(Double value) {
@@ -303,14 +336,13 @@ public class ResumeRenderService {
         sb.append("    <div class=\"section\">\n")
           .append("      <div class=\"section-title\">").append(escapeHtml(section.getTitle())).append("</div>\n");
 
-        Object data = section.getData();
         switch (section.getType()) {
-            case BizConstant.SECTION_TYPE_PROFILE -> sb.append(renderProfile(data, options));
-            case BizConstant.SECTION_TYPE_EDUCATION -> sb.append(renderEducation(data));
-            case BizConstant.SECTION_TYPE_WORK -> sb.append(renderWork(data));
-            case BizConstant.SECTION_TYPE_PROJECT -> sb.append(renderProject(data));
-            case BizConstant.SECTION_TYPE_SKILL -> sb.append(renderSkill(data));
-            case BizConstant.SECTION_TYPE_INTRODUCTION -> sb.append(renderIntroduction(data));
+            case BizConstant.SECTION_TYPE_PROFILE -> sb.append(renderProfile(section.dataAsMap(), options));
+            case BizConstant.SECTION_TYPE_EDUCATION -> sb.append(renderEducation(section.dataAsItems()));
+            case BizConstant.SECTION_TYPE_WORK -> sb.append(renderWork(section.dataAsItems()));
+            case BizConstant.SECTION_TYPE_PROJECT -> sb.append(renderProject(section.dataAsItems()));
+            case BizConstant.SECTION_TYPE_SKILL -> sb.append(renderSkill(section.dataAsItems()));
+            case BizConstant.SECTION_TYPE_INTRODUCTION -> sb.append(renderIntroduction(section.dataAsMap()));
             default -> sb.append("");
         }
 
@@ -318,8 +350,7 @@ public class ResumeRenderService {
         return sb.toString();
     }
 
-    private String renderProfile(Object data, RenderOptions options) {
-        Map<String, Object> profile = toMap(data);
+    private String renderProfile(Map<String, Object> profile, RenderOptions options) {
         boolean showAvatar = getBoolean(profile, "showAvatar", true);
         String avatarUrl = getString(profile, "avatarUrl", "");
         String name = getString(profile, "name", "");
@@ -412,93 +443,74 @@ public class ResumeRenderService {
         return sb.toString();
     }
 
-    @SuppressWarnings("unchecked")
-    private String renderEducation(Object data) {
-        List<Map<String, Object>> items = (List<Map<String, Object>>) data;
+    private String renderEducation(List<Map<String, Object>> items) {
         StringBuilder sb = new StringBuilder();
-        if (items != null) {
-            for (Map<String, Object> item : items) {
-                sb.append("      <div class=\"item\">\n")
-                  .append("        <div class=\"item-header\">\n")
-                  .append("          <span>").append(escapeHtml(getString(item, "school", ""))).append("</span>\n")
-                  .append("          <span>").append(escapeHtml(getString(item, "startDate", ""))).append(" - ")
-                  .append(escapeHtml(getString(item, "endDate", ""))).append("</span>\n")
-                  .append("        </div>\n")
-                  .append("        <div class=\"item-sub\">")
-                  .append(escapeHtml(getString(item, "degree", ""))).append(" · ")
-                  .append(escapeHtml(getString(item, "major", ""))).append("</div>\n")
-                  .append("      </div>\n");
-            }
+        for (Map<String, Object> item : items) {
+            sb.append("      <div class=\"item\">\n")
+              .append("        <div class=\"item-header\">\n")
+              .append("          <span>").append(escapeHtml(getString(item, "school", ""))).append("</span>\n")
+              .append("          <span>").append(escapeHtml(getString(item, "startDate", ""))).append(" - ")
+              .append(escapeHtml(getString(item, "endDate", ""))).append("</span>\n")
+              .append("        </div>\n")
+              .append("        <div class=\"item-sub\">")
+              .append(escapeHtml(getString(item, "degree", ""))).append(" · ")
+              .append(escapeHtml(getString(item, "major", ""))).append("</div>\n")
+              .append("      </div>\n");
         }
         return sb.toString();
     }
 
-    @SuppressWarnings("unchecked")
-    private String renderWork(Object data) {
-        List<Map<String, Object>> items = (List<Map<String, Object>>) data;
+    private String renderWork(List<Map<String, Object>> items) {
         StringBuilder sb = new StringBuilder();
-        if (items != null) {
-            for (Map<String, Object> item : items) {
-                sb.append("      <div class=\"item\">\n")
-                  .append("        <div class=\"item-header\">\n")
-                  .append("          <span>").append(escapeHtml(getString(item, "company", ""))).append(" · ")
-                  .append(escapeHtml(getString(item, "position", ""))).append("</span>\n")
-                  .append("          <span>").append(escapeHtml(getString(item, "startDate", ""))).append(" - ")
-                  .append(escapeHtml(getString(item, "endDate", ""))).append("</span>\n")
-                  .append("        </div>\n")
-                   .append(renderRichTextOrList(item, "descriptionHtml", (List<String>) item.get("description")))
-                   .append(renderRichTextOrList(item, "achievementsHtml", (List<String>) item.get("achievements")))
-                   .append("      </div>\n");
-            }
+        for (Map<String, Object> item : items) {
+            sb.append("      <div class=\"item\">\n")
+              .append("        <div class=\"item-header\">\n")
+              .append("          <span>").append(escapeHtml(getString(item, "company", ""))).append(" · ")
+              .append(escapeHtml(getString(item, "position", ""))).append("</span>\n")
+              .append("          <span>").append(escapeHtml(getString(item, "startDate", ""))).append(" - ")
+              .append(escapeHtml(getString(item, "endDate", ""))).append("</span>\n")
+              .append("        </div>\n")
+               .append(renderRichTextOrList(item, "descriptionHtml", stringList(item.get("description"))))
+               .append(renderRichTextOrList(item, "achievementsHtml", stringList(item.get("achievements"))))
+               .append("      </div>\n");
         }
         return sb.toString();
     }
 
-    @SuppressWarnings("unchecked")
-    private String renderProject(Object data) {
-        List<Map<String, Object>> items = (List<Map<String, Object>>) data;
+    private String renderProject(List<Map<String, Object>> items) {
         StringBuilder sb = new StringBuilder();
-        if (items != null) {
-            for (Map<String, Object> item : items) {
-                sb.append("      <div class=\"item\">\n")
-                  .append("        <div class=\"item-header\">\n")
-                  .append("          <span>").append(escapeHtml(getString(item, "name", ""))).append("</span>\n")
-                  .append("          <span>").append(escapeHtml(getString(item, "startDate", ""))).append(" - ")
-                  .append(escapeHtml(getString(item, "endDate", ""))).append("</span>\n")
-                  .append("        </div>\n")
-                  .append("        <div class=\"item-sub\">").append(escapeHtml(getString(item, "role", ""))).append("</div>\n")
-                   .append(renderRichTextOrList(item, "descriptionHtml", (List<String>) item.get("description")))
-                   .append(renderRichTextOrList(item, "achievementsHtml", (List<String>) item.get("achievements")))
-                   .append("      </div>\n");
-            }
+        for (Map<String, Object> item : items) {
+            sb.append("      <div class=\"item\">\n")
+              .append("        <div class=\"item-header\">\n")
+              .append("          <span>").append(escapeHtml(getString(item, "name", ""))).append("</span>\n")
+              .append("          <span>").append(escapeHtml(getString(item, "startDate", ""))).append(" - ")
+              .append(escapeHtml(getString(item, "endDate", ""))).append("</span>\n")
+              .append("        </div>\n")
+              .append("        <div class=\"item-sub\">").append(escapeHtml(getString(item, "role", ""))).append("</div>\n")
+               .append(renderRichTextOrList(item, "descriptionHtml", stringList(item.get("description"))))
+               .append(renderRichTextOrList(item, "achievementsHtml", stringList(item.get("achievements"))))
+               .append("      </div>\n");
         }
         return sb.toString();
     }
 
-    @SuppressWarnings("unchecked")
-    private String renderSkill(Object data) {
-        List<Map<String, Object>> items = (List<Map<String, Object>>) data;
+    private String renderSkill(List<Map<String, Object>> items) {
         StringBuilder sb = new StringBuilder();
-        if (items != null) {
-            for (Map<String, Object> item : items) {
-                sb.append("      <div class=\"item\">\n")
-                  .append("        <div class=\"item-header\">").append(escapeHtml(getString(item, "category", ""))).append("</div>\n")
-                  .append("        <div>");
-                List<Map<String, Object>> skills = (List<Map<String, Object>>) item.get("items");
-                if (skills != null) {
-                    for (Map<String, Object> skill : skills) {
-                        sb.append("<span class=\"skill-tag\">").append(escapeHtml(getString(skill, "name", ""))).append("</span>");
-                    }
-                }
-                sb.append("</div>\n")
-                  .append("      </div>\n");
+        for (Map<String, Object> item : items) {
+            sb.append("      <div class=\"item\">\n")
+              .append("        <div class=\"item-header\">").append(escapeHtml(getString(item, "category", ""))).append("</div>\n")
+              .append("        <div>");
+            List<Map<String, Object>> skills = mapList(item.get("items"));
+            for (Map<String, Object> skill : skills) {
+                sb.append("<span class=\"skill-tag\">").append(escapeHtml(getString(skill, "name", ""))).append("</span>");
             }
+            sb.append("</div>\n")
+              .append("      </div>\n");
         }
         return sb.toString();
     }
 
-    private String renderIntroduction(Object data) {
-        Map<String, Object> intro = toMap(data);
+    private String renderIntroduction(Map<String, Object> intro) {
         String richContent = getString(intro, "contentHtml", "");
         if (StringUtils.isNotBlank(richContent)) {
             return "      <div class=\"rich-text\">" + RichTextSanitizer.sanitize(richContent) + "</div>\n";
@@ -579,20 +591,45 @@ public class ResumeRenderService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> toMap(Object data) {
-        if (data instanceof Map) {
-            return (Map<String, Object>) data;
-        }
-        return Map.of();
-    }
-
-    @SuppressWarnings("unchecked")
     private Map<String, Object> getMap(Map<String, Object> map, String key) {
         Object value = map.get(key);
         if (value instanceof Map) {
             return (Map<String, Object>) value;
         }
         return Map.of();
+    }
+
+    /**
+     * 将字段值安全转换为字符串列表（description / achievements 等），非法或 null 返回空列表。
+     */
+    private List<String> stringList(Object value) {
+        if (!(value instanceof List<?> raw)) {
+            return List.of();
+        }
+        List<String> result = new java.util.ArrayList<>(raw.size());
+        for (Object item : raw) {
+            if (item instanceof String s) {
+                result.add(s);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 将字段值安全转换为对象列表（skill.items 等），过滤非 Map 元素。
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> mapList(Object value) {
+        if (!(value instanceof List<?> raw)) {
+            return List.of();
+        }
+        List<Map<String, Object>> result = new java.util.ArrayList<>(raw.size());
+        for (Object item : raw) {
+            if (item instanceof Map) {
+                result.add((Map<String, Object>) item);
+            }
+        }
+        return result;
     }
 
     private String getString(Map<String, Object> map, String key, String defaultValue) {

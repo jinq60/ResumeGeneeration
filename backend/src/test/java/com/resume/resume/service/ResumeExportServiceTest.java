@@ -100,7 +100,7 @@ class ResumeExportServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> exportService.buildMarkdown("user_1", "resume_1"));
-        assertEquals(ResultCode.PDF_EXPORT_NAME_REQUIRED, ex.getErrorCode());
+        assertEquals(ResultCode.RESUME_PROFILE_NAME_REQUIRED, ex.getErrorCode());
     }
 
     @Test

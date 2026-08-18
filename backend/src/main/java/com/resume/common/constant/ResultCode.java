@@ -37,6 +37,9 @@ public final class ResultCode {
     public static final int AUTH_OAUTH_EXCHANGE_FAILED = 1011;
     public static final int AUTH_SMS_CODE_NOT_AVAILABLE = 1012;
     public static final int AUTH_EMAIL_CODE_TOO_FREQUENT = 1013;
+    public static final int AUTH_SMS_CODE_INVALID = 1014;
+    public static final int AUTH_SMS_CODE_SEND_FAILED = 1015;
+    public static final int AUTH_SMS_CODE_TOO_FREQUENT = 1016;
 
     /**
      * 简历模块错误码：2000-2099

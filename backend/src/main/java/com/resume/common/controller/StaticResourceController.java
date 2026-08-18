@@ -60,7 +60,11 @@ public class StaticResourceController {
             throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "缩略图不存在。");
         }
         try (java.io.InputStream in = resource.getInputStream()) {
-            return buildResponse(fileName, in.readAllBytes(), true);
+            // 内置模板缩略图来自可信 classpath，SVG 可安全以 image/svg+xml 返回以正常显示
+            String contentType = fileName.toLowerCase().endsWith(".svg")
+                    ? "image/svg+xml"
+                    : guessContentType(fileName);
+            return buildResponse(fileName, in.readAllBytes(), true, contentType);
         } catch (java.io.IOException e) {
             throw new BusinessException(ResultCode.INTERNAL_ERROR, "缩略图读取失败。");
         }
@@ -87,7 +91,10 @@ public class StaticResourceController {
     }
 
     private ResponseEntity<byte[]> buildResponse(String objectName, byte[] data, boolean cacheable) {
-        String contentType = guessContentType(objectName);
+        return buildResponse(objectName, data, cacheable, guessContentType(objectName));
+    }
+
+    private ResponseEntity<byte[]> buildResponse(String objectName, byte[] data, boolean cacheable, String contentType) {
         org.springframework.http.ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
                 .header("X-Content-Type-Options", "nosniff")
@@ -99,7 +106,6 @@ public class StaticResourceController {
 
     private String guessContentType(String filename) {
         String lower = filename.toLowerCase();
-        if (lower.endsWith(".svg")) return "image/svg+xml";
         if (lower.endsWith(".png")) return "image/png";
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
         if (lower.endsWith(".webp")) return "image/webp";

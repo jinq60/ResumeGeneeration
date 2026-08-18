@@ -158,6 +158,7 @@ public class ResumeReviewService {
         response.setDimensionScores(review.getDimensionScores());
         response.setSuggestions(toSuggestionList(review.getSuggestions()));
         response.setHighlights(review.getHighlights());
+        response.setModelName(review.getModelName());
         response.setCreatedAt(review.getCreatedAt());
         return response;
     }

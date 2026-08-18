@@ -31,14 +31,5 @@ public class RefreshToken {
 
     private LocalDateTime expiresAt;
 
-    /**
-     * 逻辑删除标记：0 未删除，1 已删除。
-     * <p>
-     * 注意：refresh_token 为一次性令牌，删除操作必须物理删除以释放唯一索引并回收空间，
-     * 因此该字段不启用 {@code @TableLogic}，{@code delete} 直接删行。
-     * </p>
-     */
-    private Integer deleted;
-
     private LocalDateTime createdAt;
 }

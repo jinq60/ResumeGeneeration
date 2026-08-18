@@ -3,6 +3,7 @@ package com.resume.resume.share.controller;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.entity.R;
 import com.resume.common.exception.BusinessException;
+import com.resume.common.service.ResumeRenderService;
 import com.resume.resume.share.dto.CreateShareRequest;
 import com.resume.resume.share.dto.ShareResponse;
 import com.resume.resume.share.service.ShareService;
@@ -29,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 public class ShareController {
 
     private final ShareService shareService;
+    private final ResumeRenderService resumeRenderService;
 
     /**
      * 创建/轮换分享。
@@ -73,7 +75,13 @@ public class ShareController {
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setHeader("Content-Security-Policy",
-                "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; frame-ancestors 'none'");
+                "default-src 'none'; " + buildImgSrcCsp()
+                        + "; style-src 'unsafe-inline'; frame-ancestors 'none'");
         response.getWriter().write(html);
+    }
+
+    private String buildImgSrcCsp() {
+        String origin = resumeRenderService.publicBaseOrigin();
+        return "img-src 'self' data:" + (origin != null ? " " + origin : "");
     }
 }

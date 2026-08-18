@@ -20,7 +20,13 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 幂等性过滤器（注册于 Spring Security 链内、JWT 认证之后）。
@@ -29,6 +35,7 @@ import java.util.Set;
  * <ul>
  *   <li>缓存键包含 用户ID + 方法 + 路径，防止跨用户/跨路径响应投毒；</li>
  *   <li>通过唯一主键原子占位（insert 成功者为唯一执行者），消除并发下重复执行副作用；</li>
+ *   <li>并发重复请求通过 {@link CompletableFuture} 精准等待执行者完成，避免固定间隔轮询；</li>
  *   <li>/auth/** 返回凭证，禁止缓存。</li>
  * </ul>
  * </p>
@@ -40,11 +47,15 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     private static final String HEADER_KEY = "Idempotency-Key";
     private static final int TTL_HOURS = 24;
     private static final Set<String> IDEMPOTENT_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
-    private static final int WAIT_ATTEMPTS = 25;
-    private static final long WAIT_INTERVAL_MS = 200;
+    private static final long WAIT_TIMEOUT_MS = 5_000;
     private static final int STATUS_IN_FLIGHT = 0;
 
     private final IdempotencyRecordMapper idempotencyRecordMapper;
+
+    /**
+     * 进行中请求的完成信号：key = scopedKey，value = 执行者完成时被 complete 的 future。
+     */
+    private final Map<String, CompletableFuture<IdempotencyRecord>> inFlight = new ConcurrentHashMap<>();
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -102,19 +113,26 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         }
 
         ContentCachingResponseWrapper wrapped = new ContentCachingResponseWrapper(response);
-        chain.doFilter(request, wrapped);
+        IdempotencyRecord completedRecord = null;
+        try {
+            chain.doFilter(request, wrapped);
 
-        int status = wrapped.getStatus();
-        if (HttpStatus.valueOf(status).is2xxSuccessful()) {
-            if (owner) {
-                complete(scopedKey, status, wrapped);
+            int status = wrapped.getStatus();
+            if (HttpStatus.valueOf(status).is2xxSuccessful()) {
+                if (owner) {
+                    completedRecord = complete(scopedKey, status, wrapped);
+                }
+            } else if (owner) {
+                // 失败请求不缓存，释放占位以允许重试
+                idempotencyRecordMapper.deleteById(scopedKey);
             }
-        } else if (owner) {
-            // 失败请求不缓存，释放占位以允许重试
-            idempotencyRecordMapper.deleteById(scopedKey);
+        } finally {
+            // 无论成败都唤醒等待方，避免其因 future 永不完成而阻塞到超时
+            if (owner) {
+                completeInFlight(scopedKey, completedRecord);
+            }
+            wrapped.copyBodyToResponse();
         }
-
-        wrapped.copyBodyToResponse();
     }
 
     private void replay(IdempotencyRecord record, HttpServletResponse response) throws IOException {
@@ -126,20 +144,20 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     }
 
     private IdempotencyRecord waitForCompletion(String scopedKey) {
-        for (int i = 0; i < WAIT_ATTEMPTS; i++) {
-            try {
-                Thread.sleep(WAIT_INTERVAL_MS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return null;
-            }
-            IdempotencyRecord record = idempotencyRecordMapper.selectById(scopedKey);
-            if (record != null && record.getResponseStatus() != null
-                    && record.getResponseStatus() > STATUS_IN_FLIGHT) {
-                return record;
-            }
+        CompletableFuture<IdempotencyRecord> future = inFlight.get(scopedKey);
+        if (future == null) {
+            return null;
         }
-        return null;
+        try {
+            return future.get(WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (ExecutionException e) {
+            return null;
+        }
     }
 
     private boolean claim(String scopedKey, String userId, HttpServletRequest request) {
@@ -155,13 +173,15 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         record.setExpiresAt(LocalDateTime.now().plusHours(TTL_HOURS));
         try {
             idempotencyRecordMapper.insert(record);
+            // 占位成功后立即注册完成信号，缩小并发等待方拿不到 future 的窗口
+            inFlight.put(scopedKey, new CompletableFuture<>());
             return true;
         } catch (DuplicateKeyException e) {
             return false;
         }
     }
 
-    private void complete(String scopedKey, int status, ContentCachingResponseWrapper wrapped) {
+    private IdempotencyRecord complete(String scopedKey, int status, ContentCachingResponseWrapper wrapped) {
         try {
             byte[] body = wrapped.getContentAsByteArray();
             IdempotencyRecord record = new IdempotencyRecord();
@@ -171,9 +191,18 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             record.setResponseContentType(
                     wrapped.getContentType() != null ? wrapped.getContentType() : MediaType.APPLICATION_JSON_VALUE);
             idempotencyRecordMapper.updateById(record);
+            return record;
         } catch (Exception e) {
             log.warn("Failed to save idempotency record for key={}", scopedKey, e);
             idempotencyRecordMapper.deleteById(scopedKey);
+            return null;
+        }
+    }
+
+    private void completeInFlight(String scopedKey, IdempotencyRecord record) {
+        CompletableFuture<IdempotencyRecord> future = inFlight.remove(scopedKey);
+        if (future != null) {
+            future.complete(record);
         }
     }
 

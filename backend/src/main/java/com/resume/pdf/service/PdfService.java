@@ -337,7 +337,7 @@ public class PdfService {
     private String buildFileName(Resume resume) {
         List<SectionDTO> sections = resume.getSections() != null ? resume.getSections() : List.of();
         String name = "";
-        String targetPosition = resume.getTargetPosition();
+        String targetPosition = sanitizeFileName(resume.getTargetPosition());
 
         SectionDTO profileSection = sections.stream()
                 .filter(s -> BizConstant.SECTION_TYPE_PROFILE.equals(s.getType()))
@@ -346,7 +346,7 @@ public class PdfService {
         if (profileSection != null && profileSection.getData() instanceof Map) {
             @SuppressWarnings("unchecked")
             Map<String, Object> profile = (Map<String, Object>) profileSection.getData();
-            name = getString(profile, "name");
+            name = sanitizeFileName(getString(profile, "name"));
         }
 
         if (StringUtils.isNotBlank(name) && StringUtils.isNotBlank(targetPosition)) {
@@ -356,6 +356,16 @@ public class PdfService {
             return truncateFileName(name + "_简历.pdf");
         }
         return "我的简历_" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
+    }
+
+    /**
+     * 清理文件名中的路径分隔符与控制字符，避免拼进 MinIO 对象键时产生歧义。
+     */
+    private String sanitizeFileName(String name) {
+        if (name == null) {
+            return "";
+        }
+        return name.replaceAll("[\\\\/:*?\"<>|\\r\\n\\t]", "_").trim();
     }
 
     /**

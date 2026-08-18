@@ -9,6 +9,7 @@ import com.resume.user.auth.EmailCodeService;
 import com.resume.user.auth.OAuthProvider;
 import com.resume.user.auth.OAuthStateStore;
 import com.resume.user.auth.OAuthUserInfo;
+import com.resume.user.auth.SmsCodeService;
 import com.resume.user.auth.UserAuthService;
 import com.resume.user.config.AuthProperties;
 import com.resume.user.dto.*;
@@ -42,6 +43,7 @@ public class AuthController {
     private final GuestAccountGuard guestAccountGuard;
     private final AuthProviderRegistry authProviderRegistry;
     private final EmailCodeService emailCodeService;
+    private final SmsCodeService smsCodeService;
     private final OAuthStateStore oauthStateStore;
     private final UserAuthService userAuthService;
     private final AuthProperties authProperties;
@@ -94,6 +96,23 @@ public class AuthController {
     @PostMapping("/email-code/login")
     public R<AuthResponse> emailCodeLogin(@Valid @RequestBody EmailCodeLoginRequest request) {
         return R.success(userAuthService.authenticateByEmailCode(request.getEmail(), request.getCode()));
+    }
+
+    /**
+     * 发送手机短信登录验证码。
+     */
+    @PostMapping("/sms-code/send")
+    public R<Void> sendSmsCode(@Valid @RequestBody SendSmsCodeRequest request) {
+        smsCodeService.send(request.getPhone());
+        return R.success();
+    }
+
+    /**
+     * 短信验证码登录（免密，首次登录自动创建账号）。
+     */
+    @PostMapping("/sms-code/login")
+    public R<AuthResponse> smsCodeLogin(@Valid @RequestBody SmsCodeLoginRequest request) {
+        return R.success(userAuthService.authenticateBySmsCode(request.getPhone(), request.getCode()));
     }
 
     /**

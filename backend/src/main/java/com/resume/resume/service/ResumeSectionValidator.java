@@ -141,10 +141,10 @@ public class ResumeSectionValidator {
         String email = profile == null ? "" : getString(profile, "email");
 
         if (StringUtils.isBlank(name)) {
-            throw new BusinessException(ResultCode.PDF_EXPORT_NAME_REQUIRED, "建议填写姓名，便于生成正式简历。");
+            throw new BusinessException(ResultCode.RESUME_PROFILE_NAME_REQUIRED, "建议填写姓名，便于生成正式简历。");
         }
         if (StringUtils.isBlank(phone) && StringUtils.isBlank(email)) {
-            throw new BusinessException(ResultCode.PDF_EXPORT_CONTACT_REQUIRED, "简历中至少需要填写手机号或邮箱。");
+            throw new BusinessException(ResultCode.RESUME_PROFILE_CONTACT_REQUIRED, "简历中至少需要填写手机号或邮箱。");
         }
     }
 
@@ -152,8 +152,8 @@ public class ResumeSectionValidator {
     private Map<String, Object> findProfile(List<SectionDTO> sections) {
         return sections.stream()
                 .filter(s -> BizConstant.SECTION_TYPE_PROFILE.equals(s.getType()))
-                .filter(s -> s.getData() instanceof Map)
-                .map(s -> (Map<String, Object>) s.getData())
+                .map(SectionDTO::dataAsMap)
+                .filter(m -> !m.isEmpty())
                 .findFirst()
                 .orElse(null);
     }

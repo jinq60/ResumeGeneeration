@@ -21,7 +21,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -114,7 +116,7 @@ public class AiWritingService {
         try {
             return doWrite(resume, request, originalText);
         } finally {
-            counter.decrementAndGet();
+            releaseInFlight(userId, counter);
         }
     }
 
@@ -142,18 +144,21 @@ public class AiWritingService {
             LlmProvider provider = providerRouter.resolve(FEATURE_KEY);
             String model = providerRouter.resolveModel(FEATURE_KEY);
             String prompt = buildPrompt(resume, request, originalText);
+            AiProperties.FeatureConfig featureConfig = providerRouter.getFeatureConfig(FEATURE_KEY);
             AiChatRequest aiRequest = AiChatRequest.builder()
                     .model(model)
                     .userPrompt(prompt)
                     .temperature(0.4)
                     .maxTokens(MAX_PROMPT_TOKENS)
+                    .timeout(featureConfig.getTimeout())
+                    .retry(featureConfig.getRetry())
                     .build();
             AiCallLog callLog = new AiCallLog();
             callLog.setUserId(resume.getUserId());
             callLog.setFeatureKey(FEATURE_KEY);
             callLog.setProviderName(provider.getProviderName());
             callLog.setModelName(model);
-            callLog.setRequestHash(String.valueOf(prompt.hashCode()));
+            callLog.setRequestHash(DigestUtils.md5DigestAsHex(prompt.getBytes(StandardCharsets.UTF_8)));
             callLog.setCreatedAt(LocalDateTime.now());
             long start = System.currentTimeMillis();
             AtomicBoolean finalized = new AtomicBoolean(false);
@@ -162,9 +167,9 @@ public class AiWritingService {
                     .filter(StringUtils::isNotBlank)
                     .doOnComplete(() -> finishStream(callLog, resume, request, start, true, finalized))
                     .doOnError(error -> finishStream(callLog, resume, request, start, false, finalized))
-                    .doFinally(signal -> counter.decrementAndGet());
+                    .doFinally(signal -> releaseInFlight(userId, counter));
         } catch (RuntimeException e) {
-            counter.decrementAndGet();
+            releaseInFlight(userId, counter);
             throw e;
         }
     }
@@ -194,18 +199,21 @@ public class AiWritingService {
                     "targetLang", StringUtils.defaultString(request.getTargetLang())
             ));
 
+            AiProperties.FeatureConfig featureConfig = providerRouter.getFeatureConfig(FEATURE_KEY);
             AiChatRequest aiRequest = AiChatRequest.builder()
                     .model(model)
                     .userPrompt(prompt)
                     .temperature(0.4)
                     .maxTokens(MAX_PROMPT_TOKENS)
+                    .timeout(featureConfig.getTimeout())
+                    .retry(featureConfig.getRetry())
                     .build();
 
             AiChatResponse response = provider.chat(aiRequest);
 
             callLog.setProviderName(provider.getProviderName());
             callLog.setModelName(model);
-            callLog.setRequestHash(String.valueOf(prompt.hashCode()));
+            callLog.setRequestHash(DigestUtils.md5DigestAsHex(prompt.getBytes(StandardCharsets.UTF_8)));
             callLog.setPromptTokens(response.getPromptTokens());
             callLog.setCompletionTokens(response.getCompletionTokens());
             callLog.setTotalTokens(response.getTotalTokens());
@@ -243,6 +251,15 @@ public class AiWritingService {
             } catch (Exception logEx) {
                 log.warn("Insert AiCallLog failed: {}", logEx.getMessage());
             }
+        }
+    }
+
+    /**
+     * 释放并发计数，并在计数归零时清理内存条目，避免 inFlight Map 无限增长。
+     */
+    private void releaseInFlight(String userId, AtomicInteger counter) {
+        if (counter.decrementAndGet() <= 0) {
+            inFlight.remove(userId, counter);
         }
     }
 

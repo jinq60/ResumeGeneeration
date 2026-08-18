@@ -56,12 +56,15 @@ public class GithubAuthProvider extends BaseOAuthProvider {
                 throw new IllegalStateException("missing id");
             }
             String email = node.path("email").asText(null);
+            boolean emailVerified = StringUtils.isNotBlank(email);
             if (StringUtils.isBlank(email)) {
                 email = fetchPrimaryEmail(accessToken);
+                emailVerified = StringUtils.isNotBlank(email);
             }
             return new OAuthUserInfo(AuthMethod.GITHUB, id, email,
                     node.path("name").asText(null),
-                    node.path("avatar_url").asText(null));
+                    node.path("avatar_url").asText(null),
+                    emailVerified);
         } catch (Exception e) {
             log.warn("Parse GitHub user info failed: {}", e.getMessage());
             throw new com.resume.common.exception.BusinessException(

@@ -20,7 +20,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -81,12 +83,15 @@ public class AiGrammarService {
                     "resumeContent", toJson(resume.getSections()),
                     "targetPosition", StringUtils.defaultString(resume.getTargetPosition())
             ));
-            callLog.setRequestHash(String.valueOf(prompt.hashCode()));
+            callLog.setRequestHash(DigestUtils.md5DigestAsHex(prompt.getBytes(StandardCharsets.UTF_8)));
+            AiProperties.FeatureConfig featureConfig = providerRouter.getFeatureConfig(FEATURE_KEY);
             AiChatRequest request = AiChatRequest.builder()
                     .model(model)
                     .userPrompt(prompt)
                     .temperature(0.1)
                     .maxTokens(4096)
+                    .timeout(featureConfig.getTimeout())
+                    .retry(featureConfig.getRetry())
                     .build();
 
             GrammarCheckResponse result = provider.chatStructured(request, GrammarCheckResponse.class);
