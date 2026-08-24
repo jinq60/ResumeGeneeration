@@ -1,6 +1,9 @@
 package com.resume.common.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.resume.common.constant.ResultCode;
 import com.resume.common.entity.IdempotencyRecord;
+import com.resume.common.entity.R;
 import com.resume.common.mapper.IdempotencyRecordMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -51,6 +54,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     private static final int STATUS_IN_FLIGHT = 0;
 
     private final IdempotencyRecordMapper idempotencyRecordMapper;
+    private final ObjectMapper objectMapper;
 
     /**
      * 进行中请求的完成信号：key = scopedKey，value = 执行者完成时被 complete 的 future。
@@ -104,12 +108,17 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
         boolean owner = claim(scopedKey, userId, request);
         if (!owner) {
-            // 未抢到占位（极端并发），等待完成后返回；超时则降级为直接执行
+            // 未抢到占位（并发重复请求）：等待执行者完成后重放其响应；
+            // 等待超时必须拒绝执行而非降级放行，否则同一 key 的副作用会被重复执行
+            // （双扣 AI 配额、重复建任务等）。返回 425 Too Early 让客户端安全重试。
             IdempotencyRecord completed = waitForCompletion(scopedKey);
             if (completed != null) {
                 replay(completed, response);
                 return;
             }
+            log.warn("Idempotency wait timeout without owner completion: key={}", scopedKey);
+            respondConflict(response);
+            return;
         }
 
         ContentCachingResponseWrapper wrapped = new ContentCachingResponseWrapper(response);
@@ -141,6 +150,18 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         response.setContentType(record.getResponseContentType());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.getWriter().write(record.getResponseBody());
+    }
+
+    /**
+     * 同一幂等键的请求仍在处理且等待超时：返回 425，绝不放行执行业务。
+     */
+    private void respondConflict(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpStatus.TOO_EARLY.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.getWriter().write(objectMapper.writeValueAsString(
+                R.error(ResultCode.IDEMPOTENCY_CONFLICT,
+                        "相同请求正在处理中，请稍后重试（Idempotency-Key 冲突）。")));
     }
 
     private IdempotencyRecord waitForCompletion(String scopedKey) {

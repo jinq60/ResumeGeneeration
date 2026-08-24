@@ -55,12 +55,17 @@ public class MinioConfig {
             log.warn("app.minio.endpoint not configured -> MinIO disabled; file upload/download will fail at runtime");
             endpoint = "http://localhost:9000";
         }
+        // 凭据缺失必须显式报错，禁止静默回退到众所周知的 minioadmin/minioadmin 掩盖配置错误；
+        // 本地开发可在 application-dev.yml 中显式声明默认值
+        if (accessKey == null || accessKey.isBlank() || secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException(
+                    "MinIO access-key/secret-key must be configured via app.minio.access-key / app.minio.secret-key "
+                            + "(env: APP_MINIO_ACCESS_KEY / APP_MINIO_SECRET_KEY)");
+        }
         log.info("MinIO client configured: endpoint={}", endpoint);
         return MinioClient.builder()
                 .endpoint(endpoint)
-                .credentials(
-                        accessKey != null ? accessKey : "minioadmin",
-                        secretKey != null ? secretKey : "minioadmin")
+                .credentials(accessKey, secretKey)
                 .build();
     }
 }

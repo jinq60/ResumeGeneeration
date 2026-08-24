@@ -108,13 +108,16 @@
     <!-- Actions -->
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-2">
-        <el-button type="primary">
+        <el-button
+          type="primary"
+          @click="createDialogVisible = true"
+        >
           <el-icon size="18">
             <Plus />
           </el-icon>新增用户
         </el-button>
         <el-divider direction="vertical" />
-        <el-dropdown>
+        <el-dropdown @command="handleBatchCommand">
           <el-button>
             批量操作<el-icon
               class="ml-1"
@@ -125,9 +128,23 @@
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item>批量启用</el-dropdown-item>
-              <el-dropdown-item>批量禁用</el-dropdown-item>
-              <el-dropdown-item divided>
+              <el-dropdown-item
+                command="enable"
+                :disabled="selectedIds.length === 0"
+              >
+                批量启用
+              </el-dropdown-item>
+              <el-dropdown-item
+                command="disable"
+                :disabled="selectedIds.length === 0"
+              >
+                批量禁用
+              </el-dropdown-item>
+              <el-dropdown-item
+                command="delete"
+                :disabled="selectedIds.length === 0"
+                divided
+              >
                 批量删除
               </el-dropdown-item>
             </el-dropdown-menu>
@@ -136,7 +153,10 @@
         <span class="text-label-md text-outline ml-2">已选择 {{ selectedIds.length }} 项</span>
       </div>
       <div class="flex items-center gap-2">
-        <el-button>
+        <el-button
+          :loading="exporting"
+          @click="handleExport"
+        >
           <el-icon size="16">
             <Download />
           </el-icon>导出
@@ -192,7 +212,7 @@
           min-width="180"
         >
           <template #default="{ row }">
-            {{ formatContact(row) }}
+            {{ formatContact(row as User) }}
           </template>
         </el-table-column>
         <el-table-column
@@ -256,7 +276,7 @@
               <el-button
                 link
                 type="primary"
-                @click="handleViewDetail(row)"
+                @click="handleViewDetail(row as User)"
               >
                 查看
               </el-button>
@@ -269,10 +289,10 @@
                 </el-icon>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item @click="handleViewDetail(row)">
+                    <el-dropdown-item @click="handleViewDetail(row as User)">
                       详情
                     </el-dropdown-item>
-                    <el-dropdown-item @click="handleToggleStatus(row)">
+                    <el-dropdown-item @click="handleToggleStatus(row as User)">
                       {{ row.status === 'active' ? '禁用' : '启用' }}
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -350,13 +370,109 @@
         </el-descriptions>
       </div>
     </el-dialog>
+
+    <!-- 新增用户 Dialog -->
+    <el-dialog
+      v-model="createDialogVisible"
+      title="新增用户"
+      width="520px"
+    >
+      <el-form
+        ref="createFormRef"
+        :model="createForm"
+        :rules="createRules"
+        label-width="100px"
+      >
+        <el-form-item
+          label="邮箱"
+          prop="email"
+        >
+          <el-input
+            v-model="createForm.email"
+            placeholder="登录账号（必填）"
+          />
+        </el-form-item>
+        <el-form-item label="昵称">
+          <el-input
+            v-model="createForm.nickname"
+            placeholder="昵称（可选）"
+            maxlength="50"
+          />
+        </el-form-item>
+        <el-form-item label="手机号">
+          <el-input
+            v-model="createForm.phone"
+            placeholder="手机号（可选）"
+            maxlength="11"
+          />
+        </el-form-item>
+        <el-form-item label="初始密码">
+          <el-input
+            v-model="createForm.initialPassword"
+            type="password"
+            show-password
+            placeholder="留空则自动生成临时密码"
+            maxlength="32"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createDialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="creating"
+          @click="submitCreate"
+        >
+          创建
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 临时密码 Dialog -->
+    <el-dialog
+      v-model="tempPasswordVisible"
+      title="用户创建成功"
+      width="480px"
+    >
+      <div class="space-y-4">
+        <p class="text-body-md text-on-surface-variant">
+          用户 {{ createdResult?.email }} 已创建。
+        </p>
+        <div
+          v-if="createdResult?.temporaryPassword"
+          class="p-4 bg-surface-container-low rounded-lg border border-outline-variant"
+        >
+          <p class="text-label-md font-bold text-on-surface-variant mb-2">
+            一次性临时密码（仅显示一次，请立即转交用户）
+          </p>
+          <p class="text-headline-md font-bold text-primary font-mono">
+            {{ createdResult.temporaryPassword }}
+          </p>
+        </div>
+        <p class="text-body-md text-on-surface-variant">
+          {{ createdResult?.message }}
+        </p>
+      </div>
+      <template #footer>
+        <el-button
+          type="primary"
+          @click="tempPasswordVisible = false"
+        >
+          知道了
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { userApi, type User, type UserStats } from '@/api/admin/users'
+import { useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { userApi, type User, type UserStats, type CreateUserResponse } from '@/api/admin/users'
+import { adminDownload } from '@/utils/adminDownload'
 import {
   User as UserIcon,
   Search,
@@ -377,14 +493,39 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
+const route = useRoute()
+
 const filters = reactive({
-  keyword: '',
+  keyword: (route.query.keyword as string) || '',
   status: ''
 })
 
 const userList = ref<User[]>([])
 const detailVisible = ref(false)
 const currentUser = ref<User | null>(null)
+
+const createDialogVisible = ref(false)
+const creating = ref(false)
+const createFormRef = ref<FormInstance>()
+const createForm = reactive({
+  email: '',
+  nickname: '',
+  phone: '',
+  initialPassword: ''
+})
+const createRules: FormRules = {
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
+  ],
+  phone: [
+    { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
+  ]
+}
+
+const tempPasswordVisible = ref(false)
+const createdResult = ref<CreateUserResponse | null>(null)
+const exporting = ref(false)
 
 const stats = reactive([
   { label: '用户总数', value: '-', growth: '', compare: '', icon: UserIcon, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
@@ -487,6 +628,79 @@ async function loadStats() {
     stats[3].value = String(s.disabledUsers)
   } catch (e: any) {
     ElMessage.error(e.message || '加载统计数据失败')
+  }
+}
+
+async function submitCreate() {
+  if (!createFormRef.value) return
+  try {
+    await createFormRef.value.validate()
+  } catch {
+    return
+  }
+  creating.value = true
+  try {
+    const result = await userApi.createUser({
+      email: createForm.email.trim(),
+      nickname: createForm.nickname.trim() || undefined,
+      phone: createForm.phone.trim() || undefined,
+      initialPassword: createForm.initialPassword || undefined
+    })
+    createdResult.value = result
+    createDialogVisible.value = false
+    createForm.email = ''
+    createForm.nickname = ''
+    createForm.phone = ''
+    createForm.initialPassword = ''
+    tempPasswordVisible.value = true
+    loadUserList()
+    loadStats()
+  } catch (e: any) {
+    ElMessage.error(e.message || '创建失败')
+  } finally {
+    creating.value = false
+  }
+}
+
+async function handleBatchCommand(command: string) {
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先选择用户')
+    return
+  }
+  if (command === 'delete') {
+    try {
+      await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个用户吗？`, '批量删除', { type: 'warning' })
+    } catch {
+      return
+    }
+  }
+  try {
+    for (const id of selectedIds.value) {
+      if (command === 'enable' || command === 'disable') {
+        await userApi.updateUserStatus(id, command === 'enable' ? 'active' : 'disabled')
+      } else if (command === 'delete') {
+        await userApi.deleteUser(id)
+      }
+    }
+    ElMessage.success('批量操作完成')
+    loadUserList()
+  } catch (e: any) {
+    ElMessage.error(e.message || '批量操作失败')
+  }
+}
+
+async function handleExport() {
+  exporting.value = true
+  try {
+    const fileName = await adminDownload(
+      userApi.exportUrl({ status: filters.status || undefined, keyword: filters.keyword || undefined }),
+      '用户数据.csv'
+    )
+    ElMessage.success(`已导出 ${fileName}`)
+  } catch (e: any) {
+    ElMessage.error(e.message || '导出失败')
+  } finally {
+    exporting.value = false
   }
 }
 

@@ -24,6 +24,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -64,10 +66,19 @@ public class PdfService {
     private final MinioStorageService minioStorageService;
     private final ResumeSectionValidator resumeSectionValidator;
     private final AuditLogService auditLogService;
+    private final com.resume.notification.service.NotificationService notificationService;
     @Qualifier("pdfTaskExecutor")
     private final Executor pdfTaskExecutor;
 
     private final Semaphore exportSemaphore = new Semaphore(MAX_CONCURRENT_EXPORTS);
+
+    /**
+     * Playwright 与 Chromium 进程复用：每次导出不再启动/销毁浏览器，
+     * 显著降低内存抖动与启动开销。信号量已限制并发导出数。
+     */
+    private final Object browserLock = new Object();
+    private volatile Playwright sharedPlaywright;
+    private volatile Browser sharedBrowser;
 
     /**
      * 创建 PDF 导出任务。
@@ -98,22 +109,76 @@ public class PdfService {
         pdfTaskMapper.insert(task);
         auditLogService.record(userId, "pdf_export", resumeId, "templateId=" + exportTemplateId);
 
-        try {
-            pdfTaskExecutor.execute(() -> executeExport(task.getId(), userId, resumeId, exportTemplateId));
-        } catch (RejectedExecutionException e) {
-            log.warn("PDF export queue full: taskId={}", task.getId());
-            PdfTask failed = new PdfTask();
-            failed.setId(task.getId());
-            failed.setStatus(BizConstant.TASK_STATUS_FAILED);
-            failed.setErrorMsg("导出任务过多，请稍后再试。");
-            failed.setUpdatedAt(LocalDateTime.now());
-            pdfTaskMapper.updateById(failed);
-        }
+        // 异步导出必须在事务提交后触发：事务内立即提交线程池时，后台线程可能读不到未提交的任务行
+        submitExportAfterCommit(task.getId(), userId, resumeId, exportTemplateId);
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("taskId", task.getId());
         result.put("status", task.getStatus());
         return result;
+    }
+
+    /**
+     * 管理端创建 PDF 导出任务：不做所有权校验，任务归属简历所有者，
+     * 所有者可在自己的下载中心查看，完成时收到通知。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> exportPdfByAdmin(String operatorId, String resumeId, String templateId) {
+        log.info("exportPdfByAdmin start: operatorId={}, resumeId={}, templateId={}",
+                operatorId, resumeId, templateId);
+        Resume resume = resumeService.getResumeForPreview(resumeId);
+        validateResumeForExport(resume);
+
+        String exportTemplateId = StringUtils.isNotBlank(templateId) ? templateId : resume.getTemplateId();
+        templateService.getTemplateEntity(exportTemplateId);
+
+        PdfTask task = new PdfTask();
+        task.setUserId(resume.getUserId());
+        task.setResumeId(resumeId);
+        task.setTemplateId(exportTemplateId);
+        task.setStatus(BizConstant.TASK_STATUS_PENDING);
+        task.setDeleted(BizConstant.NOT_DELETED);
+        task.setCreatedAt(LocalDateTime.now());
+        task.setUpdatedAt(LocalDateTime.now());
+        pdfTaskMapper.insert(task);
+        auditLogService.record(operatorId, "pdf_export_admin", resumeId, "templateId=" + exportTemplateId);
+
+        submitExportAfterCommit(task.getId(), task.getUserId(), resumeId, exportTemplateId);
+
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("taskId", task.getId());
+        result.put("status", task.getStatus());
+        return result;
+    }
+
+    /**
+     * 事务提交后再提交后台导出；无事务上下文时立即提交。
+     * 队列满时将任务标记为失败，避免永久卡在 pending。
+     */
+    private void submitExportAfterCommit(String taskId, String userId, String resumeId, String exportTemplateId) {
+        Runnable submit = () -> {
+            try {
+                pdfTaskExecutor.execute(() -> executeExport(taskId, userId, resumeId, exportTemplateId));
+            } catch (RejectedExecutionException e) {
+                log.warn("PDF export queue full: taskId={}", taskId);
+                PdfTask failed = new PdfTask();
+                failed.setId(taskId);
+                failed.setStatus(BizConstant.TASK_STATUS_FAILED);
+                failed.setErrorMsg("导出任务过多，请稍后再试。");
+                failed.setUpdatedAt(LocalDateTime.now());
+                pdfTaskMapper.updateById(failed);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    submit.run();
+                }
+            });
+        } else {
+            submit.run();
+        }
     }
 
     /**
@@ -222,7 +287,39 @@ public class PdfService {
     }
 
     /**
+     * 管理端查询 PDF 任务（不做所有权校验）。
+     */
+    public PdfTaskResponse getTaskByAdmin(String taskId) {
+        PdfTask task = pdfTaskMapper.selectById(taskId);
+        if (task == null || BizConstant.DELETED.equals(task.getDeleted())) {
+            throw new BusinessException(ResultCode.PDF_TASK_NOT_FOUND, "PDF 任务不存在。");
+        }
+        return toResponse(task);
+    }
+
+    /**
+     * 管理端流式下载 PDF（不做所有权校验）。
+     */
+    public InputStream downloadPdfStreamByAdmin(String taskId) {
+        PdfTask task = pdfTaskMapper.selectById(taskId);
+        if (task == null || BizConstant.DELETED.equals(task.getDeleted())) {
+            throw new BusinessException(ResultCode.PDF_TASK_NOT_FOUND, "PDF 任务不存在。");
+        }
+        if (!BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
+            throw new BusinessException(ResultCode.PDF_FILE_NOT_READY, "PDF 文件尚未生成完成。");
+        }
+        if (StringUtils.isBlank(task.getFilePath())) {
+            throw new BusinessException(ResultCode.PDF_EXPORT_FAILED, "PDF 文件路径不存在。");
+        }
+        return minioStorageService.downloadStream(minioStorageService.getBucketPdfs(), task.getFilePath());
+    }
+
+    /**
      * 清理指定简历关联的所有 PDF 任务及 MinIO 文件。
+     * <p>
+     * 任务记录在当前事务内逻辑删除；MinIO 文件延迟到事务提交后移除，
+     * 若事务回滚则文件保留，避免出现"记录在、文件没了"的不一致。
+     * </p>
      */
     @Transactional(rollbackFor = Exception.class)
     public void cleanupTasksByResume(String userId, String resumeId) {
@@ -230,18 +327,19 @@ public class PdfService {
         wrapper.eq(PdfTask::getUserId, userId)
                 .eq(PdfTask::getResumeId, resumeId);
         List<PdfTask> tasks = pdfTaskMapper.selectList(wrapper);
-        for (PdfTask task : tasks) {
-            if (StringUtils.isNotBlank(task.getFilePath())) {
-                minioStorageService.remove(minioStorageService.getBucketPdfs(), task.getFilePath());
-            }
-        }
+        List<String> filePaths = tasks.stream()
+                .map(PdfTask::getFilePath)
+                .filter(StringUtils::isNotBlank)
+                .toList();
         if (!tasks.isEmpty()) {
             pdfTaskMapper.delete(wrapper);
         }
+        minioStorageService.removeAfterCommit(minioStorageService.getBucketPdfs(), filePaths);
     }
 
     private void generatePdf(String taskId, Resume resume, Template template) {
         Path tempDir = null;
+        Browser browser = null;
         try {
             updateTaskStatus(taskId, BizConstant.TASK_STATUS_PROCESSING, null);
             log.info("generatePdf -> processing: taskId={}, resumeId={}", taskId, resume.getId());
@@ -253,9 +351,8 @@ public class PdfService {
             Path pdfPath = tempDir.resolve(fileName);
             Files.writeString(htmlPath, html);
 
-            try (Playwright playwright = Playwright.create();
-                 Browser browser = playwright.chromium().launch(buildLaunchOptions());
-                 BrowserContext context = browser.newContext();
+            browser = acquireBrowser();
+            try (BrowserContext context = browser.newContext();
                  Page page = context.newPage()) {
                 page.navigate(htmlPath.toUri().toString(),
                         new Page.NavigateOptions().setTimeout(60_000));
@@ -280,10 +377,17 @@ public class PdfService {
             update.setCompletedAt(LocalDateTime.now());
             update.setUpdatedAt(LocalDateTime.now());
             pdfTaskMapper.updateById(update);
+            notificationService.notify(resume.getUserId(), "pdf", "PDF 导出完成",
+                    "你的简历《" + resume.getTitle() + "》已导出为 PDF，可前往下载中心下载。");
             log.info("generatePdf success: taskId={}, fileSize={}, fileName={}",
                     taskId, update.getFileSize(), update.getFileName());
         } catch (Exception e) {
             log.error("Generate PDF failed: taskId={}", taskId, e);
+            // Chromium 崩溃/关闭后丢弃共享实例，下次导出时重建，避免复用已损坏的浏览器
+            if (browser != null && !browser.isConnected()) {
+                log.warn("Shared Chromium seems crashed, discarding for next export");
+                discardBrowser();
+            }
             String msg = e.getMessage() == null ? "" : e.getMessage();
             updateTaskStatus(taskId, BizConstant.TASK_STATUS_FAILED,
                     StringUtils.abbreviate("PDF 生成失败：" + msg, 500));
@@ -299,6 +403,70 @@ public class PdfService {
                     log.warn("Failed to clean temp dir: {}", tempDir, e);
                 }
             }
+        }
+    }
+
+    /**
+     * 获取共享 Chromium 浏览器；未启动或已崩溃时（重新）启动。
+     * Playwright 的 BrowserContext 相互隔离，支持并发导出共享同一浏览器进程。
+     */
+    private Browser acquireBrowser() {
+        Browser current = sharedBrowser;
+        if (current != null && current.isConnected()) {
+            return current;
+        }
+        synchronized (browserLock) {
+            current = sharedBrowser;
+            if (current != null && !current.isConnected()) {
+                discardLocked();
+            }
+            if (sharedBrowser == null) {
+                sharedPlaywright = Playwright.create();
+                sharedBrowser = sharedPlaywright.chromium().launch(buildLaunchOptions());
+                log.info("Shared Chromium launched for PDF export");
+            }
+            return sharedBrowser;
+        }
+    }
+
+    /**
+     * 丢弃共享浏览器实例（加锁包装，供导出失败路径调用）。
+     */
+    private void discardBrowser() {
+        synchronized (browserLock) {
+            discardLocked();
+        }
+    }
+
+    /**
+     * 丢弃共享浏览器实例（须在 browserLock 内调用）。
+     */
+    private void discardLocked() {
+        if (sharedBrowser != null) {
+            try {
+                sharedBrowser.close();
+            } catch (Exception e) {
+                log.warn("Failed to close crashed Chromium", e);
+            }
+            sharedBrowser = null;
+        }
+        if (sharedPlaywright != null) {
+            try {
+                sharedPlaywright.close();
+            } catch (Exception e) {
+                log.warn("Failed to close Playwright after browser crash", e);
+            }
+            sharedPlaywright = null;
+        }
+    }
+
+    /**
+     * 应用关闭时释放共享浏览器资源。
+     */
+    @jakarta.annotation.PreDestroy
+    public void shutdownBrowser() {
+        synchronized (browserLock) {
+            discardLocked();
         }
     }
 

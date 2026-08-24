@@ -7,11 +7,35 @@ spring:
     multipart:
       max-file-size: 20MB
       max-request-size: 50MB
+  # 邮箱验证码 SMTP（须与 app.auth.smtp.* 同时配置；host 为空时不创建 JavaMailSender）
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    default-encoding: UTF-8
+    protocol: ${SMTP_PROTOCOL:smtp}
+    properties:
+      mail.smtp.auth: true
+      # QQ 邮箱 465 端口须开启 SSL；587 端口须开启 STARTTLS
+      mail.smtp.ssl.enable: ${SMTP_SSL_ENABLE:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS_ENABLE:false}
+      mail.smtp.starttls.required: ${SMTP_STARTTLS_ENABLE:false}
+      # 465 隐式 SSL 场景建议设置 socketFactory（QQ/163 等国内邮箱常见；Spring Boot 3 使用 jakarta.net.ssl.SSLSocketFactory）
+      mail.smtp.socketFactory.class: ${SMTP_SOCKET_FACTORY_CLASS:}
+      mail.smtp.socketFactory.port: ${SMTP_SOCKET_FACTORY_PORT:}
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
 
 server:
   port: 8080
   servlet:
     context-path: /api
+  # native 策略启用 Tomcat RemoteIpValve：仅当直连方为可信内网代理（docker 网段/127.0.0.1）
+  # 时才依据 X-Forwarded-For 重写 getRemoteAddr()，使限流与游客限额按真实客户端 IP 计数；
+  # 直连公网时不信任任何头，无法伪造绕过
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:native}
 
 mybatis-plus:
   configuration:
@@ -36,6 +60,10 @@ management:
   endpoint:
     health:
       show-details: never
+  # 邮件是可选能力（SMTP 认证失败不应拖垮整体健康状态）；真实发送失败会返回明确业务错误码
+  health:
+    mail:
+      enabled: false
   metrics:
     tags:
       application: resume-generation

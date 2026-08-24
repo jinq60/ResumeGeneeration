@@ -57,77 +57,34 @@
                 stroke-width="4"
               />
               <circle
+                v-for="seg in donutSegments"
+                :key="seg.label"
                 cx="18"
                 cy="18"
                 r="16"
                 fill="transparent"
-                stroke="#0057c2"
-                stroke-dasharray="28 100"
-                stroke-dashoffset="0"
-                stroke-width="4"
-              />
-              <circle
-                cx="18"
-                cy="18"
-                r="16"
-                fill="transparent"
-                stroke="#266d00"
-                stroke-dasharray="22 100"
-                stroke-dashoffset="-28"
-                stroke-width="4"
-              />
-              <circle
-                cx="18"
-                cy="18"
-                r="16"
-                fill="transparent"
-                stroke="#7431d3"
-                stroke-dasharray="18 100"
-                stroke-dashoffset="-50"
-                stroke-width="4"
-              />
-              <circle
-                cx="18"
-                cy="18"
-                r="16"
-                fill="transparent"
-                stroke="#d9892b"
-                stroke-dasharray="16 100"
-                stroke-dashoffset="-68"
-                stroke-width="4"
-              />
-              <circle
-                cx="18"
-                cy="18"
-                r="16"
-                fill="transparent"
-                stroke="#191c1e"
-                stroke-dasharray="16 100"
-                stroke-dashoffset="-84"
+                :stroke="seg.color"
+                :stroke-dasharray="seg.percent + ' ' + (100 - seg.percent)"
+                :stroke-dashoffset="'-' + seg.offset"
                 stroke-width="4"
               />
             </svg>
             <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
               <span class="text-[10px] text-on-surface-variant">总投递</span>
-              <span class="text-title-md font-bold">128,945</span>
+              <span class="text-title-md font-bold">{{ stats[0]?.value || 0 }}</span>
             </div>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-2 text-[12px]">
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-primary" />已投递
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-secondary" />筛选中
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-tertiary" />面试中
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-orange-500" />Offer
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-on-surface" />结束
+          <div
+            v-for="seg in donutSegments"
+            :key="seg.label"
+            class="flex items-center gap-2"
+          >
+            <span
+              class="w-2 h-2 rounded-full"
+              :style="{ background: seg.color }"
+            />{{ seg.label }} ({{ seg.count }})
           </div>
         </div>
       </div>
@@ -136,27 +93,32 @@
         <h4 class="text-title-md font-bold">
           热门投递岗位 TOP5
         </h4>
-        <div class="space-y-4">
-          <div
-            v-for="(job, idx) in topJobs"
-            :key="job.name"
-            class="flex items-center gap-4"
-          >
-            <span
-              class="w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-bold"
-              :class="idx < 3 ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant'"
-            >{{ idx + 1 }}</span>
-            <div class="flex-1">
-              <div class="flex justify-between text-body-md font-bold mb-1">
-                <span>{{ job.name }}</span>
-                <span>{{ job.count }} 次</span>
-              </div>
-              <div class="h-2 bg-surface-container rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-primary rounded-full"
-                  :style="{ width: job.percent + '%' }"
-                />
-              </div>
+        <div
+          v-if="topJobs.length === 0"
+          class="flex-1 flex items-center justify-center text-on-surface-variant"
+        >
+          暂无投递数据
+        </div>
+        <div
+          v-for="(job, idx) in topJobs"
+          v-else
+          :key="job.name"
+          class="flex items-center gap-4"
+        >
+          <span
+            class="w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-bold"
+            :class="idx < 3 ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant'"
+          >{{ idx + 1 }}</span>
+          <div class="flex-1">
+            <div class="flex justify-between text-body-md font-bold mb-1">
+              <span>{{ job.name }}</span>
+              <span>{{ job.count }} 次</span>
+            </div>
+            <div class="h-2 bg-surface-container rounded-full overflow-hidden">
+              <div
+                class="h-full bg-primary rounded-full"
+                :style="{ width: job.percent + '%' }"
+              />
             </div>
           </div>
         </div>
@@ -168,7 +130,10 @@
         <h3 class="text-title-md font-bold">
           最近投递记录
         </h3>
-        <el-button type="primary">
+        <el-button
+          type="primary"
+          @click="exportData"
+        >
           导出数据
         </el-button>
       </div>
@@ -177,23 +142,10 @@
         :data="deliveryList"
       >
         <el-table-column
-          label="用户"
+          label="用户ID"
+          prop="userId"
           min-width="160"
-        >
-          <template #default="{ row }">
-            <div class="flex items-center gap-3">
-              <el-avatar
-                :size="32"
-                :src="row.avatarUrl"
-              >
-                <el-icon size="16">
-                  <User />
-                </el-icon>
-              </el-avatar>
-              <span>{{ row.userName }}</span>
-            </div>
-          </template>
-        </el-table-column>
+        />
         <el-table-column
           label="公司"
           prop="company"
@@ -203,23 +155,26 @@
           prop="position"
         />
         <el-table-column
-          label="匹配度"
-          prop="match"
+          label="渠道"
+          prop="channel"
           width="100"
         >
           <template #default="{ row }">
-            <span class="font-bold text-secondary">{{ row.match }}%</span>
+            {{ row.channel || '—' }}
           </template>
         </el-table-column>
         <el-table-column
           label="当前状态"
-          prop="status"
           width="120"
-        />
+        >
+          <template #default="{ row }">
+            {{ statusLabel(row.status) }}
+          </template>
+        </el-table-column>
         <el-table-column
           label="投递时间"
-          prop="time"
-          width="170"
+          prop="applyDate"
+          width="120"
         />
       </el-table>
       <div class="px-6 py-4 flex justify-between items-center bg-surface-container-low border-t border-outline-variant">
@@ -232,6 +187,8 @@
           layout="sizes, prev, pager, next"
           background
           small
+          @current-change="loadList"
+          @size-change="handleSizeChange"
         />
       </div>
     </div>
@@ -239,52 +196,110 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Promotion, Filter, UserFilled, CircleCheckFilled, User } from '@element-plus/icons-vue'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Promotion, Filter, UserFilled, CircleCheckFilled } from '@element-plus/icons-vue'
+import { adminDeliveryApi, type DeliveryStats } from '@/api/admin/deliveries'
+import { DELIVERY_STATUS_LABELS } from '@/api/delivery'
+import { adminDownload } from '@/utils/adminDownload'
 
 const loading = ref(false)
 const page = ref(1)
 const pageSize = ref(10)
-const total = ref(48231)
+const total = ref(0)
 
-const stats = [
-  { label: '总投递数', value: '128,945', icon: Promotion, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
-  { label: '筛选中', value: '32,401', icon: Filter, iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' },
-  { label: '面试中', value: '8,642', icon: UserFilled, iconBg: 'bg-secondary/10', iconColor: 'text-secondary' },
-  { label: 'Offer 数', value: '2,156', icon: CircleCheckFilled, iconBg: 'bg-on-tertiary-fixed-variant/10', iconColor: 'text-on-tertiary-fixed-variant' }
-]
+const stats = ref([
+  { label: '总投递数', value: '0', icon: Promotion, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
+  { label: '面试中', value: '0', icon: UserFilled, iconBg: 'bg-secondary/10', iconColor: 'text-secondary' },
+  { label: 'Offer 数', value: '0', icon: CircleCheckFilled, iconBg: 'bg-on-tertiary-fixed-variant/10', iconColor: 'text-on-tertiary-fixed-variant' },
+  { label: '已结束', value: '0', icon: Filter, iconBg: 'bg-surface-container-high/10', iconColor: 'text-on-surface-variant' }
+])
 
-const topJobs = [
-  { name: '后端开发工程师', count: 18234, percent: 100 },
-  { name: '前端开发工程师', count: 15234, percent: 84 },
-  { name: '产品经理', count: 12456, percent: 68 },
-  { name: '算法工程师', count: 9876, percent: 54 },
-  { name: 'UI 设计师', count: 7654, percent: 42 }
-]
+const topJobs = ref<DeliveryStats['topJobs']>([])
+const statusCounts = ref<Record<string, number>>({})
+
+const donutColors = ['#0057c2', '#266d00', '#7431d3', '#d9892b', '#191c1e']
+
+const donutSegments = computed(() => {
+  const groups: Array<{ label: string; statuses: string[]; color: string }> = [
+    { label: '已投递', statuses: ['delivered'], color: donutColors[0] },
+    { label: '筛选中', statuses: ['written'], color: donutColors[1] },
+    { label: '面试中', statuses: ['interview1', 'interview2', 'hr'], color: donutColors[2] },
+    { label: 'Offer', statuses: ['offer'], color: donutColors[3] },
+    { label: '结束', statuses: ['rejected', 'withdrawn'], color: donutColors[4] }
+  ]
+  const totalCount = groups.reduce((sum, g) => sum + g.statuses.reduce((s, st) => s + (statusCounts.value[st] || 0), 0), 0)
+  let offset = 0
+  return groups.map(g => {
+    const count = g.statuses.reduce((s, st) => s + (statusCounts.value[st] || 0), 0)
+    const percent = totalCount === 0 ? 0 : Math.round(count * 1000 / totalCount) / 10
+    const seg = { label: g.label, color: g.color, count, percent, offset }
+    offset += percent
+    return seg
+  })
+})
+
+function statusLabel(status: string) {
+  return DELIVERY_STATUS_LABELS[status] || status
+}
+
+function handleSizeChange() {
+  page.value = 1
+  loadList()
+}
+
+async function loadStats() {
+  try {
+    const s: DeliveryStats = await adminDeliveryApi.stats()
+    statusCounts.value = s.statusCounts || {}
+    topJobs.value = s.topJobs || []
+    stats.value[0].value = String(s.totalDeliveries || 0)
+    const interviewing = (s.statusCounts?.['interview1'] || 0) + (s.statusCounts?.['interview2'] || 0) + (s.statusCounts?.['hr'] || 0)
+    stats.value[1].value = String(interviewing)
+    stats.value[2].value = String(s.statusCounts?.['offer'] || 0)
+    stats.value[3].value = String((s.statusCounts?.['rejected'] || 0) + (s.statusCounts?.['withdrawn'] || 0))
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载统计数据失败')
+  }
+}
+
+async function loadList() {
+  loading.value = true
+  try {
+    const res = await adminDeliveryApi.list({ page: page.value, size: pageSize.value })
+    deliveryList.value = res.records || []
+    total.value = res.total || 0
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载投递记录失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function exportData() {
+  try {
+    const fileName = await adminDownload(adminDeliveryApi.exportUrl(), '投递数据.csv')
+    ElMessage.success(`已导出 ${fileName}`)
+  } catch (e: any) {
+    ElMessage.error(e.message || '导出失败')
+  }
+}
 
 interface DeliveryItem {
-  userName: string
-  avatarUrl: string
+  id: string
+  userId: string
   company: string
   position: string
-  match: number
+  channel?: string
   status: string
-  time: string
+  applyDate?: string
 }
 
 const deliveryList = ref<DeliveryItem[]>([])
 
 onMounted(() => {
-  loading.value = true
-  setTimeout(() => {
-    deliveryList.value = [
-      { userName: '张一航', avatarUrl: '', company: '腾讯', position: '后端开发工程师', match: 89, status: '一面', time: '2025-05-15 10:28' },
-      { userName: '李雨桐', avatarUrl: '', company: '字节跳动', position: '后端开发工程师', match: 86, status: '笔试', time: '2025-05-15 09:56' },
-      { userName: '张伟', avatarUrl: '', company: '华为', position: '云计算开发工程师', match: 83, status: 'HR 面', time: '2025-05-14 16:54' },
-      { userName: '陈一凡', avatarUrl: '', company: '小米', position: 'Java 开发工程师', match: 80, status: '已投递', time: '2025-05-14 09:12' }
-    ]
-    loading.value = false
-  }, 500)
+  loadStats()
+  loadList()
 })
 </script>
 

@@ -1,5 +1,6 @@
 package com.resume.common.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.common.entity.IdempotencyRecord;
 import com.resume.common.mapper.IdempotencyRecordMapper;
 import jakarta.servlet.FilterChain;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -35,7 +37,7 @@ class IdempotencyFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new IdempotencyFilter(mapper);
+        filter = new IdempotencyFilter(mapper, new ObjectMapper());
     }
 
     private String scopedKey(String rawKey) {
@@ -147,5 +149,23 @@ class IdempotencyFilterTest {
         IdempotencyRecord completed = completeCaptor.getValue();
         assertEquals(scopedKey("key-456"), completed.getIdempotencyKey());
         assertEquals(200, completed.getResponseStatus());
+    }
+
+    @Test
+    void shouldRejectWith425WhenClaimFailsAndOwnerNeverCompletes() throws Exception {
+        // 并发场景：占位被其他请求持有（DuplicateKeyException），且执行者未在等待期内完成
+        // → 必须返回 425 拒绝，绝不能降级为直接执行业务
+        when(mapper.selectById(anyString())).thenReturn(null);
+        when(mapper.insert(any(IdempotencyRecord.class))).thenThrow(new DuplicateKeyException("dup"));
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/resumes");
+        request.addHeader("Idempotency-Key", "key-dup");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(request, response, chain);
+
+        verify(chain, never()).doFilter(any(), any());
+        assertEquals(425, response.getStatus());
+        assertTrue(response.getContentAsString().contains("425"));
     }
 }

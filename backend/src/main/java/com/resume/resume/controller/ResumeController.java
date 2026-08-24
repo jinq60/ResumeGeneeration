@@ -51,7 +51,7 @@ public class ResumeController {
         return R.success(resumeService.getResume(userId, id));
     }
 
-@PutMapping("/{id}")
+    @PutMapping("/{id}")
     public R<UpdateResumeResponse> update(@AuthenticationPrincipal String userId,
                                                @PathVariable String id,
                                                @Valid @RequestBody UpdateResumeRequest request) {
@@ -65,7 +65,7 @@ public class ResumeController {
         return R.success();
     }
 
-@PostMapping("/{id}/duplicate")
+    @PostMapping("/{id}/duplicate")
     public R<DuplicateResumeResponse> duplicate(@AuthenticationPrincipal String userId,
                                               @PathVariable String id) {
         return R.success(resumeService.duplicateResume(userId, id));

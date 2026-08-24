@@ -1,279 +1,252 @@
 <template>
   <div>
-    <!-- Hero -->
-    <section class="bg-gradient-to-br from-primary-fixed/50 to-surface-container-lowest pt-16 pb-24 overflow-hidden">
-      <div class="max-w-[1440px] mx-auto px-margin-page grid grid-cols-1 lg:grid-cols-2 gap-stack-lg items-center">
-        <div class="z-10">
-          <div class="inline-flex items-center gap-2 px-3 py-1 bg-primary-fixed text-on-surface rounded-full text-label-md font-label-md mb-6">
-            <el-icon size="14">
-              <MagicStick />
-            </el-icon>
-            <span>AI 智能面试官已上线</span>
-          </div>
-          <h1 class="text-[56px] leading-tight font-bold text-on-surface mb-6">
-            把经历，<br><span class="text-primary">整理成机会。</span>
-          </h1>
-          <p class="text-body-lg font-body-lg text-on-surface-variant mb-10 max-w-lg">
-            智能简历助手帮助企业与职场人高效打造专业简历，用数据与 AI 让每一次投递更有价值。突破传统排版困扰，实时点评优化，助力你的职场起航。
-          </p>
-          <div class="flex flex-wrap gap-4 mb-10">
-            <button
-              class="bg-primary text-on-primary px-8 py-4 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform"
-              @click="goTo('/login')"
-            >
-              免费生成简历
-              <el-icon size="20">
-                <ArrowRight />
-              </el-icon>
-            </button>
-            <button
-              class="border border-outline-variant text-on-surface-variant hover:bg-surface-container-low px-8 py-4 rounded-lg font-label-md flex items-center gap-2 transition-colors"
-              @click="goTo('/login')"
-            >
-              <el-icon size="20">
-                <VideoPlay />
-              </el-icon>
-              查看产品演示
-            </button>
-          </div>
-          <div class="flex items-center gap-8 text-on-surface-variant text-label-md font-label-md">
-            <div class="flex items-center gap-2">
-              <el-icon
-                class="text-secondary"
-                size="18"
-              >
-                <CircleCheckFilled />
-              </el-icon>
-              数据安全保障
-            </div>
-            <div class="flex items-center gap-2">
-              <el-icon
-                class="text-secondary"
-                size="18"
-              >
-                <CircleCheckFilled />
-              </el-icon>
-              隐私严格保护
-            </div>
-            <div class="flex items-center gap-2">
-              <el-icon
-                class="text-secondary"
-                size="18"
-              >
-                <CircleCheckFilled />
-              </el-icon>
-              专业简历服务
-            </div>
-          </div>
-        </div>
-        <div class="relative lg:h-[520px] flex items-center justify-center">
-          <div class="relative w-full max-w-md bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant shadow-xl animate-float">
-            <div class="aspect-[3/4] bg-surface-container flex items-center justify-center">
-              <div class="p-8 bg-white rounded-xl shadow-lg w-3/4 h-3/4 flex flex-col gap-4">
-                <div class="flex items-center gap-3">
-                  <div class="w-12 h-12 rounded-lg bg-primary text-on-primary flex items-center justify-center text-xl font-bold">
-                    Z
-                  </div>
-                  <div>
-                    <div class="font-bold text-on-surface">
-                      张一航
-                    </div>
-                    <div class="text-[12px] text-on-surface-variant">
-                      产品经理
-                    </div>
-                  </div>
-                </div>
-                <div class="space-y-2">
-                  <div class="h-2 bg-surface-container rounded w-full" />
-                  <div class="h-2 bg-surface-container rounded w-5/6" />
-                  <div class="h-2 bg-surface-container rounded w-4/6" />
-                </div>
-                <div class="space-y-2">
-                  <div class="h-2 bg-surface-container rounded w-full" />
-                  <div class="h-2 bg-surface-container rounded w-3/4" />
-                </div>
-                <div class="mt-auto flex gap-2">
-                  <span class="px-2 py-1 bg-primary/10 text-primary rounded text-[10px] font-bold">需求分析</span>
-                  <span class="px-2 py-1 bg-secondary/10 text-secondary rounded text-[10px] font-bold">数据分析</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="absolute top-10 -right-4 bg-white/70 backdrop-blur-md border border-white/50 p-4 rounded-xl shadow-lg animate-bounce">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
-                <el-icon size="18">
-                  <CircleCheckFilled />
-                </el-icon>
-              </div>
-              <div>
-                <p class="text-label-md font-label-md text-on-surface">
-                  AI 优化建议
-                </p>
-                <p class="text-[10px] text-on-surface-variant">
-                  简历竞争力提升 35%
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <!-- Hero Section -->
+    <section class="relative overflow-hidden pt-24 pb-32 lg:pt-32 lg:pb-40">
+      <!-- Background blobs -->
+      <div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div class="absolute top-0 left-1/4 w-[500px] h-[500px] bg-secondary/60 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" />
+        <div class="absolute top-0 right-1/4 w-[500px] h-[500px] bg-accent/80 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000" />
+        <div class="absolute -bottom-32 left-1/3 w-[500px] h-[500px] bg-secondary/50 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000" />
       </div>
-    </section>
 
-    <!-- Partners -->
-    <section class="bg-surface py-12 border-y border-outline-variant">
-      <div class="max-w-[1440px] mx-auto px-margin-page text-center">
-        <p class="text-label-md font-label-md text-on-surface-variant mb-8 uppercase tracking-widest">
-          众多知名企业与机构的信赖之选
+      <div class="max-w-[1200px] mx-auto px-margin-page text-center">
+        <!-- Badge -->
+        <div class="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-full text-label-md font-medium text-muted-foreground mb-8 animate-fade-in-up">
+          <span class="w-2 h-2 rounded-full bg-foreground animate-pulse" />
+          AI 智能简历已上线
+        </div>
+
+        <!-- Headline -->
+        <h1 class="text-4xl sm:text-5xl lg:text-7xl font-serif font-medium text-foreground leading-[1.1] tracking-tight mb-8 animate-fade-in-up animation-delay-200">
+          把经历，<br class="sm:hidden">
+          <span class="text-muted">整理成机会。</span>
+        </h1>
+
+        <!-- Subtitle -->
+        <p class="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up animation-delay-400">
+          智能简历助手帮助职场人高效打造专业简历。AI 实时点评、一键优化、多模板切换，让每一次投递都更有价值。
         </p>
-        <div class="flex flex-wrap justify-center items-center gap-12 opacity-50 grayscale hover:grayscale-0 transition-all duration-500 text-title-lg font-title-lg">
-          <span>Tencent 腾讯</span>
-          <span>Alibaba 阿里巴巴</span>
-          <span>ByteDance 字节跳动</span>
-          <span>HUAWEI 华为</span>
-          <span>MEITUAN 美团</span>
-          <span>XIAOMI 小米</span>
+
+        <!-- CTAs -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-fade-in-up animation-delay-600">
+          <button
+            class="w-full sm:w-auto px-8 py-4 bg-foreground text-primary-foreground rounded-xl font-medium text-base hover:opacity-90 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 shadow-lg"
+            @click="goTo('/login')"
+          >
+            免费生成简历
+            <el-icon size="18"><ArrowRight /></el-icon>
+          </button>
+          <button
+            class="w-full sm:w-auto px-8 py-4 bg-card border border-border text-foreground rounded-xl font-medium text-base hover:bg-secondary/80 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2"
+            @click="goTo('/templates')"
+          >
+            浏览模板
+            <el-icon size="18"><Grid /></el-icon>
+          </button>
+        </div>
+
+        <!-- Trust badges -->
+        <div class="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground animate-fade-in">
+          <div class="flex items-center gap-2">
+            <el-icon class="text-foreground" size="18"><CircleCheckFilled /></el-icon>
+            <span>免费使用</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <el-icon class="text-foreground" size="18"><CircleCheckFilled /></el-icon>
+            <span>数据安全</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <el-icon class="text-foreground" size="18"><CircleCheckFilled /></el-icon>
+            <span>AI 驱动</span>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Features -->
-    <section class="py-24 bg-surface-container-low">
-      <div class="max-w-[1440px] mx-auto px-margin-page">
+    <!-- Editor Preview Section -->
+    <section class="py-24 bg-secondary/30">
+      <div class="max-w-[1200px] mx-auto px-margin-page">
         <div class="text-center mb-16">
-          <h2 class="text-headline-md font-headline-md text-on-surface mb-4">
-            核心功能，助你快人一步
+          <p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">产品演示</p>
+          <h2 class="text-3xl sm:text-4xl lg:text-5xl font-serif font-medium text-foreground mb-4">
+            高效编辑，专业呈现
           </h2>
-          <p class="text-body-md font-body-md text-on-surface-variant max-w-2xl mx-auto">
-            我们集成了最先进的 AI 技术，为你提供从撰写、排版到优化的一站式解决方案，让简历脱颖而出。
+          <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
+            所见即所得的编辑体验，结构化填写，实时预览，AI 实时辅助优化。
           </p>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-gutter">
+
+        <div class="relative mx-auto max-w-5xl">
+          <!-- Browser mockup -->
+          <div class="bg-card rounded-2xl border border-border shadow-xl overflow-hidden animate-fade-in-up">
+            <div class="bg-secondary/70 px-4 py-3 flex items-center gap-2 border-b border-border">
+              <span class="w-3 h-3 rounded-full bg-muted/40" />
+              <span class="w-3 h-3 rounded-full bg-muted/40" />
+              <span class="w-3 h-3 rounded-full bg-muted/40" />
+              <span class="ml-4 text-sm text-muted-foreground">智能简历编辑器</span>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-12 h-[400px] lg:h-[500px]">
+              <!-- Sidebar -->
+              <div class="hidden lg:block lg:col-span-3 bg-card border-r border-border p-4">
+                <div class="space-y-2">
+                  <div
+                    v-for="(item, idx) in sidebarItems"
+                    :key="item"
+                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm"
+                    :class="idx === 0 ? 'bg-secondary text-foreground font-medium' : 'text-muted-foreground hover:bg-secondary/50'"
+                  >
+                    <div class="w-4 h-4 rounded bg-muted/20" />
+                    {{ item }}
+                  </div>
+                </div>
+              </div>
+              <!-- Editor -->
+              <div class="col-span-1 lg:col-span-5 bg-secondary/20 p-6 lg:p-8 overflow-hidden">
+                <div class="bg-card rounded-xl shadow-sm p-5 lg:p-6 h-full space-y-4 border border-border">
+                  <div class="flex items-center gap-3 pb-4 border-b border-border">
+                    <div class="w-10 h-10 rounded-lg bg-foreground text-primary-foreground flex items-center justify-center font-serif text-lg font-medium">
+                      Z
+                    </div>
+                    <div>
+                      <div class="font-medium text-foreground">张一航</div>
+                      <div class="text-xs text-muted-foreground">产品经理</div>
+                    </div>
+                  </div>
+                  <div class="space-y-3">
+                    <div class="h-3 bg-secondary rounded-full w-full" />
+                    <div class="h-3 bg-secondary rounded-full w-5/6" />
+                    <div class="h-3 bg-secondary rounded-full w-4/6" />
+                  </div>
+                  <div class="space-y-3 pt-2">
+                    <div class="h-3 bg-secondary rounded-full w-full" />
+                    <div class="h-3 bg-secondary rounded-full w-3/4" />
+                  </div>
+                </div>
+              </div>
+              <!-- Preview -->
+              <div class="hidden lg:block lg:col-span-4 bg-card p-6 border-l border-border">
+                <div class="text-title-md font-medium text-foreground mb-6">AI 简历评估</div>
+                <div class="flex items-baseline gap-1 mb-2">
+                  <span class="text-5xl font-serif font-medium text-foreground">82</span>
+                  <span class="text-xl text-muted">/100</span>
+                </div>
+                <div class="h-2 bg-secondary rounded-full mb-6">
+                  <div class="h-full bg-foreground rounded-full w-[82%]" />
+                </div>
+                <div class="space-y-3">
+                  <div class="p-3 bg-destructive/5 rounded-lg border border-destructive/10 text-sm text-destructive font-medium">
+                    最值得修改 (2)
+                  </div>
+                  <div class="p-3 bg-secondary rounded-lg text-sm text-foreground font-medium">
+                    可增强 (3)
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="py-24 lg:py-32">
+      <div class="max-w-[1200px] mx-auto px-margin-page">
+        <div class="text-center mb-16">
+          <p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">核心功能</p>
+          <h2 class="text-3xl sm:text-4xl lg:text-5xl font-serif font-medium text-foreground mb-4">
+            一站式简历解决方案
+          </h2>
+          <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
+            从撰写、排版到优化，AI 全程辅助，让简历脱颖而出。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div
-            v-for="f in features"
+            v-for="(f, idx) in features"
             :key="f.title"
-            class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant hover:border-primary transition-all group"
+            class="group bg-card p-6 lg:p-8 rounded-2xl border border-border hover:shadow-lg hover:-translate-y-1 transition-all duration-300 animate-fade-in-up"
+            :class="`animation-delay-${(idx + 1) * 100}`"
           >
             <div
-              class="w-12 h-12 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"
+              class="w-12 h-12 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300"
               :class="f.iconBg"
             >
               <el-icon
                 :class="f.iconColor"
-                size="28"
+                size="24"
               >
                 <component :is="f.icon" />
               </el-icon>
             </div>
-            <h3 class="text-title-md font-title-md text-on-surface mb-3">
-              {{ f.title }}
-            </h3>
-            <p class="text-body-md font-body-md text-on-surface-variant">
-              {{ f.desc }}
-            </p>
+            <h3 class="text-lg font-medium text-foreground mb-2">{{ f.title }}</h3>
+            <p class="text-sm text-muted-foreground leading-relaxed">{{ f.desc }}</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Demo -->
-    <section class="py-24 bg-surface-container-lowest">
-      <div class="max-w-[1440px] mx-auto px-margin-page">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div class="lg:col-span-4">
-            <p class="text-primary font-label-md text-label-md mb-2 uppercase tracking-wide">
-              产品演示
-            </p>
-            <h2 class="text-headline-md font-headline-md text-on-surface mb-6">
-              高效编辑，<br>专业呈现
+    <!-- How it works -->
+    <section class="py-24 bg-secondary/30">
+      <div class="max-w-[1200px] mx-auto px-margin-page">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">使用流程</p>
+            <h2 class="text-3xl sm:text-4xl font-serif font-medium text-foreground mb-6">
+              三步生成专业简历
             </h2>
-            <p class="text-body-lg font-body-lg text-on-surface-variant mb-8">
-              所见即所得的编辑体验，结构化填写，实时预览，AI 实时辅助优化。告别 Word 排版噩梦，把时间花在核心经历的打磨上。
+            <p class="text-lg text-muted-foreground mb-10">
+              无需设计基础，跟随引导填写信息，AI 会自动帮你优化表达与排版。
             </p>
-            <ul class="space-y-4 mb-10">
-              <li class="flex items-center gap-3 text-body-md font-body-md text-on-surface">
-                <el-icon
-                  class="text-primary"
-                  size="20"
-                >
-                  <CircleCheckFilled />
-                </el-icon>
-                模块化自由拖拽
-              </li>
-              <li class="flex items-center gap-3 text-body-md font-body-md text-on-surface">
-                <el-icon
-                  class="text-primary"
-                  size="20"
-                >
-                  <CircleCheckFilled />
-                </el-icon>
-                AI 自动纠错与润色
-              </li>
-              <li class="flex items-center gap-3 text-body-md font-body-md text-on-surface">
-                <el-icon
-                  class="text-primary"
-                  size="20"
-                >
-                  <CircleCheckFilled />
-                </el-icon>
-                多版本投递管理
-              </li>
-            </ul>
-            <button
-              class="bg-primary text-on-primary px-8 py-4 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform"
-              @click="goTo('/login')"
-            >
-              立即体验编辑器
-              <el-icon size="20">
-                <TopRight />
-              </el-icon>
-            </button>
-          </div>
-          <div class="lg:col-span-8">
-            <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xl overflow-hidden">
-              <div class="bg-surface-container-low p-3 flex items-center gap-2 border-b border-outline-variant">
-                <span class="w-3 h-3 rounded-full bg-error" />
-                <span class="w-3 h-3 rounded-full bg-yellow-500" />
-                <span class="w-3 h-3 rounded-full bg-secondary" />
-                <span class="ml-4 text-label-md font-label-md text-on-surface-variant">智能简历编辑器</span>
+
+            <div class="space-y-8">
+              <div
+                v-for="(step, idx) in steps"
+                :key="step.title"
+                class="flex gap-4"
+              >
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-foreground text-primary-foreground flex items-center justify-center font-medium">
+                  {{ idx + 1 }}
+                </div>
+                <div>
+                  <h3 class="text-lg font-medium text-foreground mb-1">{{ step.title }}</h3>
+                  <p class="text-sm text-muted-foreground leading-relaxed">{{ step.desc }}</p>
+                </div>
               </div>
-              <div class="grid grid-cols-12 h-[400px]">
-                <div class="col-span-3 bg-primary p-4 space-y-3">
-                  <div
-                    v-for="i in 4"
-                    :key="i"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg"
-                    :class="i === 1 ? 'bg-primary-container text-on-primary' : 'text-on-primary/60'"
-                  >
-                    <div class="w-4 h-4 rounded bg-white/20" />
-                    <span class="text-label-md font-label-md">模块 {{ i }}</span>
+            </div>
+          </div>
+
+          <div class="relative">
+            <div class="absolute inset-0 bg-gradient-to-tr from-secondary via-accent to-secondary opacity-50 rounded-3xl blur-2xl" />
+            <div class="relative bg-card rounded-2xl border border-border shadow-xl p-8 animate-float">
+              <div class="space-y-6">
+                <div class="flex items-center gap-4">
+                  <div class="w-16 h-16 rounded-2xl bg-foreground text-primary-foreground flex items-center justify-center">
+                    <el-icon size="32"><Document /></el-icon>
+                  </div>
+                  <div>
+                    <div class="text-lg font-medium text-foreground">选择模板</div>
+                    <div class="text-sm text-muted-foreground">20+ 专业模板随心切换</div>
                   </div>
                 </div>
-                <div class="col-span-6 bg-surface-container-low p-8 overflow-hidden">
-                  <div class="bg-white rounded-lg shadow-md p-6 h-full space-y-4">
-                    <div class="h-4 bg-surface-container rounded w-1/3" />
-                    <div class="h-3 bg-surface-container rounded w-full" />
-                    <div class="h-3 bg-surface-container rounded w-5/6" />
-                    <div class="h-3 bg-surface-container rounded w-4/6" />
+                <div class="h-px bg-border" />
+                <div class="flex items-center gap-4">
+                  <div class="w-16 h-16 rounded-2xl bg-secondary text-foreground flex items-center justify-center">
+                    <el-icon size="32"><EditPen /></el-icon>
+                  </div>
+                  <div>
+                    <div class="text-lg font-medium text-foreground">填写经历</div>
+                    <div class="text-sm text-muted-foreground">模块化编辑，实时预览</div>
                   </div>
                 </div>
-                <div class="col-span-3 bg-surface-container-lowest p-4 border-l border-outline-variant">
-                  <div class="text-title-md font-title-md text-on-surface mb-4">
-                    AI 简历评估
+                <div class="h-px bg-border" />
+                <div class="flex items-center gap-4">
+                  <div class="w-16 h-16 rounded-2xl bg-secondary text-foreground flex items-center justify-center">
+                    <el-icon size="32"><Download /></el-icon>
                   </div>
-                  <div class="text-4xl font-bold text-primary mb-2">
-                    82<span class="text-xl text-outline">/100</span>
-                  </div>
-                  <div class="h-2 bg-surface-container rounded-full mb-4">
-                    <div class="h-full bg-primary rounded-full w-[82%]" />
-                  </div>
-                  <div class="space-y-2">
-                    <div class="p-2 bg-error/5 rounded border border-error/20 text-[12px] font-bold text-error">
-                      最值得修改 (2)
-                    </div>
-                    <div class="p-2 bg-secondary-container/10 rounded border border-secondary-container/20 text-[12px] font-bold text-secondary">
-                      可增强 (3)
-                    </div>
+                  <div>
+                    <div class="text-lg font-medium text-foreground">导出投递</div>
+                    <div class="text-sm text-muted-foreground">PDF / Word / Markdown 一键导出</div>
                   </div>
                 </div>
               </div>
@@ -283,53 +256,155 @@
       </div>
     </section>
 
-    <!-- CTA -->
-    <section class="py-24 bg-primary">
-      <div class="max-w-[1440px] mx-auto px-margin-page text-center">
-        <h2 class="text-headline-md font-headline-md text-on-primary mb-6">
-          准备好打造一份专业简历了吗？
-        </h2>
-        <p class="text-body-lg font-body-lg text-on-primary/80 mb-10 max-w-2xl mx-auto">
-          立即注册，免费体验 AI 简历生成、点评与导出功能。
-        </p>
-        <button
-          class="bg-white text-primary px-8 py-4 rounded-lg font-label-md shadow-sm hover:scale-[0.98] transition-transform"
-          @click="goTo('/login')"
-        >
-          免费开始使用
-        </button>
+    <!-- FAQ Section -->
+    <section class="py-24 lg:py-32">
+      <div class="max-w-[800px] mx-auto px-margin-page">
+        <div class="text-center mb-16">
+          <p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">常见问题</p>
+          <h2 class="text-3xl sm:text-4xl font-serif font-medium text-foreground">
+            你可能想知道的
+          </h2>
+        </div>
+
+        <div class="space-y-4">
+          <div
+            v-for="(faq, idx) in faqs"
+            :key="idx"
+            class="bg-card rounded-xl border border-border overflow-hidden"
+          >
+            <button
+              class="w-full flex items-center justify-between p-6 text-left hover:bg-secondary/30 transition-colors"
+              @click="toggleFaq(idx)"
+            >
+              <span class="font-medium text-foreground">{{ faq.q }}</span>
+              <el-icon
+                class="text-muted-foreground transition-transform duration-200"
+                :class="{ 'rotate-180': openFaq === idx }"
+              >
+                <ArrowDown />
+              </el-icon>
+            </button>
+            <div
+              v-show="openFaq === idx"
+              class="px-6 pb-6 text-sm text-muted-foreground leading-relaxed"
+            >
+              {{ faq.a }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-24 lg:py-32">
+      <div class="max-w-[1200px] mx-auto px-margin-page">
+        <div class="relative bg-foreground rounded-3xl px-8 py-16 lg:py-24 text-center overflow-hidden">
+          <!-- Decorative circles -->
+          <div class="absolute top-0 right-0 w-64 h-64 bg-primary-foreground/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div class="absolute bottom-0 left-0 w-48 h-48 bg-primary-foreground/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+
+          <div class="relative z-10">
+            <h2 class="text-3xl sm:text-4xl lg:text-5xl font-serif font-medium text-primary-foreground mb-4">
+              开启你的新职业篇章
+            </h2>
+            <p class="text-lg text-primary-foreground/70 max-w-xl mx-auto mb-10">
+              立即使用智能简历，创建一份令人印象深刻的简历
+            </p>
+            <button
+              class="px-8 py-4 bg-primary-foreground text-foreground rounded-xl font-medium text-base hover:opacity-90 active:scale-[0.98] transition-all duration-200 inline-flex items-center gap-2"
+              @click="goTo('/login')"
+            >
+              免费开始使用
+              <el-icon size="18"><ArrowRight /></el-icon>
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthModalStore } from '@/stores/authModal'
 import {
-  MagicStick, ArrowRight, VideoPlay, CircleCheckFilled,
-  TopRight, ChatDotRound, Grid, Download
+  ArrowRight,
+  Grid,
+  CircleCheckFilled,
+  MagicStick,
+  ChatDotRound,
+  Download,
+  Document,
+  EditPen,
+  ArrowDown
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const authModalStore = useAuthModalStore()
+const openFaq = ref<number | null>(0)
+
+const sidebarItems = ['基本信息', '教育背景', '项目经历', '工作经历', '技能清单']
 
 const features = [
-  { title: '智能生成', desc: '基于岗位需求与经历描述，智能生成专业词汇与工作亮点。', icon: MagicStick, iconBg: 'bg-primary-fixed', iconColor: 'text-primary' },
-  { title: 'AI 点评优化', desc: '多维度深度解析，提供针对性的修改建议，提升面试邀请率。', icon: ChatDotRound, iconBg: 'bg-tertiary-fixed', iconColor: 'text-tertiary' },
-  { title: '模板秒速切换', desc: '海量职场精英模板，内容排版自动适配，风格随心切换。', icon: Grid, iconBg: 'bg-secondary-container', iconColor: 'text-secondary' },
-  { title: '一键导出 PDF', desc: '高清无损导出，支持多种主流格式，确保投递排版万无一失。', icon: Download, iconBg: 'bg-primary-fixed', iconColor: 'text-primary' }
+  {
+    title: '智能生成',
+    desc: '基于岗位需求与经历描述，智能生成专业词汇与工作亮点。',
+    icon: MagicStick,
+    iconBg: 'bg-secondary',
+    iconColor: 'text-foreground'
+  },
+  {
+    title: 'AI 点评优化',
+    desc: '多维度深度解析，提供针对性的修改建议，提升面试邀请率。',
+    icon: ChatDotRound,
+    iconBg: 'bg-secondary',
+    iconColor: 'text-foreground'
+  },
+  {
+    title: '模板秒速切换',
+    desc: '海量职场精英模板，内容排版自动适配，风格随心切换。',
+    icon: Grid,
+    iconBg: 'bg-secondary',
+    iconColor: 'text-foreground'
+  },
+  {
+    title: '一键导出 PDF',
+    desc: '高清无损导出，支持多种主流格式，确保投递排版万无一失。',
+    icon: Download,
+    iconBg: 'bg-secondary',
+    iconColor: 'text-foreground'
+  }
+]
+
+const steps = [
+  { title: '选择模板', desc: '从 20+ 专业模板中挑选最适合你行业与岗位的风格。' },
+  { title: '填写经历', desc: '按模块填写教育、工作、项目经历，AI 实时给出优化建议。' },
+  { title: '导出投递', desc: '一键导出 PDF / Word / Markdown，直接用于求职投递。' }
+]
+
+const faqs = [
+  { q: '使用智能简历需要付费吗？', a: '基础功能完全免费，包括简历编辑、预览、PDF 导出和 AI 点评。部分高级模板和 AI 写作次数可能对登录用户开放更多额度。' },
+  { q: '我的简历数据安全吗？', a: '我们采用加密传输和存储，你也可以随时导出或删除自己的简历数据。' },
+  { q: '支持哪些导出格式？', a: '目前支持 PDF、Word 和 Markdown 三种格式导出，后续会增加更多格式。' },
+  { q: 'AI 写作功能如何使用？', a: '在编辑器中选中任意文本字段，点击 AI 写作按钮，选择想要的场景（润色、扩写、翻译等），即可生成内容。' }
 ]
 
 function goTo(path: string) {
+  if (path === '/login') {
+    authModalStore.open()
+    return
+  }
   router.push(path)
+}
+
+function toggleFaq(idx: number) {
+  openFaq.value = openFaq.value === idx ? null : idx
 }
 </script>
 
 <style scoped>
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-.animate-float {
-  animation: float 6s ease-in-out infinite;
+.font-serif {
+  font-family: var(--font-serif);
 }
 </style>

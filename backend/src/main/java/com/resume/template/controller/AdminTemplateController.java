@@ -18,6 +18,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 
@@ -115,5 +116,23 @@ public class AdminTemplateController {
     public R<Void> delete(@PathVariable String id) {
         templateService.deleteTemplate(id);
         return R.success();
+    }
+
+    /**
+     * 导出模板 JSON（含配置与 HTML 模板引用），便于迁移到其他环境。
+     */
+    @GetMapping("/{id}/export")
+    public void export(@PathVariable String id, jakarta.servlet.http.HttpServletResponse response)
+            throws java.io.IOException {
+        TemplateDTO template = templateService.getAdminTemplate(id);
+        String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                .writerWithDefaultPrettyPrinter().writeValueAsString(template);
+        String fileName = java.net.URLEncoder.encode(
+                template.getName() + "_" + template.getCode() + ".json", StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        response.setContentType("application/json;charset=UTF-8");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + fileName);
+        response.getOutputStream().write(json.getBytes(StandardCharsets.UTF_8));
     }
 }

@@ -10,7 +10,7 @@
 
 | PRD 需求 | 范围对齐 | 数据模型 | API 规范 | 校验规则 | TDD 计划 | 代码位置 |
 |---|---|---|---|---|---|---|
-| 注册/登录/游客 | `scope-alignment.md` §2.1 | `user` 表 | `api-spec.md` §5.1-5.3 | `validation-rules.md` §2 | `tdd-test-plan.md` §2.1 `UserServiceTest` | `AuthController`, `UserService` |
+| 注册/登录/游客 | `scope-alignment.md` §2.1 | `user` 表 | `api-spec.md` §5.1-5.3 | `validation-rules.md` §2 | `tdd-test-plan.md` §2.1 `UserServiceTest` | `AuthController`, `UserService`, `frontend/src/components/auth/LoginModal.vue`, `frontend/src/stores/authModal.ts`, `frontend/src/views/LoginView.vue` |
 | 多方式登录适配器 | 业务线 v1.1 后续迭代 | `user_auth` 表（V12） | `api-spec.md` §5.5 | 邮箱格式/验证码规则 | `AuthControllerTest`, `EmailCodeServiceTest`, `UserAuthServiceTest` | `user/auth/`（AuthProvider、OAuthProvider、EmailCodeService、UserAuthService） |
 
 ## 2. 简历管理模块
@@ -121,25 +121,25 @@
 | 简历列表 | Google Stitch 项目 `my-resumes` | `frontend/src/views/workbench/ResumeListView.vue` |
 | 简历编辑器 | Google Stitch 项目 `resume-editor` | `frontend/src/views/workbench/EditorView.vue` |
 | 官网首页 | Google Stitch 项目 `landing-page` | `frontend/src/views/website/HomeView.vue` |
-| 投递管理（用户侧） | Google Stitch 项目 `delivery-management` | `frontend/src/views/workbench/DeliveryManagementView.vue` |
+| 投递管理（用户侧） | Google Stitch 项目 `delivery-management` | `frontend/src/views/workbench/DeliveryManagementView.vue` + `backend/src/main/java/com/resume/delivery/` |
 | 后台总览 | Google Stitch 项目 `admin-overview` | `frontend/src/views/admin/Dashboard.vue` |
-| 用户管理 | Google Stitch 项目 `user-management` | `frontend/src/views/admin/UserManagement.vue` |
-| 模板管理 | Google Stitch 项目 `template-management` | `frontend/src/views/admin/TemplateManagement.vue` |
-| 简历管理 | Google Stitch 项目 `resume-management` | `frontend/src/views/admin/ResumeManagement.vue` |
-| AI 规则管理 | Google Stitch 项目 `ai-rules` | `frontend/src/views/admin/SystemSettings.vue` |
-| 内容审核 | Google Stitch 项目 `content-audit` | `frontend/src/views/admin/ContentAudit.vue` |
-| 投递数据 | Google Stitch 项目 `delivery-data` | `frontend/src/views/admin/DeliveryData.vue` |
+| 用户管理 | Google Stitch 项目 `user-management` | `frontend/src/views/admin/UserManagement.vue` + `backend/.../user/controller/AdminUserController.java` |
+| 模板管理 | Google Stitch 项目 `template-management` | `frontend/src/views/admin/TemplateManagement.vue` + `backend/.../template/controller/AdminTemplateController.java` |
+| 简历管理 | Google Stitch 项目 `resume-management` | `frontend/src/views/admin/ResumeManagement.vue` + `backend/.../resume/controller/AdminResumeController.java` |
+| AI 规则管理 | Google Stitch 项目 `ai-rules` | `frontend/src/views/admin/SystemSettings.vue` + `backend/.../ai/controller/AdminAiRuleController.java` |
+| 内容审核 | Google Stitch 项目 `content-audit` | `frontend/src/views/admin/ContentAudit.vue` + `backend/src/main/java/com/resume/audit/` |
+| 投递数据 | Google Stitch 项目 `delivery-data` | `frontend/src/views/admin/DeliveryData.vue` + `backend/.../delivery/controller/AdminDeliveryController.java` |
 | 用户端布局与导航 | Google Stitch 设计系统 | `frontend/src/components/workbench/WorkbenchLayout.vue`, `WorkbenchSidebar.vue` |
 | 管理端布局 | Google Stitch 设计系统 | `frontend/src/components/admin/AdminLayout.vue` |
 | 设计系统/主题 | Google Stitch 设计令牌 | `frontend/src/assets/styles/design-system.scss`, `tailwind.css` |
 | 管理员登录 | 设计系统 | `frontend/src/views/admin/Login.vue` |
-| 用户账号设置 | 设计系统 | `frontend/src/views/workbench/SettingsView.vue` |
+| 用户账号设置 | 设计系统 | `frontend/src/views/workbench/SettingsView.vue` + `backend/.../user/controller/UserController.java`（PUT /users/me、偏好设置） |
 | 模板中心 | 设计系统 | `frontend/src/views/workbench/TemplateCenterView.vue` |
 | AI 点评入口 | 设计系统 | `frontend/src/views/workbench/AIReviewCenterView.vue` |
 | 404 页面 | 设计系统 | `frontend/src/views/NotFoundView.vue` |
 | 模板详情页 | 设计系统 | `frontend/src/views/workbench/TemplateDetailView.vue` |
 | 下载中心 | 设计系统 | `frontend/src/views/workbench/DownloadCenterView.vue` |
-| 通知中心 | 设计系统 | `frontend/src/views/workbench/NotificationCenterView.vue` |
+| 通知中心 | 设计系统 | `frontend/src/views/workbench/NotificationCenterView.vue` + `backend/src/main/java/com/resume/notification/` |
 | 简历详情/预览页 | 设计系统 | `frontend/src/views/workbench/ResumeDetailView.vue` |
 | 简历分享页 | 业务线 v1.1 Phase 2 | `frontend/src/views/ShareView.vue` |
 | 路由与鉴权守卫 | `security-guide.md` | `frontend/src/router/index.ts` |

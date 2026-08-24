@@ -8,9 +8,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mock.env.MockEnvironment;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class EmailCodeServiceTest {
 
@@ -23,7 +25,12 @@ class EmailCodeServiceTest {
         ObjectProvider<JavaMailSender> mailProvider = mock(ObjectProvider.class);
         // 未配置 Redis：走内存模式
         ObjectProvider<RedisTemplate<String, String>> redisProvider = mock(ObjectProvider.class);
-        service = new EmailCodeService(properties, mailProvider, redisProvider);
+        // dev profile：未配置 SMTP 时降级为日志输出验证码（本地联调）
+        ObjectProvider<org.springframework.core.env.Environment> envProvider = mock(ObjectProvider.class);
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("dev");
+        when(envProvider.getIfAvailable()).thenReturn(environment);
+        service = new EmailCodeService(properties, mailProvider, redisProvider, envProvider);
     }
 
     @Test
@@ -92,5 +99,28 @@ class EmailCodeServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.send("demo@example.com"));
         assertEquals(ResultCode.AUTH_EMAIL_CODE_TOO_FREQUENT, ex.getErrorCode());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void send_shouldFailFastInProdWhenSmtpNotConfigured() throws Exception {
+        // 生产 profile 未配置 SMTP：必须 fail-fast，且验证码不得落库/泄露到日志
+        AuthProperties properties = new AuthProperties();
+        ObjectProvider<JavaMailSender> mailProvider = mock(ObjectProvider.class);
+        ObjectProvider<RedisTemplate<String, String>> redisProvider = mock(ObjectProvider.class);
+        ObjectProvider<org.springframework.core.env.Environment> envProvider = mock(ObjectProvider.class);
+        MockEnvironment prodEnvironment = new MockEnvironment();
+        prodEnvironment.setActiveProfiles("prod");
+        when(envProvider.getIfAvailable()).thenReturn(prodEnvironment);
+
+        EmailCodeService prodService = new EmailCodeService(properties, mailProvider, redisProvider, envProvider);
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> prodService.send("prod@example.com"));
+        assertEquals(ResultCode.AUTH_EMAIL_CODE_SEND_FAILED, ex.getErrorCode());
+
+        java.lang.reflect.Field field = EmailCodeService.class.getDeclaredField("codes");
+        field.setAccessible(true);
+        assertTrue(((java.util.Map<?, ?>) field.get(prodService)).isEmpty(),
+                "生产环境发送失败时不应落库任何验证码");
     }
 }

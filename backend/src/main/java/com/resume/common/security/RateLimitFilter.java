@@ -11,7 +11,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -63,8 +66,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveKey(HttpServletRequest request) {
+        // 已认证请求按 userId 计数（不同用户互不影响）；匿名请求按 IP 计数。
         // 不直接信任 X-Forwarded-For，防止客户端伪造 IP 绕过限流。
         // 如需获取真实客户端 IP，应在可信反向代理后统一部署，由网关统一注入并校验。
-        return "rate:" + request.getRemoteAddr();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof String userId
+                && StringUtils.hasText(userId)) {
+            return "rate:user:" + userId;
+        }
+        return "rate:ip:" + request.getRemoteAddr();
     }
 }

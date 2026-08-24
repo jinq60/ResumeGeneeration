@@ -6,6 +6,7 @@ import com.resume.user.dto.AdminUserDetailResponse;
 import com.resume.user.dto.AdminUserListItemResponse;
 import com.resume.user.dto.ResetPasswordResponse;
 import com.resume.user.service.AdminUserService;
+import com.resume.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -34,6 +35,9 @@ class AdminUserControllerTest {
 
     @MockBean
     private AdminUserService adminUserService;
+
+    @MockBean
+    private UserService userService;
 
     @Test
     void list_shouldReturnUsers_whenAdmin() throws Exception {

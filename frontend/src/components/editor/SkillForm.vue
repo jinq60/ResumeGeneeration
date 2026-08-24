@@ -75,7 +75,7 @@
       type="primary"
       plain
       style="width: 100%; margin-top: 16px"
-      @click="addCategory"
+      @click="addCategory()"
     >
       <el-icon><Plus /></el-icon>
       添加技能分类

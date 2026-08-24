@@ -72,20 +72,34 @@
               <Search />
             </el-icon>
             <input
+              ref="searchInputRef"
+              v-model="searchKeyword"
               type="text"
               placeholder="搜索用户、简历、模板、订单等..."
+              @keyup.enter="handleSearch"
             >
             <span class="search-kbd">⌘ K</span>
           </div>
 
-          <button class="icon-btn relative">
+          <button
+            class="icon-btn relative"
+            title="内容审核"
+            @click="router.push('/admin/audit')"
+          >
             <el-icon size="20">
               <Bell />
             </el-icon>
-            <span class="badge">12</span>
+            <span
+              v-if="pendingAudits > 0"
+              class="badge"
+            >{{ pendingAudits > 99 ? '99+' : pendingAudits }}</span>
           </button>
 
-          <button class="icon-btn">
+          <button
+            class="icon-btn"
+            title="帮助文档"
+            @click="openHelp"
+          >
             <el-icon size="20">
               <QuestionFilled />
             </el-icon>
@@ -139,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -159,11 +173,15 @@ import {
   Wallet,
   TrendCharts
 } from '@element-plus/icons-vue'
+import { auditApi } from '@/api/admin/audits'
 
 const route = useRoute()
 const router = useRouter()
 
 const collapsed = ref(false)
+const searchKeyword = ref('')
+const searchInputRef = ref<HTMLInputElement>()
+const pendingAudits = ref(0)
 const adminName = computed(() => localStorage.getItem('admin_username') || 'admin')
 
 const navItems = [
@@ -184,6 +202,41 @@ function isActive(path: string) {
 function toggleCollapse() {
   collapsed.value = !collapsed.value
 }
+
+async function loadPendingAudits() {
+  try {
+    const stats = await auditApi.stats()
+    pendingAudits.value = stats?.pending || 0
+  } catch {
+    pendingAudits.value = 0
+  }
+}
+
+function handleSearch() {
+  const kw = searchKeyword.value.trim()
+  if (!kw) return
+  router.push({ path: '/admin/users', query: { keyword: kw } })
+}
+
+function openHelp() {
+  window.open('/help-docs', '_blank')
+}
+
+function handleSearchShortcut(event: KeyboardEvent) {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    searchInputRef.value?.focus()
+  }
+}
+
+onMounted(() => {
+  loadPendingAudits()
+  window.addEventListener('keydown', handleSearchShortcut)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleSearchShortcut)
+})
 
 const currentPageParent = computed(() => {
   return '后台'

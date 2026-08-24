@@ -105,6 +105,18 @@ public class AiResumeOptimizeService {
         return optimizeTaskMapper.selectOne(wrapper);
     }
 
+    /**
+     * 线程池队列已满、异步任务被拒绝时的补偿：将任务标记为 failed，让用户可感知。
+     */
+    public void markTaskRejected(String taskId) {
+        ResumeOptimizeTask update = new ResumeOptimizeTask();
+        update.setId(taskId);
+        update.setStatus(BizConstant.TASK_STATUS_FAILED);
+        update.setErrorMsg("AI 服务繁忙，请稍后再试。");
+        update.setUpdatedAt(LocalDateTime.now());
+        optimizeTaskMapper.updateById(update);
+    }
+
     @Async("aiTaskExecutor")
     public void executeOptimize(String taskId, Resume resume, String jobDescription) {
         ResumeOptimizeTask task = optimizeTaskMapper.selectById(taskId);

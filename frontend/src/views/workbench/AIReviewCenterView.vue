@@ -1,5 +1,5 @@
 <template>
-  <main class="max-w-[1440px] mx-auto px-margin-page py-stack-lg">
+  <main class="workbench-page py-stack-lg">
     <!-- Header Section -->
     <div class="flex flex-col gap-2 mb-stack-lg">
       <h1 class="text-headline-md font-headline-md text-on-surface">
@@ -154,7 +154,10 @@
                 <span>{{ resume.updatedAt }}</span>
               </div>
             </div>
-            <button class="bg-primary text-on-primary text-label-md font-bold px-3 py-1 rounded-full shrink-0 hover:scale-[0.98] transition-transform">
+            <button
+              class="bg-primary text-on-primary text-label-md font-bold px-3 py-1 rounded-full shrink-0 hover:scale-[0.98] transition-transform"
+              @click.stop="goReview(resume.id)"
+            >
               点评
             </button>
           </li>
@@ -213,6 +216,10 @@ async function loadResumes() {
 
 function selectResume(id: string) {
   selectedResumeId.value = id
+}
+
+function goReview(id: string) {
+  router.push({ path: `/workbench/resumes/${id}/review` })
 }
 
 function startReview() {

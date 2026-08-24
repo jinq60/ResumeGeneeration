@@ -63,6 +63,9 @@ class AuthControllerTest {
     private OAuthStateStore oauthStateStore;
 
     @MockBean
+    private com.resume.user.auth.OAuthLoginCodeStore oauthLoginCodeStore;
+
+    @MockBean
     private UserAuthService userAuthService;
 
     @MockBean
@@ -188,13 +191,40 @@ class AuthControllerTest {
         when(oauth.exchangeAndFetch("code123"))
                 .thenReturn(new OAuthUserInfo("google", "sub_1", "demo@example.com", "Demo", null, true));
         when(userAuthService.authenticateByOAuth(any())).thenReturn(buildAuthResponse());
+        when(oauthLoginCodeStore.issue(any()))
+                .thenReturn("one-time-login-code");
 
         mockMvc.perform(get("/auth/oauth/google/callback")
                 .param("code", "code123")
                 .param("state", "state123"))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location",
-                        org.hamcrest.Matchers.containsString("/login?token=token123")));
+                        org.hamcrest.Matchers.containsString("/login?oauth_code=one-time-login-code")));
+    }
+
+    @Test
+    void testOAuthExchange_Success() throws Exception {
+        when(oauthLoginCodeStore.consume("valid-code")).thenReturn(buildAuthResponse());
+
+        mockMvc.perform(post("/auth/oauth/exchange")
+                .contentType("application/json")
+                .content("{\"code\":\"valid-code\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.accessToken").value("token123"))
+                // 令牌对经 POST body 下发，不再出现在任何 URL 中
+                .andExpect(jsonPath("$.data.refreshToken").value("refresh123"));
+    }
+
+    @Test
+    void testOAuthExchange_InvalidCode() throws Exception {
+        when(oauthLoginCodeStore.consume("bad-code")).thenReturn(null);
+
+        mockMvc.perform(post("/auth/oauth/exchange")
+                .contentType("application/json")
+                .content("{\"code\":\"bad-code\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.not(200)));
     }
 
     @Test

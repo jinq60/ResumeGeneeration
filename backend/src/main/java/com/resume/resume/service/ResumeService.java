@@ -32,13 +32,14 @@ import java.util.*;
 @Service
 public class ResumeService {
 
-private final ResumeMapper resumeMapper;
+    private final ResumeMapper resumeMapper;
     private final TemplateService templateService;
     private final PdfService pdfService;
     private final AvatarService avatarService;
     private final ResumeSectionValidator resumeSectionValidator;
     private final AuditLogService auditLogService;
     private final com.resume.resume.share.service.ShareService shareService;
+    private final com.resume.audit.service.ContentAuditService contentAuditService;
 
     public ResumeService(ResumeMapper resumeMapper,
                           TemplateService templateService,
@@ -46,7 +47,8 @@ private final ResumeMapper resumeMapper;
                           @Lazy AvatarService avatarService,
                           ResumeSectionValidator resumeSectionValidator,
                           AuditLogService auditLogService,
-                          @Lazy com.resume.resume.share.service.ShareService shareService) {
+                          @Lazy com.resume.resume.share.service.ShareService shareService,
+                          com.resume.audit.service.ContentAuditService contentAuditService) {
         this.resumeMapper = resumeMapper;
         this.templateService = templateService;
         this.pdfService = pdfService;
@@ -54,6 +56,7 @@ private final ResumeMapper resumeMapper;
         this.resumeSectionValidator = resumeSectionValidator;
         this.auditLogService = auditLogService;
         this.shareService = shareService;
+        this.contentAuditService = contentAuditService;
     }
 
     private static final int MAX_TITLE_LENGTH = 128;
@@ -89,6 +92,9 @@ private final ResumeMapper resumeMapper;
         resume.setCreatedAt(LocalDateTime.now());
         resume.setUpdatedAt(LocalDateTime.now());
         resumeMapper.insert(resume);
+
+        // 简历进入内容审核队列（待审核）
+        contentAuditService.createForResume(userId, resume.getId(), title);
 
         log.info("createResume success: userId={}, resumeId={}", userId, resume.getId());
         return toDetailResponse(resume);
@@ -233,11 +239,16 @@ private final ResumeMapper resumeMapper;
         LocalDateTime now = LocalDateTime.now();
         resume.setLastEditedAt(now);
         resume.setUpdatedAt(now);
-        resumeMapper.updateById(resume);
+        if (resumeMapper.updateById(resume) == 0) {
+            throw new BusinessException(ResultCode.RESUME_VERSION_CONFLICT,
+                    "简历已被其他编辑修改，请刷新后重试。");
+        }
+        incrementVersion(resume);
 
         UpdateResumeResponse response = new UpdateResumeResponse();
         response.setId(resume.getId());
         response.setUpdatedAt(resume.getUpdatedAt());
+        response.setVersion(resume.getVersion());
         return response;
     }
 
@@ -301,7 +312,11 @@ private final ResumeMapper resumeMapper;
         LocalDateTime now = LocalDateTime.now();
         resume.setLastEditedAt(now);
         resume.setUpdatedAt(now);
-        resumeMapper.updateById(resume);
+        if (resumeMapper.updateById(resume) == 0) {
+            throw new BusinessException(ResultCode.RESUME_VERSION_CONFLICT,
+                    "简历已被其他编辑修改，请刷新后重试。");
+        }
+        incrementVersion(resume);
 
         RenameResumeResponse response = new RenameResumeResponse();
         response.setId(resume.getId());
@@ -372,9 +387,21 @@ private final ResumeMapper resumeMapper;
             resume.setSections(sections);
             resume.setLastEditedAt(LocalDateTime.now());
             resume.setUpdatedAt(LocalDateTime.now());
-            resumeMapper.updateById(resume);
+            // 回填属于旁路写入：若用户正在编辑导致版本冲突，跳过回填而不影响头像任务成功状态
+            if (resumeMapper.updateById(resume) == 0) {
+                log.warn("fillAvatarUrl skipped: optimistic lock conflict, userId={}, resumeId={}", userId, resumeId);
+                return;
+            }
+            incrementVersion(resume);
             log.info("Avatar URL filled: userId={}, resumeId={}", userId, resumeId);
         }
+    }
+
+    /**
+     * 同步内存中的版本号：数据库侧由乐观锁拦截器自动 version+1，这里保持一致。
+     */
+    private void incrementVersion(Resume resume) {
+        resume.setVersion(resume.getVersion() == null ? 1 : resume.getVersion() + 1);
     }
 
     private void validateScene(String scene) {

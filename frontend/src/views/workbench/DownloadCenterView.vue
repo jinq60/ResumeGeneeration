@@ -1,5 +1,5 @@
 <template>
-  <main class="max-w-[1440px] mx-auto px-margin-page py-stack-lg">
+  <main class="workbench-page py-stack-lg">
     <header class="flex justify-between items-end mb-stack-lg gap-gutter">
       <div class="flex flex-col">
         <h1 class="text-headline-md font-headline-md text-on-surface">
@@ -20,7 +20,7 @@
       </button>
     </header>
 
-    <div class="max-w-[1080px] mx-auto w-full flex flex-col gap-stack-lg">
+    <div class="workbench-page w-full flex flex-col gap-stack-lg">
       <div class="flex gap-2 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant/30 w-fit">
         <button
           v-for="tab in tabs"

@@ -19,6 +19,11 @@ export interface EmailCodeLoginRequest {
   code: string
 }
 
+export interface SmsCodeLoginRequest {
+  phone: string
+  code: string
+}
+
 export const authApi = {
   login(data: LoginRequest): Promise<AuthResponse> {
     return request.post('/auth/login', data) as Promise<AuthResponse>
@@ -41,12 +46,21 @@ export const authApi = {
   emailCodeLogin(data: EmailCodeLoginRequest): Promise<AuthResponse> {
     return request.post('/auth/email-code/login', data) as Promise<AuthResponse>
   },
+  smsCodeSend(phone: string): Promise<void> {
+    return request.post('/auth/sms-code/send', { phone }) as Promise<void>
+  },
+  smsCodeLogin(data: SmsCodeLoginRequest): Promise<AuthResponse> {
+    return request.post('/auth/sms-code/login', data) as Promise<AuthResponse>
+  },
+  oauthExchange(code: string): Promise<AuthResponse> {
+    return request.post('/auth/oauth/exchange', { code }) as Promise<AuthResponse>
+  },
   loginMethods(): Promise<{ loginMethods: { method: string; configured: boolean }[]; oauthProviders: { provider: string; configured: boolean }[] }> {
     return request.get('/auth/methods') as Promise<{ loginMethods: { method: string; configured: boolean }[]; oauthProviders: { provider: string; configured: boolean }[] }>
   }
 }
 
-/** 第三方授权跳转地址（浏览器整页跳转，回跳后由 /login 处理 token） */
+/** 第三方授权跳转地址（浏览器整页跳转，回跳后由登录弹窗处理授权码） */
 export function oauthAuthorizeUrl(provider: string): string {
   const base = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
   return `${base}/auth/oauth/${provider}/authorize`

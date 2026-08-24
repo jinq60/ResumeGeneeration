@@ -50,9 +50,9 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useAuthModalStore } from '@/stores/authModal'
 
-const router = useRouter()
+const authModalStore = useAuthModalStore()
 
 const plans = [
   {
@@ -85,6 +85,6 @@ const plans = [
 ]
 
 function goToLogin() {
-  router.push('/login')
+  authModalStore.open()
 }
 </script>

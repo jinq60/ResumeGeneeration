@@ -10,12 +10,13 @@ services:
     container_name: resume-mysql
     restart: unless-stopped
     env_file:
-      - /opt/resume-generation/.env
+      - ${ENV_FILE:-/opt/resume-generation/.env}
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-resume_generation}
       MYSQL_USER: ${MYSQL_USER:-resume}
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      # 仅绑定宿主回环地址供本机调试；生产访问一律经 frontend nginx 反代，禁止发布到 0.0.0.0
+      - "${MYSQL_PORT:-127.0.0.1:3306}:3306"
     volumes:
       - resume-mysql-data:/var/lib/mysql
     command:
@@ -37,10 +38,11 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     env_file:
-      - /opt/resume-generation/.env
+      - ${ENV_FILE:-/opt/resume-generation/.env}
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      # 仅绑定宿主回环地址；MinIO 控制台/ API 禁止暴露公网
+      - "${MINIO_API_PORT:-127.0.0.1:9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-127.0.0.1:9001}:9001"
     volumes:
       - resume-minio-data:/data
     networks:
@@ -55,12 +57,16 @@ services:
     image: redis:7.2-alpine
     container_name: resume-redis
     restart: unless-stopped
+    # 强制密码认证；REDIS_PASSWORD 必须在 .env 中配置为强随机值
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT:-127.0.0.1:6379}:6379"
     networks:
       - resume-net
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      environment:
+        REDIS_PASSWORD: ${REDIS_PASSWORD}
       interval: 10s
       timeout: 5s
       retries: 5
@@ -73,15 +79,17 @@ services:
     container_name: resume-backend
     restart: unless-stopped
     env_file:
-      - /opt/resume-generation/.env
+      - ${ENV_FILE:-/opt/resume-generation/.env}
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/resume_generation?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
       APP_MINIO_ENDPOINT: http://minio:9000
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     ports:
-      - "8080:8080"
+      # 后端仅本机调试用；外部流量经 frontend nginx 反代 /api，禁止发布到 0.0.0.0
+      - "${BACKEND_PORT:-127.0.0.1:8080}:8080"
     depends_on:
       mysql:
         condition: service_healthy

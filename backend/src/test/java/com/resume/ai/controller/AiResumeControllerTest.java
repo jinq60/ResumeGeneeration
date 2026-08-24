@@ -96,7 +96,7 @@ class AiResumeControllerTest {
                 .with(user("user123").roles("USER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isTooManyRequests());
     }
 
     @Test

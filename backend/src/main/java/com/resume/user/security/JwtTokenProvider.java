@@ -33,6 +33,8 @@ public class JwtTokenProvider {
     public static final String CLAIM_TYPE = "type";
     public static final String CLAIM_GUEST = "guest";
     public static final String CLAIM_ROLE = "role";
+    /** 刷新令牌所属令牌家族 ID：用于失窃重放时定位并撤销整个家族。 */
+    public static final String CLAIM_FAMILY_ID = "fid";
 
     public static final String TOKEN_TYPE_ACCESS = "access";
     public static final String TOKEN_TYPE_REFRESH = "refresh";
@@ -110,11 +112,19 @@ public class JwtTokenProvider {
      * 生成刷新令牌。
      */
     public String generateRefreshToken(String userId) {
+        return generateRefreshToken(userId, null);
+    }
+
+    /**
+     * 生成携带家族 ID 的刷新令牌（reuse detection 依赖该 claim 定位失窃家族）。
+     */
+    public String generateRefreshToken(String userId, String familyId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + refreshTokenExpiration);
         return Jwts.builder()
                 .subject(userId)
                 .claim(CLAIM_TYPE, TOKEN_TYPE_REFRESH)
+                .claim(CLAIM_FAMILY_ID, familyId)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(getSigningKey())
@@ -170,6 +180,20 @@ public class JwtTokenProvider {
      */
     public String getTokenType(String token) {
         return parseClaims(token).get(CLAIM_TYPE, String.class);
+    }
+
+    /**
+     * 从刷新令牌中解析令牌家族 ID；无该 claim（历史令牌）时返回 null。
+     */
+    public String getFamilyId(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        try {
+            return parseClaims(token).get(CLAIM_FAMILY_ID, String.class);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**

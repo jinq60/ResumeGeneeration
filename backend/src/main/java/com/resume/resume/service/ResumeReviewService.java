@@ -97,12 +97,12 @@ public class ResumeReviewService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    aiResumeReviewService.executeReview(review.getId(), resume, request.getJobDescription());
+                    submitReview(review.getId(), resume, request.getJobDescription());
                 }
             });
         } else {
             // 无事务场景（如单元测试直调）直接触发
-            aiResumeReviewService.executeReview(review.getId(), resume, request.getJobDescription());
+            submitReview(review.getId(), resume, request.getJobDescription());
         }
 
         ResumeReviewResponse response = new ResumeReviewResponse();
@@ -110,6 +110,23 @@ public class ResumeReviewService {
         response.setResumeId(resumeId);
         response.setCreatedAt(review.getCreatedAt());
         return response;
+    }
+
+    /**
+     * 提交异步点评任务；线程池队列满被拒绝时将点评记录标记为 failed，避免永久卡在 pending。
+     */
+    private void submitReview(String reviewId, Resume resume, String jobDescription) {
+        try {
+            aiResumeReviewService.executeReview(reviewId, resume, jobDescription);
+        } catch (org.springframework.core.task.TaskRejectedException e) {
+            log.warn("AI review task rejected (thread pool exhausted): reviewId={}", reviewId);
+            ResumeReview update = new ResumeReview();
+            update.setId(reviewId);
+            update.setStatus(BizConstant.REVIEW_STATUS_FAILED);
+            update.setErrorMsg("AI 服务繁忙，请稍后再试。");
+            update.setUpdatedAt(LocalDateTime.now());
+            resumeReviewMapper.updateById(update);
+        }
     }
 
     /**

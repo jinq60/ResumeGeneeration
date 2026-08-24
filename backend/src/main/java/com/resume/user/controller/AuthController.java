@@ -6,6 +6,7 @@ import com.resume.common.exception.BusinessException;
 import com.resume.user.auth.AuthProvider;
 import com.resume.user.auth.AuthProviderRegistry;
 import com.resume.user.auth.EmailCodeService;
+import com.resume.user.auth.OAuthLoginCodeStore;
 import com.resume.user.auth.OAuthProvider;
 import com.resume.user.auth.OAuthStateStore;
 import com.resume.user.auth.OAuthUserInfo;
@@ -45,6 +46,7 @@ public class AuthController {
     private final EmailCodeService emailCodeService;
     private final SmsCodeService smsCodeService;
     private final OAuthStateStore oauthStateStore;
+    private final OAuthLoginCodeStore oauthLoginCodeStore;
     private final UserAuthService userAuthService;
     private final AuthProperties authProperties;
 
@@ -133,7 +135,12 @@ public class AuthController {
     }
 
     /**
-     * 第三方回调：换 token → 拉取用户 → 登录/绑定 → 302 回前端携带 JWT。
+     * 第三方回调：换 token → 拉取用户 → 登录/绑定 → 签发一次性授权码 → 302 回前端。
+     * <p>
+     * JWT 不再进入重定向 URL（防浏览器历史/访问日志/Referer 泄露），
+     * 前端凭 oauth_code 调用 {@link #exchangeOAuthCode} 换取令牌对；
+     * 授权码单次消费、2 分钟过期。
+     * </p>
      */
     @GetMapping("/oauth/{provider}/callback")
     public void callback(@PathVariable String provider,
@@ -141,7 +148,7 @@ public class AuthController {
                          @RequestParam(required = false) String state,
                          jakarta.servlet.http.HttpServletResponse response) throws IOException {
         String frontend = authProperties.getOauth().getFrontendRedirect();
-        // 回调 URL 携带 JWT：禁止缓存，防止 token 落入中间缓存/代理
+        // 回调 URL 携带授权码：禁止缓存，防止授权码落入中间缓存/代理
         response.setHeader("Cache-Control", "no-store");
         try {
             OAuthProvider oauth = authProviderRegistry.getOAuthProvider(provider);
@@ -153,9 +160,8 @@ public class AuthController {
             }
             OAuthUserInfo info = oauth.exchangeAndFetch(code);
             AuthResponse auth = userAuthService.authenticateByOAuth(info);
-            response.sendRedirect(frontend + "?token=" + encode(auth.getAccessToken())
-                    + "&refresh=" + encode(auth.getRefreshToken())
-                    + "&guest=" + auth.getIsGuest());
+            String loginCode = oauthLoginCodeStore.issue(auth);
+            response.sendRedirect(frontend + "?oauth_code=" + encode(loginCode));
         } catch (BusinessException e) {
             log.warn("OAuth callback failed: provider={}, error={}", provider, e.getMessage());
             response.sendRedirect(frontend + "?error=" + encode(e.getMessage()));
@@ -163,6 +169,19 @@ public class AuthController {
             log.error("OAuth callback error: provider={}", provider, e);
             response.sendRedirect(frontend + "?error=" + encode("第三方登录失败，请稍后重试。"));
         }
+    }
+
+    /**
+     * 用一次性授权码换取令牌对（code 单次消费、短时效）。
+     */
+    @PostMapping("/oauth/exchange")
+    public R<AuthResponse> exchangeOAuthCode(@Valid @RequestBody OAuthExchangeRequest request) {
+        AuthResponse auth = oauthLoginCodeStore.consume(request.getCode());
+        if (auth == null) {
+            throw new BusinessException(ResultCode.AUTH_OAUTH_EXCHANGE_FAILED,
+                    "授权码无效或已过期，请重新发起第三方登录。");
+        }
+        return R.success(auth);
     }
 
     @PostMapping("/guest")

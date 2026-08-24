@@ -17,7 +17,7 @@
       </div>
     </header>
 
-    <div class="flex-1 max-w-[1080px] w-full mx-auto px-margin-page pb-margin-page grid grid-cols-1 lg:grid-cols-2 gap-gutter">
+    <div class="workbench-page flex-1 w-full px-margin-page pb-margin-page grid grid-cols-1 lg:grid-cols-2 gap-gutter">
       <!-- 上传 + 设置 -->
       <section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col">
         <h2 class="text-title-lg font-title-lg text-on-surface">
@@ -414,7 +414,7 @@ function beforeUpload(file: File) {
   return true
 }
 
-async function handleFileChange(file: { raw: File }) {
+async function handleFileChange(file: { raw?: File }) {
   if (!file.raw) return
   const valid = beforeUpload(file.raw)
   if (!valid) return

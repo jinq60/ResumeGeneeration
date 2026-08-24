@@ -74,20 +74,29 @@
 | `app.auth.oauth.google.client-secret` | `GOOGLE_CLIENT_SECRET` | 空 | Google OAuth 客户端密钥 |
 | `app.auth.oauth.github.client-id` | `GITHUB_CLIENT_ID` | 空 | GitHub OAuth 客户端 ID |
 | `app.auth.oauth.github.client-secret` | `GITHUB_CLIENT_SECRET` | 空 | GitHub OAuth 客户端密钥 |
+| `app.auth.oauth.google.client-id` | `GOOGLE_CLIENT_ID` | 空 | Google OAuth 客户端 ID |
+| `app.auth.oauth.google.client-secret` | `GOOGLE_CLIENT_SECRET` | 空 | Google OAuth 客户端密钥 |
 | `app.auth.oauth.qq.app-id` | `QQ_APP_ID` | 空 | QQ 互联 APP ID |
 | `app.auth.oauth.qq.app-key` | `QQ_APP_KEY` | 空 | QQ 互联 APP KEY |
 | `app.auth.smtp.host` | `SMTP_HOST` | 空 | SMTP 服务器；留空时验证码降级为日志输出（仅限开发） |
 | `app.auth.smtp.port` | `SMTP_PORT` | `587` | SMTP 端口 |
 | `app.auth.smtp.username` | `SMTP_USERNAME` | 空 | SMTP 账号（通常是邮箱） |
-| `app.auth.smtp.password` | `SMTP_PASSWORD` | 空 | SMTP 密码/授权码 |
+| `app.auth.smtp.password` | `SMTP_PASSWORD` | 空 | SMTP 密码/授权码（QQ 邮箱为授权码，非登录密码） |
 | `app.auth.smtp.from` | `SMTP_FROM` | 空 | 发件人地址，缺省用 username |
+| `spring.mail.protocol` | `SMTP_PROTOCOL` | `smtp` | 邮件协议；465 隐式 SSL 可改为 `smtps` |
+| `spring.mail.properties.mail.smtp.ssl.enable` | `SMTP_SSL_ENABLE` | `false` | 是否启用 SSL（QQ 465 必须 `true`） |
+| `spring.mail.properties.mail.smtp.starttls.enable` | `SMTP_STARTTLS_ENABLE` | `false` | 是否启用 STARTTLS（587 端口需 `true`） |
+| `spring.mail.properties.mail.smtp.socketFactory.class` | `SMTP_SOCKET_FACTORY_CLASS` | 空 | 隐式 SSL 场景可显式指定，如 `jakarta.net.ssl.SSLSocketFactory` |
+| `spring.mail.properties.mail.smtp.socketFactory.port` | `SMTP_SOCKET_FACTORY_PORT` | 空 | SocketFactory 端口，通常与 SMTP_PORT 一致 |
+
+> 说明：`spring.mail.*` 与 `app.auth.smtp.*` 需同时配置，前者用于创建 `JavaMailSender`，后者供 `EmailCodeService` 判断就绪与取发件人。QQ 邮箱推荐使用 `smtp.qq.com:465`（`SMTP_SSL_ENABLE=true`）；若使用 587 端口则关闭 SSL 并开启 STARTTLS。生产环境（`prod` profile）未配置 SMTP 时，`/auth/methods` 将返回 `email_code` 未就绪，前端不会显示邮箱验证码入口。
 
 #### 需要获取的密钥/API 配置单
 
 | 用途 | 需要获取 | 获取入口 | 回调地址（回填到平台） | 填到环境变量 |
 |---|---|---|---|---|
 | 邮箱验证码发送 | 任意邮箱的 SMTP 授权码（如 QQ 邮箱/163/Outlook 开启 SMTP 服务） | 邮箱服务商设置页 | — | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` |
-| Google 登录 | OAuth 客户端 ID + 密钥 | https://console.cloud.google.com → 凭据 → OAuth 客户端 ID（Web 应用） | `http://localhost:8080/api/auth/oauth/google/callback`（生产换成域名） | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` |
+| Google 登录 | OAuth 客户端 ID + 密钥 | https://console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client ID（Web application） | `http://localhost:8080/api/auth/oauth/google/callback`（生产换成域名） | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` |
 | GitHub 登录 | OAuth App Client ID + Secret | https://github.com/settings/developers → OAuth Apps | `http://localhost:8080/api/auth/oauth/github/callback` | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` |
 | QQ 扫码登录 | APP ID + APP Key（需实名开发者 + 应用审核） | https://connect.qq.com | `http://localhost:8080/api/auth/oauth/qq/callback` | `QQ_APP_ID` / `QQ_APP_KEY` |
 

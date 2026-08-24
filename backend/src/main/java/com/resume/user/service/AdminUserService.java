@@ -85,6 +85,55 @@ public class AdminUserService {
     }
 
     /**
+     * 导出用户 CSV。
+     */
+    public String buildCsv(String status, String keyword) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getDeleted, BizConstant.NOT_DELETED);
+        if (StringUtils.isNotBlank(status)) {
+            wrapper.eq(User::getStatus, status);
+        }
+        if (StringUtils.isNotBlank(keyword)) {
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(User::getNickname, kw)
+                    .or().like(User::getPhone, kw)
+                    .or().like(User::getEmail, kw));
+        }
+        wrapper.orderByDesc(User::getCreatedAt);
+
+        List<User> users = userMapper.selectList(wrapper);
+        StringBuilder sb = new StringBuilder();
+        sb.append("user_id,nickname,phone,email,role,is_guest,status,created_at,updated_at\n");
+        for (User user : users) {
+            sb.append(csv(user.getId())).append(',')
+                    .append(csv(user.getNickname())).append(',')
+                    .append(csv(user.getPhone())).append(',')
+                    .append(csv(user.getEmail())).append(',')
+                    .append(csv(user.getRole())).append(',')
+                    .append(BizConstant.IS_GUEST.equals(user.getIsGuest()) ? 1 : 0).append(',')
+                    .append(csv(user.getStatus())).append(',')
+                    .append(user.getCreatedAt() != null ? user.getCreatedAt() : "").append(',')
+                    .append(user.getUpdatedAt() != null ? user.getUpdatedAt() : "")
+                    .append('\n');
+        }
+        return sb.toString();
+    }
+
+    private String csv(String value) {
+        if (value == null) {
+            return "";
+        }
+        // 防 Excel 公式注入：以 = + - @ 或制表符开头的用户可控值前置单引号
+        String safe = value;
+        if (!safe.isEmpty() && ("=+-@\t".indexOf(safe.charAt(0)) >= 0)) {
+            safe = "'" + safe;
+        }
+        String escaped = safe.replace("\"", "\"\"");
+        return escaped.contains(",") || escaped.contains("\"") || escaped.contains("\n")
+                ? "\"" + escaped + "\"" : escaped;
+    }
+
+    /**
      * 获取用户详情。
      */
     public AdminUserDetailResponse getUser(String userId) {

@@ -9,9 +9,36 @@ spring:
       mode: never
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  # 邮箱验证码 SMTP：生产环境必须显式配置，禁止占位验证码裸奔上线
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    default-encoding: UTF-8
+    protocol: ${SMTP_PROTOCOL:smtp}
+    properties:
+      mail.smtp.auth: true
+      # QQ 邮箱 465 端口须开启 SSL；587 端口须开启 STARTTLS
+      mail.smtp.ssl.enable: ${SMTP_SSL_ENABLE:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS_ENABLE:false}
+      mail.smtp.starttls.required: ${SMTP_STARTTLS_ENABLE:false}
+      # 465 隐式 SSL 场景建议设置 socketFactory（QQ/163 等国内邮箱常见）
+      mail.smtp.socketFactory.class: ${SMTP_SOCKET_FACTORY_CLASS:}
+      mail.smtp.socketFactory.port: ${SMTP_SOCKET_FACTORY_PORT:}
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
 
 server:
   shutdown: graceful
+
+# 生产环境关闭 API 文档，禁止接口结构对外暴露
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 mybatis-plus:
   configuration:
@@ -43,3 +70,10 @@ app:
     verify-code:
       # 生产必须显式 strict：未接入真实验证码服务时注册将被拒绝（禁止占位验证码裸奔上线）
       mode: strict
+    smtp:
+      # 邮箱验证码 SMTP：须与 spring.mail.* 保持同步；host 为空时 EmailCodeService 降级为日志输出
+      host: ${SMTP_HOST:}
+      port: ${SMTP_PORT:587}
+      username: ${SMTP_USERNAME:}
+      password: ${SMTP_PASSWORD:}
+      from: ${SMTP_FROM:}

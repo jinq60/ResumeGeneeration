@@ -31,6 +31,22 @@ export interface UserStats {
   todayNewUsers: number
 }
 
+export interface CreateUserRequest {
+  nickname?: string
+  phone?: string
+  email: string
+  initialPassword?: string
+}
+
+export interface CreateUserResponse {
+  userId: string
+  nickname?: string
+  email: string
+  phone?: string
+  temporaryPassword?: string
+  message: string
+}
+
 export const userApi = {
   // 获取用户列表
   getUsers: (params?: {
@@ -60,5 +76,20 @@ export const userApi = {
   // 删除用户
   deleteUser: (id: string): Promise<void> => {
     return adminRequest.delete(`/admin/users/${id}`)
+  },
+
+  // 新增用户
+  createUser: (data: CreateUserRequest): Promise<CreateUserResponse> => {
+    return adminRequest.post('/admin/users', data)
+  },
+
+  // 导出用户 CSV
+  exportUrl(params?: { status?: string; keyword?: string }): string {
+    const base = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+    const query = new URLSearchParams()
+    if (params?.status) query.set('status', params.status)
+    if (params?.keyword) query.set('keyword', params.keyword)
+    const qs = query.toString()
+    return `${base}/admin/users/export${qs ? `?${qs}` : ''}`
   }
 }

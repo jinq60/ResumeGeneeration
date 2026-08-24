@@ -71,7 +71,9 @@ class AvatarServiceTest {
 
         assertDoesNotThrow(() -> avatarService.deleteAvatar(userId, avatarId));
 
-        verify(minioStorageService).remove("resumes-avatars", "user_1/avatars/avatar_123_source.png");
+        // 文件删除延迟到事务提交后执行（本测试无事务，removeAfterCommit 内部立即删除）
+        verify(minioStorageService).removeAfterCommit("resumes-avatars",
+                java.util.List.of("user_1/avatars/avatar_123_source.png"));
         verify(avatarTaskMapper).update(any(AvatarTask.class), any(LambdaQueryWrapper.class));
 
         ArgumentCaptor<AvatarTask> captor = ArgumentCaptor.forClass(AvatarTask.class);

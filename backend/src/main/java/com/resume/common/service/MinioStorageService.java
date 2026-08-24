@@ -10,8 +10,11 @@ import io.minio.RemoveObjectArgs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.InputStream;
+import java.util.List;
 
 /**
  * MinIO 对象存储服务。
@@ -54,6 +57,30 @@ public class MinioStorageService {
                             .build());
         } catch (Exception e) {
             log.warn("Remove file from MinIO failed: bucket={}, object={}", bucket, objectName, e);
+        }
+    }
+
+    /**
+     * 事务提交后再删除对象：若当前处于 Spring 事务中，注册 afterCommit 回调；
+     * 否则立即删除（兼容非事务调用）。避免事务回滚后 DB 记录与 MinIO 文件不一致。
+     */
+    public void removeAfterCommit(String bucket, List<String> objectNames) {
+        if (objectNames == null || objectNames.isEmpty()) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    for (String objectName : objectNames) {
+                        remove(bucket, objectName);
+                    }
+                }
+            });
+        } else {
+            for (String objectName : objectNames) {
+                remove(bucket, objectName);
+            }
         }
     }
 

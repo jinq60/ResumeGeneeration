@@ -1,9 +1,9 @@
 <template>
-  <div class="flex flex-col h-screen bg-surface-container-low">
-    <header class="h-14 shrink-0 px-6 bg-surface-container-lowest border-b border-outline-variant flex items-center justify-between">
+  <div class="flex flex-col h-screen bg-background animate-fade-in-up">
+    <header class="h-14 shrink-0 px-6 bg-card border-b border-border flex items-center justify-between">
       <div class="flex items-center gap-3">
         <button
-          class="w-8 h-8 bg-transparent border border-outline-variant rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors"
+          class="w-8 h-8 bg-transparent border border-border rounded-xl flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
           title="返回"
           @click="router.back()"
         >
@@ -11,26 +11,26 @@
             <ArrowLeft />
           </el-icon>
         </button>
-        <h1 class="text-title-lg font-title-lg text-on-surface">
+        <h1 class="text-xl font-medium text-foreground">
           导出 PDF
         </h1>
       </div>
       <button
-        class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="!resume"
-        @click="goEditor"
-      >
-        <el-icon size="14">
-          <Edit />
-        </el-icon>
-        <span>继续编辑</span>
-      </button>
+          class="border border-border rounded-xl hover:bg-secondary text-muted-foreground px-4 py-2 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          :disabled="!resume"
+          @click="goEditor"
+        >
+          <el-icon size="14">
+            <Edit />
+          </el-icon>
+          <span>继续编辑</span>
+        </button>
     </header>
 
     <div class="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_460px] min-h-0">
       <!-- 预览 -->
-      <section class="bg-surface-container-low flex flex-col items-center p-8 overflow-auto">
-        <div class="w-full max-w-[210mm] bg-surface-container-lowest rounded-sm shadow-md min-h-[600px]">
+      <section class="bg-secondary/30 flex flex-col items-center p-8 overflow-auto">
+        <div class="w-full max-w-[210mm] bg-card rounded-2xl shadow-xl min-h-[600px]">
           <ResumePreview
             v-if="resume"
             :resume="resume"
@@ -38,50 +38,63 @@
           />
           <div
             v-else
-            class="h-[600px] flex flex-col items-center justify-center gap-3 text-on-surface-variant text-sm"
+            class="h-[600px] flex flex-col items-center justify-center gap-3 text-muted-foreground text-sm"
           >
             <el-icon
               size="28"
-              class="text-outline"
+              class="text-muted-foreground"
             >
               <Document />
             </el-icon>
             <p>加载简历中…</p>
           </div>
         </div>
-        <div class="mt-3 text-[11px] text-on-surface-variant font-mono tabular-nums">
+        <div class="mt-3 text-[11px] text-muted-foreground font-mono tabular-nums">
           A4 · 210 × 297mm · 模板 {{ selectedTemplateId || 'default' }}
         </div>
       </section>
 
       <!-- 设置面板 -->
-      <section class="bg-surface-container-lowest border-l border-outline-variant p-6 overflow-y-auto flex flex-col">
-        <h2 class="text-title-lg font-title-lg text-on-surface">
+      <section class="bg-card border-l border-border p-6 overflow-y-auto flex flex-col">
+        <h2 class="text-xl font-medium text-foreground">
           导出设置
         </h2>
-        <p class="mt-1 text-sm text-on-surface-variant">
+        <p class="mt-1 text-sm text-muted-foreground">
           导出后可在下载中心获取。
         </p>
+        <button
+          class="mt-2 self-start text-sm font-medium text-foreground hover:text-muted-foreground transition-colors"
+          @click="router.push('/workbench/downloads')"
+        >
+          前往下载中心 →
+        </button>
 
         <div class="mt-5 flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-on-surface-variant tracking-wide">选择模板</label>
-          <select
-            v-model="selectedTemplateId"
-            class="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-            @change="handleTemplateChange"
-          >
-            <option
-              v-for="t in templates"
-              :key="t.id"
-              :value="t.id"
+          <label class="text-sm font-medium text-foreground">选择模板</label>
+          <div class="relative">
+            <select
+              v-model="selectedTemplateId"
+              class="w-full px-3 py-2.5 bg-secondary border border-transparent rounded-xl text-sm text-foreground focus:outline-none focus:bg-card focus:border-border transition-all appearance-none"
+              @change="handleTemplateChange"
             >
-              {{ t.name }}{{ t.isRecommended ? ' · 推荐' : '' }}
-            </option>
-          </select>
+              <option
+                v-for="t in templates"
+                :key="t.id"
+                :value="t.id"
+              >
+                {{ t.name }}{{ t.isRecommended ? ' · 推荐' : '' }}
+              </option>
+            </select>
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+              <el-icon size="14">
+                <ArrowDown />
+              </el-icon>
+            </span>
+          </div>
         </div>
 
         <div class="mt-5 flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-on-surface-variant tracking-wide">导出格式</label>
+          <label class="text-sm font-medium text-foreground">导出格式</label>
           <el-radio-group
             v-model="exportFormat"
             class="w-full"
@@ -102,20 +115,20 @@
         </div>
 
         <div class="mt-5 flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-on-surface-variant tracking-wide">文件名</label>
+          <label class="text-sm font-medium text-foreground">文件名</label>
           <div class="relative">
             <input
               v-model="exportForm.fileName"
               type="text"
-              class="w-full px-3 py-2.5 pr-12 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+              class="w-full px-3 py-2.5 pr-12 bg-secondary border border-transparent rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:bg-card focus:border-border transition-all"
               placeholder="文件名"
             >
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm pointer-events-none font-mono tabular-nums">.{{ exportFormat === 'pdf' ? 'pdf' : exportFormat === 'word' ? 'docx' : 'md' }}</span>
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none font-mono tabular-nums">.{{ exportFormat === 'pdf' ? 'pdf' : exportFormat === 'word' ? 'docx' : 'md' }}</span>
           </div>
         </div>
 
         <button
-          class="mt-6 bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md flex items-center justify-center gap-2 shadow-sm hover:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+          class="mt-6 w-full bg-foreground text-primary-foreground px-4 py-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 shadow-lg hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="!selectedTemplateId || exporting || (exportFormat !== 'pdf' && directExporting)"
           @click="handleExport"
         >
@@ -135,32 +148,32 @@
           <span>{{ exporting || directExporting ? '导出中…' : '导出 ' + formatLabel }}</span>
         </button>
 
-        <hr class="my-6 border-none border-t border-outline-variant">
+        <hr class="my-6 border-t border-border">
 
         <!-- 任务状态 -->
         <div
           v-if="exportTask"
-          class="p-4 bg-surface-container-low rounded-lg"
+          class="p-5 bg-secondary rounded-2xl"
         >
           <div class="flex items-center justify-between mb-3">
-            <h3 class="text-title-md font-title-md text-on-surface">
+            <h3 class="text-lg font-medium text-foreground">
               导出任务
             </h3>
-            <span :class="['text-[11px] px-2 py-0.5 rounded-full font-medium', taskTagClass]">
+            <span :class="['text-[11px] px-2.5 py-0.5 rounded-full font-medium', taskTagClass]">
               {{ getTaskStatusText() }}
             </span>
           </div>
 
-          <ul class="list-none p-0 mb-3 flex flex-col gap-1">
+          <ul class="list-none p-0 mb-4 flex flex-col gap-1.5">
             <li
               v-if="exportTask.completedAt"
-              class="flex justify-between text-xs text-on-surface-variant font-mono tabular-nums"
+              class="flex justify-between text-xs text-muted-foreground font-mono tabular-nums"
             >
               <span>完成时间</span><span>{{ formatDate(exportTask.completedAt) }}</span>
             </li>
             <li
               v-if="exportTask.fileSize"
-              class="flex justify-between text-xs text-on-surface-variant font-mono tabular-nums"
+              class="flex justify-between text-xs text-muted-foreground font-mono tabular-nums"
             >
               <span>文件大小</span><span>{{ formatFileSize(exportTask.fileSize) }}</span>
             </li>
@@ -168,7 +181,7 @@
               v-if="exportTask.errorMsg"
               class="flex justify-between text-xs"
             >
-              <span class="text-on-surface-variant">错误</span><span class="text-error max-w-[70%] text-right">{{ exportTask.errorMsg }}</span>
+              <span class="text-muted-foreground">错误</span><span class="text-destructive max-w-[70%] text-right">{{ exportTask.errorMsg }}</span>
             </li>
           </ul>
 
@@ -177,7 +190,7 @@
             class="flex gap-2 flex-wrap"
           >
             <button
-              class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform"
+              class="bg-foreground text-primary-foreground px-4 py-2 rounded-xl font-medium text-sm flex items-center gap-2 shadow-lg hover:opacity-90 active:scale-[0.98] transition-all"
               @click="handleDownload"
             >
               <el-icon size="14">
@@ -186,7 +199,7 @@
               <span>下载 PDF</span>
             </button>
             <button
-              class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2"
+              class="border border-border rounded-xl hover:bg-card text-muted-foreground px-4 py-2 text-sm font-medium transition-colors"
               @click="handleExport"
             >
               重新导出
@@ -197,7 +210,7 @@
             class="flex gap-2 flex-wrap"
           >
             <button
-              class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform"
+              class="bg-foreground text-primary-foreground px-4 py-2 rounded-xl font-medium text-sm flex items-center gap-2 shadow-lg hover:opacity-90 active:scale-[0.98] transition-all"
               @click="handleExport"
             >
               重试
@@ -213,7 +226,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Download, Edit, Document, Loading } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowDown, Download, Edit, Document, Loading } from '@element-plus/icons-vue'
 import { resumeApi } from '@/api/resume'
 import { templateApi } from '@/api/template'
 import { pdfApi } from '@/api/pdf'
@@ -245,10 +258,10 @@ const formatLabel = computed(() => {
 
 const taskTagClass = computed(() => {
   const status = exportTask.value?.status
-  if (status === 'pending') return 'bg-surface-container text-on-surface-variant'
-  if (status === 'processing') return 'bg-primary-fixed text-primary'
-  if (status === 'success') return 'bg-secondary-container text-secondary'
-  if (status === 'failed') return 'bg-error-container text-error'
+  if (status === 'pending') return 'bg-secondary text-muted-foreground'
+  if (status === 'processing') return 'bg-secondary text-foreground'
+  if (status === 'success') return 'bg-foreground text-primary-foreground'
+  if (status === 'failed') return 'bg-destructive/10 text-destructive'
   return ''
 })
 

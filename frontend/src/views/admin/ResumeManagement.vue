@@ -139,16 +139,37 @@
             <el-button
               link
               type="primary"
-              @click="previewResume(row)"
+              @click="previewResume(row as Resume)"
             >
               预览
             </el-button>
-            <el-button
-              link
-              @click="downloadResume(row)"
-            >
-              下载
-            </el-button>
+            <el-dropdown @command="(cmd: string) => downloadResume(cmd, row as Resume)">
+              <el-button link>
+                下载
+                <el-icon
+                  class="ml-1"
+                  size="12"
+                >
+                  <ArrowDown />
+                </el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="word">
+                    Word (.docx)
+                  </el-dropdown-item>
+                  <el-dropdown-item command="markdown">
+                    Markdown (.md)
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    command="pdf"
+                    divided
+                  >
+                    PDF（异步生成）
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
         </el-table-column>
       </el-table>
@@ -170,8 +191,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Document, Search, Download, View } from '@element-plus/icons-vue'
+import { Document, Search, Download, View, ArrowDown } from '@element-plus/icons-vue'
 import { resumeApi, type Resume, type ResumeStats } from '@/api/admin/resumes'
+import { adminDownload } from '@/utils/adminDownload'
 
 const loading = ref(false)
 const filters = reactive({ keyword: '' })
@@ -242,11 +264,39 @@ function formatDate(date: string | null) {
 }
 
 function previewResume(row: Resume) {
-  ElMessage.info(`预览简历 ${row.title}`)
+  window.open(resumeApi.previewUrl(row.id), '_blank')
 }
 
-function downloadResume(row: Resume) {
-  ElMessage.info(`下载简历 ${row.title}`)
+async function downloadResume(format: string, row: Resume) {
+  try {
+    if (format === 'word') {
+      const fileName = await adminDownload(resumeApi.exportWordUrl(row.id), '简历.docx')
+      ElMessage.success(`已导出 ${fileName}`)
+    } else if (format === 'markdown') {
+      const fileName = await adminDownload(resumeApi.exportMarkdownUrl(row.id), '简历.md')
+      ElMessage.success(`已导出 ${fileName}`)
+    } else if (format === 'pdf') {
+      const { taskId } = await resumeApi.exportPdf(row.id)
+      ElMessage.info('PDF 正在后台生成，请稍候…')
+      // 轮询任务状态（最长 120 秒）
+      for (let i = 0; i < 120; i++) {
+        await new Promise(r => setTimeout(r, 1000))
+        const task = await resumeApi.getPdfTask(taskId)
+        if (task.status === 'success') {
+          const fileName = await adminDownload(resumeApi.pdfDownloadUrl(taskId), task.fileName || '简历.pdf')
+          ElMessage.success(`已导出 ${fileName}`)
+          return
+        }
+        if (task.status === 'failed') {
+          ElMessage.error(task.errorMsg || 'PDF 生成失败')
+          return
+        }
+      }
+      ElMessage.warning('PDF 生成超时，请稍后在用户下载中心查看')
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message || '下载失败')
+  }
 }
 
 watch([page, pageSize], loadResumes)

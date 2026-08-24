@@ -1,191 +1,76 @@
 <template>
   <div class="profile-form">
-    <el-form
-      :model="formData"
-      :rules="rules"
-      label-width="100px"
-      size="default"
-    >
-      <el-form-item
-        label="姓名"
-        prop="name"
-      >
-        <el-input
-          v-model="formData.name"
-          placeholder="请输入姓名"
-        />
-      </el-form-item>
+    <section class="profile-fields">
+      <div v-if="isFieldVisible('name')" class="profile-field-row">
+        <span class="field-drag">⠿</span><el-icon><User /></el-icon><span class="field-label">姓名</span>
+        <el-input v-model="formData.name" class="field-control" placeholder="请输入姓名" />
+        <el-icon class="field-action" @click="toggleField('name')"><View /></el-icon>
+      </div>
+      <div v-if="isFieldVisible('targetPosition')" class="profile-field-row">
+        <span class="field-drag">⠿</span><el-icon><Briefcase /></el-icon><span class="field-label">职位</span>
+        <el-input v-model="formData.targetPosition" class="field-control" placeholder="请输入目标岗位" />
+        <el-icon class="field-action" @click="toggleField('targetPosition')"><View /></el-icon>
+      </div>
+      <div v-if="isFieldVisible('availability')" class="profile-field-row">
+        <span class="field-drag">⠿</span><el-icon><Briefcase /></el-icon><span class="field-label">状态</span>
+<el-input v-model="formData.availability" class="field-control" placeholder="请输入到岗时间" />
+        <el-icon class="field-action" @click="toggleField('availability')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('availability')"><Delete /></el-icon>
+      </div>
+      <div v-if="isFieldVisible('birthDate')" class="profile-field-row">
+        <span class="field-drag">⠿</span><el-icon><Calendar /></el-icon><span class="field-label">生日</span>
+        <el-date-picker v-model="formData.birthDate" class="field-control" type="month" placeholder="选择出生年月" format="YYYY-MM" value-format="YYYY-MM" />
+        <el-icon class="field-action" @click="toggleField('birthDate')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('birthDate')"><Delete /></el-icon>
+      </div>
+      <div v-if="isFieldVisible('email')" class="profile-field-row">
+        <span class="field-drag">⠿</span><el-icon><Message /></el-icon><span class="field-label">邮箱</span>
+        <el-input v-model="formData.email" class="field-control" placeholder="请输入邮箱" /><el-icon class="field-action" @click="toggleField('email')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('email')"><Delete /></el-icon>
+      </div>
+      <div v-if="isFieldVisible('phone')" class="profile-field-row">
+        <span class="field-drag">⠿</span><el-icon><Phone /></el-icon><span class="field-label">电话</span>
+        <el-input v-model="formData.phone" class="field-control" placeholder="请输入手机号" /><el-icon class="field-action" @click="toggleField('phone')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('phone')"><Delete /></el-icon>
+      </div>
+      <div v-if="isFieldVisible('city')" class="profile-field-row">
+        <span class="field-drag">⠿</span><el-icon><Location /></el-icon><span class="field-label">地址</span>
+        <el-input v-model="formData.city" class="field-control" placeholder="请输入所在城市" /><el-icon class="field-action" @click="toggleField('city')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('city')"><Delete /></el-icon>
+      </div>
+    </section>
 
-      <el-form-item
-        label="性别"
-        prop="gender"
-      >
-        <el-radio-group v-model="formData.gender">
-          <el-radio label="male">
-            男
-          </el-radio>
-          <el-radio label="female">
-            女
-          </el-radio>
-          <el-radio label="other">
-            其他
-          </el-radio>
-        </el-radio-group>
-      </el-form-item>
+    <h3 class="custom-heading">自定义字段</h3>
+<template v-for="field in formData.customFields || []" :key="field.id">
+      <div v-if="isFieldVisible(field.id)" class="custom-field-row">
+        <span class="field-drag">⠿</span><el-icon><Link /></el-icon>
+        <el-input v-model="field.label" class="custom-label" placeholder="字段名称" />
+        <el-input v-model="field.value" class="custom-value" placeholder="字段内容" />
+        <span class="show-label"><el-switch v-model="field.showLabel" size="small" /> 显示标签</span>
+        <el-icon class="field-action" @click="toggleField(field.id)"><View /></el-icon><el-icon class="field-delete" @click="removeCustomField(field.id)"><Delete /></el-icon>
+      </div>
+    </template>
+    <div v-if="addingCustomField" class="custom-add-form">
+      <el-input v-model="newFieldLabel" autofocus placeholder="请输入字段名称" @keyup.enter="confirmAddCustomField" />
+      <el-button type="primary" @click="confirmAddCustomField">确定</el-button>
+      <el-button @click="cancelAddCustomField">取消</el-button>
+    </div>
+    <button v-else class="add-custom-button" type="button" @click="startAddCustomField"><el-icon><Plus /></el-icon> 添加自定义字段</button>
 
-      <el-form-item
-        label="出生日期"
-        prop="birthDate"
-      >
-        <el-date-picker
-          v-model="formData.birthDate"
-          type="month"
-          placeholder="选择出生年月"
-          format="YYYY-MM"
-          value-format="YYYY-MM"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="手机号"
-        prop="phone"
-      >
-        <el-input
-          v-model="formData.phone"
-          placeholder="请输入手机号"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="邮箱"
-        prop="email"
-      >
-        <el-input
-          v-model="formData.email"
-          placeholder="请输入邮箱"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="所在城市"
-        prop="city"
-      >
-        <el-input
-          v-model="formData.city"
-          placeholder="请输入所在城市"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="目标岗位"
-        prop="targetPosition"
-      >
-        <el-input
-          v-model="formData.targetPosition"
-          placeholder="请输入目标岗位"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="期望薪资"
-        prop="expectedSalary"
-      >
-        <el-input
-          v-model="formData.expectedSalary"
-          placeholder="请输入期望薪资"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="到岗时间"
-        prop="availability"
-      >
-        <el-input
-          v-model="formData.availability"
-          placeholder="请输入到岗时间"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="个人网站"
-        prop="personalWebsite"
-      >
-        <el-input
-          v-model="formData.personalWebsite"
-          placeholder="请输入个人网站链接"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="GitHub"
-        prop="github"
-      >
-        <el-input
-          v-model="formData.github"
-          placeholder="请输入GitHub链接"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="作品集"
-        prop="portfolio"
-      >
-        <el-input
-          v-model="formData.portfolio"
-          placeholder="请输入作品集链接"
-        />
-      </el-form-item>
-
-      <el-form-item
-        label="头像URL"
-        prop="avatarUrl"
-      >
-        <el-input
-          v-model="formData.avatarUrl"
-          placeholder="请输入头像URL"
-        />
-      </el-form-item>
-
-      <el-form-item label="一寸照">
-        <div class="w-full">
-          <el-button
-            type="primary"
-            plain
-            @click="goAvatarUpload"
-          >
-            上传并优化一寸照
-          </el-button>
-          <p class="text-xs text-on-surface-variant mt-1">
-            优化完成后会自动回填到头像 URL
-          </p>
-        </div>
-      </el-form-item>
-
-      <el-divider>展示设置</el-divider>
-
-      <el-form-item label="显示性别">
-        <el-switch v-model="formData.showGender" />
-      </el-form-item>
-
-      <el-form-item label="显示年龄">
-        <el-switch v-model="formData.showAge" />
-      </el-form-item>
-
-      <el-form-item label="显示薪资">
-        <el-switch v-model="formData.showSalary" />
-      </el-form-item>
-
-      <el-form-item label="显示头像">
-        <el-switch v-model="formData.showAvatar" />
-      </el-form-item>
-    </el-form>
+    <div class="avatar-card">
+      <div class="avatar-title">头像</div>
+      <img v-if="formData.avatarUrl" class="avatar-preview" :src="formData.avatarUrl" alt="头像预览">
+      <el-upload :show-file-list="false" :auto-upload="false" accept="image/jpeg,image/png,image/webp" :on-change="handleAvatarChange">
+        <el-button :loading="avatarUploading">{{ avatarUploading ? '上传中…' : '选择图片' }}</el-button>
+      </el-upload>
+      <span class="avatar-upload-hint">JPG、PNG 或 WEBP，最大 10MB</span>
+    </div>
+    <div class="extra-settings"><el-button type="primary" plain @click="goAvatarUpload">上传并优化一寸照</el-button><el-divider>展示设置</el-divider><span>显示头像</span><el-switch v-model="formData.showAvatar" /><span>显示性别</span><el-switch v-model="formData.showGender" /><span>显示年龄</span><el-switch v-model="formData.showAge" /><span>显示薪资</span><el-switch v-model="formData.showSalary" /></div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import type { UploadFile } from 'element-plus'
+import { Briefcase, Calendar, Delete, Link, Location, Message, Phone, Plus, User, View } from '@element-plus/icons-vue'
 import type { Profile } from '@/types/resume'
 import { useSectionSync } from '@/composables/useSectionSync'
+import { avatarApi } from '@/api/avatar'
 
 interface Props {
   resume: any
@@ -193,6 +78,33 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits(['update'])
+const avatarUploading = ref(false)
+const hiddenFields = ref<string[]>([])
+const addingCustomField = ref(false)
+const newFieldLabel = ref('')
+
+function isFieldVisible(key: string) {
+  return !hiddenFields.value.includes(key)
+}
+
+function removeProfileField(key: string) {
+  hiddenFields.value = [...hiddenFields.value, key]
+}
+
+function toggleField(key: string) {
+  hiddenFields.value = isFieldVisible(key) ? [...hiddenFields.value, key] : hiddenFields.value.filter(item => item !== key)
+}
+
+async function handleAvatarChange(file: UploadFile) {
+  if (!file.raw || !props.resume?.id) return
+  avatarUploading.value = true
+  try {
+    const result = await avatarApi.upload(file.raw, props.resume.id)
+    formData.value.avatarUrl = result.sourceImageUrl
+  } finally {
+    avatarUploading.value = false
+  }
+}
 
 function goAvatarUpload() {
   const resumeId = props.resume?.id
@@ -218,7 +130,8 @@ const formData = ref<Profile>({
   showGender: true,
   showAge: false,
   showSalary: false,
-  showAvatar: true
+  showAvatar: true,
+  customFields: []
 })
 
 const rules = {
@@ -240,10 +153,32 @@ const rules = {
   ],
   portfolio: [
     { type: 'url', message: '请输入正确的URL', trigger: 'blur' }
-  ],
-  avatarUrl: [
-    { type: 'url', message: '请输入正确的URL', trigger: 'blur' }
   ]
+}
+
+function startAddCustomField() {
+  newFieldLabel.value = ''
+  addingCustomField.value = true
+}
+
+function confirmAddCustomField() {
+  const label = newFieldLabel.value.trim()
+  if (!label) return
+  formData.value.customFields = [
+    ...(formData.value.customFields || []),
+    { id: `profile_field_${Date.now()}`, label, value: '', showLabel: true }
+  ]
+  addingCustomField.value = false
+  newFieldLabel.value = ''
+}
+
+function cancelAddCustomField() {
+  addingCustomField.value = false
+  newFieldLabel.value = ''
+}
+
+function removeCustomField(id: string) {
+  formData.value.customFields = (formData.value.customFields || []).filter(field => field.id !== id)
 }
 
 // 从简历中提取个人信息
@@ -286,10 +221,171 @@ useSectionSync(
 
 <style scoped lang="scss">
 .profile-form {
-  padding: 16px 0;
+  padding: 24px 34px 48px;
+  color: #171717;
+  font-family: Georgia, 'Times New Roman', 'Microsoft YaHei', serif;
+}
 
-  .el-form {
-    max-width: 600px;
+.profile-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.profile-field-row {
+  display: grid;
+  grid-template-columns: 24px 22px 70px minmax(120px, 1fr) 28px 28px;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+}
+
+.field-drag {
+  color: #777;
+  font-size: 21px;
+  line-height: 1;
+  cursor: grab;
+  overflow: hidden;
+  width: 16px;
+}
+
+.field-label {
+  white-space: nowrap;
+  font-size: 15px;
+}
+
+.field-control {
+  width: min(100%, 360px);
+}
+
+.field-control :deep(.el-input__wrapper),
+.field-control :deep(.el-date-editor) {
+  min-height: 36px;
+  border-radius: 11px;
+}
+
+.field-action,
+.field-delete {
+  cursor: pointer;
+  justify-self: center;
+}
+
+.field-delete {
+  color: #ff4d4f;
+}
+
+.custom-heading {
+  margin: 28px 0 16px 6px;
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.custom-field-row {
+  display: grid;
+  grid-template-columns: 24px 22px 110px minmax(120px, 1fr) 92px 28px 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e2e2e2;
+  border-radius: 13px;
+  margin-bottom: 16px;
+}
+
+.custom-field-row :deep(.el-input__wrapper) {
+  min-height: 36px;
+  border-radius: 10px;
+}
+
+.show-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #666;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.add-custom-button {
+  width: 100%;
+  height: 42px;
+  border: 0;
+  border-radius: 9px;
+  background: #1b1b18;
+  color: white;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.custom-add-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.custom-add-form .el-input {
+  flex: 1;
+}
+
+.avatar-card {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid #e7e7e7;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.avatar-title {
+  width: 100%;
+  font-size: 16px;
+}
+
+.avatar-preview {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 7px;
+  border: 1px solid #ddd;
+}
+
+.avatar-upload-hint {
+  width: 100%;
+  color: #777;
+  font-size: 12px;
+}
+
+.extra-settings {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+  color: #555;
+  font-size: 13px;
+}
+
+.extra-settings :deep(.el-divider) {
+  width: 100%;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .profile-form {
+    padding: 20px 18px 40px;
+  }
+
+  .custom-field-row {
+    grid-template-columns: 20px 20px 1fr 1fr 28px 28px;
+  }
+
+  .show-label {
+    grid-column: 3 / 5;
   }
 }
 </style>

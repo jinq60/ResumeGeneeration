@@ -2,6 +2,92 @@
 
 > 记录 `docs/superpowers/specs/2026-07-03-api-spec.md` 的所有变更，便于前后端联调与版本管理。
 
+## v2.4（2026-08-24）— 安全加固
+
+### 变更（破坏性）
+
+- **OAuth 回调不再经 URL 传递 JWT**：`GET /auth/oauth/{provider}/callback` 成功后重定向为 `frontend?oauth_code={一次性授权码}`（旧 `token/refresh/guest` 参数废弃）。前端须以授权码调用新增的 `POST /auth/oauth/exchange` 换取令牌对。授权码 32 字节随机、单次消费、120 秒过期。
+- **幂等冲突不再放行执行**：同一 `Idempotency-Key` 的并发重复请求在等待超时后返回 HTTP `425` + 业务码 `425`（`IDEMPOTENCY_CONFLICT`），而非降级直接执行业务。
+- **邮箱验证码生产 fail-fast**：非 dev/test profile 下未配置 SMTP 时，`POST /auth/email-code/send` 返回 `1009 AUTH_EMAIL_CODE_SEND_FAILED`（此前降级将验证码写入日志）。
+
+### 增强
+
+- 刷新令牌 reuse detection 补全：refresh JWT 新增 `fid`（familyId）claim；签名合法但记录已被消费时按家族撤销全部令牌（覆盖失窃令牌顺序重放场景），返回 `1007`。
+- 生产编排安全基线收紧：Redis 强制密码认证；MySQL/MinIO/Redis/后端端口默认仅绑定宿主 `127.0.0.1`。
+- 限流与游客限额按真实客户端 IP 计数：启用 `server.forward-headers-strategy=native`（仅在直连方为可信内网代理时信任 X-Forwarded-For）。
+- 管理员临时密码生成保证同时包含字母与数字（修复约 19% 概率被自身复杂度校验拒绝的问题）。
+- 分享页 iframe 增加 `sandbox="allow-same-origin"`；前端登录态收敛为单一 localStorage 键并自动迁移历史双键数据。
+
+## v2.3（2026-08-21）
+
+### 新增（投递管理 / 通知中心 / 内容审核 / AI 规则 / 用户设置）
+
+**投递管理（用户端）**
+- `POST /deliveries`：创建投递记录（校验简历归属；状态机：delivered/written/interview1/interview2/hr/offer/rejected/withdrawn）。
+- `GET /deliveries`：分页查询，支持 keyword/company/position/status/startDate/endDate 筛选。
+- `GET /deliveries/{id}`、`PUT /deliveries/{id}`、`DELETE /deliveries/{id}`：详情 / 更新进度 / 逻辑删除。
+
+**投递数据（管理端）**
+- `GET /admin/deliveries`：全平台投递分页列表。
+- `GET /admin/deliveries/stats`：总数 + 状态分布 + 热门岗位 TOP5。
+- `GET /admin/deliveries/export`：CSV 导出（UTF-8 BOM）。
+
+**通知中心（用户端）**
+- `GET /notifications`：分页查询（`unreadOnly` 可选）。
+- `GET /notifications/unread-count`：未读数。
+- `PUT /notifications/{id}/read`、`PUT /notifications/read-all`、`DELETE /notifications/{id}`。
+- 事件接入：PDF 导出完成、AI 点评完成、头像优化完成自动写入通知。
+
+**内容审核（管理端）**
+- `GET /admin/audits`：分页查询（keyword/status/riskLevel）。
+- `GET /admin/audits/stats`：各状态统计 + 今日已审。
+- `POST /admin/audits/{id}/approve`、`POST /admin/audits/{id}/reject`、`POST /admin/audits/{id}/mark-warning`（可选 riskLevel）。
+- 简历创建 / 导入时自动生成 `pending` 审核记录。
+
+**AI 规则管理（管理端）**
+- `GET /admin/ai-rules`、`GET /admin/ai-rules/{id}`、`GET /admin/ai-rules/stats`。
+- `POST /admin/ai-rules`：创建草稿（version=1，familyId=自身 ID）。
+- `PUT /admin/ai-rules/{id}/draft`：保存草稿。
+- `POST /admin/ai-rules/{id}/publish`：发布新版本（原生效版本停用，版本号 +1）。
+- `PATCH /admin/ai-rules/{id}/status`：启停（active/disabled）。
+- `GET /admin/ai-rules/{id}/versions`：版本列表。
+- `POST /admin/ai-rules/{id}/rollback/{version}`：回滚到指定版本。
+- `POST /admin/ai-rules/{id}/test`：测试运行（调用已配置 LLM，未配置时返回占位）。
+- `DELETE /admin/ai-rules/{id}`：删除（生效中不可删）。
+
+**用户设置**
+- `PUT /users/me`：更新昵称 / 手机号 / 邮箱 / 头像（游客不可改；手机号、邮箱唯一校验）。
+- `GET /users/me/preferences`、`PUT /users/me/preferences`：偏好设置读写（JSON 整体覆盖）。
+
+**管理端用户 / 简历 / 模板增强**
+- `POST /admin/users`：新增用户（邮箱必填；初始密码留空时返回一次性临时密码）。
+- `GET /admin/users/export`：用户 CSV 导出（含状态 / 关键词筛选）。
+- `GET /admin/resumes/{id}/preview`：管理端简历 HTML 预览（无所有权校验）。
+- `GET /admin/resumes/{id}/export/markdown`、`GET /admin/resumes/{id}/export/word`：管理端导出。
+- `POST /admin/resumes/{id}/export/pdf`：管理端创建 PDF 任务（任务归属简历所有者）。
+- `GET /admin/pdf/tasks/{taskId}`、`GET /admin/pdf/download/{taskId}`：管理端查询 / 下载 PDF 任务。
+- `GET /admin/templates/{id}/export`：模板 JSON 导出。
+
+**数据库迁移**
+- V15：`delivery_record` / `notification` / `content_audit` / `ai_rule`（familyId 版本族）/ `user_preference` 表。
+
+---
+
+## v2.2（2026-08-18）
+
+### 后端加固与并发安全
+
+- `PUT /resumes/{id}`、`PUT /resumes/{id}/title` 引入乐观锁（V13 迁移 `resume.version`）：响应新增 `version` 字段；并发编辑冲突返回 `RESUME_VERSION_CONFLICT`(2012)，HTTP 409。
+- 限流策略调整：已认证请求按 userId 计数，匿名请求按 IP 计数（`RateLimitFilter`）。
+- HTTP 状态映射补全：`AVATAR_SOURCE_NOT_FOUND`(4003)、`AI_TASK_NOT_FOUND`(6000) → 404；`AI_DAILY_QUOTA_EXCEEDED`(6009)、`AI_CONCURRENT_LIMIT_EXCEEDED`(6004) → 429。
+- Refresh token 家族撤销（V14 迁移 `refresh_token.family_id`）：检测到令牌复用攻击时整家族失效。
+- 简历删除/头像删除的 MinIO 文件清理延迟到事务提交后执行，避免回滚后 DB 与文件不一致。
+- AI 异步线程池队列满时任务直接标记失败（不再降级同步执行占住请求线程）。
+- PDF 导出复用共享 Chromium 实例，降低启动/销毁开销。
+- CI 新增集成测试 job（MySQL/MinIO 容器 + `ResumeServiceIntegrationTest`）。
+
+---
+
 ## v2.1（2026-08-06）
 
 ### 完善（多方式登录）

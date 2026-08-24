@@ -61,12 +61,57 @@ public class ResumeExportService {
     }
 
     /**
+     * 生成 Markdown（管理端导出，不做所有权校验）。
+     */
+    public String buildMarkdownForAdmin(String resumeId) {
+        Resume resume = resumeService.getResumeForPreview(resumeId);
+        resumeSectionValidator.validateForExport(resume.getSections());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("# ").append(profileValue(resume, "name")).append("\n\n");
+        sb.append("> 目标岗位：").append(profileValue(resume, "targetPosition")).append("\n\n");
+        String contact = buildContactLine(resume);
+        if (StringUtils.isNotBlank(contact)) {
+            sb.append("> ").append(contact).append("\n\n");
+        }
+
+        for (SectionDTO section : resume.getSections()) {
+            if (!Boolean.TRUE.equals(section.getVisible())) {
+                continue;
+            }
+            sb.append("## ").append(section.getTitle()).append("\n\n");
+            appendSectionMarkdown(sb, section);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 生成 Word 文档字节（管理端导出，不做所有权校验）。
+     */
+    public byte[] buildWordForAdmin(String resumeId) {
+        Resume resume = resumeService.getResumeForPreview(resumeId);
+        resumeSectionValidator.validateForExport(resume.getSections());
+        return buildWordBytes(resume, resumeId);
+    }
+
+    /**
+     * 导出文件名（管理端导出，不做所有权校验）。
+     */
+    public String buildExportFileNameForAdmin(String resumeId, String extension) {
+        Resume resume = resumeService.getResumeForPreview(resumeId);
+        return buildExportFileName(resume, extension);
+    }
+
+    /**
      * 生成 Word 文档字节。
      */
     public byte[] buildWord(String userId, String resumeId) {
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
         resumeSectionValidator.validateForExport(resume.getSections());
+        return buildWordBytes(resume, resumeId);
+    }
 
+    private byte[] buildWordBytes(Resume resume, String resumeId) {
         String html = renderWordHtml(resume);
         try {
             WordprocessingMLPackage wordPackage = WordprocessingMLPackage.createPackage();
@@ -88,6 +133,10 @@ public class ResumeExportService {
      */
     public String buildExportFileName(String userId, String resumeId, String extension) {
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
+        return buildExportFileName(resume, extension);
+    }
+
+    private String buildExportFileName(Resume resume, String extension) {
         String name = sanitizeFileName(profileValue(resume, "name"));
         String targetPosition = sanitizeFileName(resume.getTargetPosition());
         String base;

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -39,11 +41,15 @@ public class EmailCodeService {
     private final AuthProperties authProperties;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
     private final ObjectProvider<RedisTemplate<String, String>> redisTemplateProvider;
+    private final ObjectProvider<Environment> environmentProvider;
 
     private final Map<String, Entry> codes = new ConcurrentHashMap<>();
 
     /**
      * 发送验证码到邮箱（带重发间隔限制）。
+     * <p>
+     * 先投递成功再落库冷却标记：SMTP 抖动失败时用户可立即重试，不会被无辜冷却。
+     * </p>
      */
     public void send(String email) {
         String key = normalizeEmail(email);
@@ -53,8 +59,8 @@ public class EmailCodeService {
         }
 
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-        store(key, code);
         sendMail(email, code);
+        store(key, code);
     }
 
     /**
@@ -183,9 +189,16 @@ public class EmailCodeService {
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         AuthProperties.SmtpConfig smtp = authProperties.getSmtp();
         if (mailSender == null || StringUtils.isBlank(smtp.getHost())) {
-            // 验证码属敏感凭据，禁止写入日志；未配置 SMTP 时仅记录发送失败告警
-            log.warn("SMTP not configured, email verify code not sent to {}", email);
-            return;
+            // 仅 dev/test 允许将验证码输出到日志供本地联调；
+            // 生产环境未配置 SMTP 时必须 fail-fast，防止验证码泄露到日志导致任意账号接管
+            if (isDevOrTestProfile()) {
+                log.warn("SMTP not configured, email verify code not sent to {}", email);
+                log.info("[DEV] Email verify code for {}: {}", email, code);
+                return;
+            }
+            log.error("Email verify code requested but SMTP not configured; refusing to send (prod).");
+            throw new BusinessException(ResultCode.AUTH_EMAIL_CODE_SEND_FAILED,
+                    "邮箱验证码服务未就绪，请联系管理员或使用密码登录。");
         }
         try {
             SimpleMailMessage mail = new SimpleMailMessage();
@@ -205,6 +218,15 @@ public class EmailCodeService {
 
     private String normalizeEmail(String email) {
         return StringUtils.trim(email).toLowerCase();
+    }
+
+    private boolean isDevOrTestProfile() {
+        Environment environment = environmentProvider.getIfAvailable();
+        if (environment == null) {
+            return false;
+        }
+        return Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> "dev".equals(profile) || "test".equals(profile));
     }
 
     private record Entry(String code, LocalDateTime expiresAt, LocalDateTime lastSentAt, int attempts) {

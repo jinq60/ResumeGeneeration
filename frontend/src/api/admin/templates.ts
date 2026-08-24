@@ -97,5 +97,11 @@ export const templateApi = {
         'Content-Type': 'multipart/form-data'
       }
     })
+  },
+
+  // 导出模板 JSON
+  exportUrl(id: string): string {
+    const base = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+    return `${base}/admin/templates/${id}/export`
   }
 }

@@ -1,5 +1,5 @@
 <template>
-  <main class="max-w-[1440px] mx-auto px-margin-page py-stack-lg">
+  <main class="workbench-page py-stack-lg">
     <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-stack-lg">
       <div class="flex items-center gap-3">
         <button
@@ -253,7 +253,7 @@ async function openShareDialog() {
   }
 }
 
-async function handleShareToggle(enabled: boolean) {
+async function handleShareToggle(enabled: string | number | boolean) {
   try {
     if (enabled) {
       shareInfo.value = await shareApi.create(resumeId, {

@@ -76,5 +76,6 @@ export interface Profile {
   name: string; gender?: string; birthDate?: string; phone?: string; email?: string
   city?: string; targetPosition?: string; expectedSalary?: string; availability?: string
   personalWebsite?: string; github?: string; portfolio?: string; avatarUrl?: string
+  customFields?: Array<{ id: string; label: string; value: string; showLabel?: boolean }>
   showGender?: boolean; showAge?: boolean; showSalary?: boolean; showAvatar?: boolean
 }

@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # 后端运行镜像
 # 基于 maven 镜像构建，并在此镜像内通过 Playwright CLI 安装 Chromium 浏览器。
 # 避免拉取 2GB+ 的 mcr.microsoft.com/playwright/java 官方镜像。
@@ -30,6 +29,9 @@ COPY src ./src
 # 设置 Playwright 浏览器下载镜像，加速国内下载
 ENV PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright
 ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+
+# 使用阿里云 apt 镜像，加速国内系统依赖下载（archive.ubuntu.com 在国内经常超时）
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|https://mirrors.aliyun.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list
 
 # 安装 CJK 中文字体，否则 Playwright 导出的 PDF 中文会显示为方块（豆腐块）
 RUN apt-get update && \

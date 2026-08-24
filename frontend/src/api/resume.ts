@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import { getAccessToken } from '@/utils/authStorage'
 import type { Resume, Section } from '@/types/resume'
 import type { RenderSettings } from '@/utils/renderSettings'
 
@@ -101,7 +102,7 @@ export const resumeApi = {
     signal?: AbortSignal
   ): Promise<void> {
     const baseURL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
-    const token = localStorage.getItem('access_token')
+    const token = getAccessToken()
     const response = await fetch(`${baseURL}/resumes/${id}/ai/write/stream`, {
       method: 'POST',
       headers: {

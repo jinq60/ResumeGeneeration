@@ -29,6 +29,7 @@
         :src="iframeSrc"
         class="w-full max-w-[210mm] flex-1 bg-surface-container-lowest rounded-sm shadow-sm border border-outline-variant"
         frameborder="0"
+        sandbox="allow-same-origin"
       />
       <div class="py-4 text-xs text-outline text-center">
         由

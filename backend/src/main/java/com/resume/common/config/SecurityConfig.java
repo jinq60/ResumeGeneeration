@@ -50,8 +50,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public IdempotencyFilter idempotencyFilter(IdempotencyRecordMapper idempotencyRecordMapper) {
-        return new IdempotencyFilter(idempotencyRecordMapper);
+    public IdempotencyFilter idempotencyFilter(IdempotencyRecordMapper idempotencyRecordMapper,
+                                               ObjectMapper objectMapper) {
+        return new IdempotencyFilter(idempotencyRecordMapper, objectMapper);
     }
 
     /**
@@ -101,8 +102,10 @@ public class SecurityConfig {
                     response.getWriter().write(objectMapper.writeValueAsString(
                             R.error(ResultCode.ACCESS_DENIED, "无权访问该资源。")));
                 }))
-            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+            // 链内顺序：JWT 认证 → 限流 → 幂等 → UsernamePasswordAuthenticationFilter。
+            // JWT 必须先于限流执行，使限流能按已认证的 userId 计数（见 RateLimitFilter.resolveKey）。
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             // 幂等过滤器必须在认证之后执行，防止重放绕过 JWT 校验
             .addFilterAfter(idempotencyFilter, JwtAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth

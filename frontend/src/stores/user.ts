@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-
-const STORAGE_KEY = 'resume_user_info'
+import {
+  readStoredAuth,
+  writeStoredAuth,
+  clearStoredAuth
+} from '@/utils/authStorage'
 
 export interface UserInfo {
   userId: string
@@ -29,8 +32,14 @@ export const useUserStore = defineStore('user', () => {
     isGuest.value = info.isGuest ?? true
     accessToken.value = info.accessToken
     refreshToken.value = info.refreshToken || ''
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(info))
-    localStorage.setItem('access_token', info.accessToken)
+    writeStoredAuth({
+      userId: info.userId,
+      nickname: info.nickname,
+      avatar: info.avatar,
+      isGuest: info.isGuest,
+      accessToken: info.accessToken,
+      refreshToken: info.refreshToken
+    })
   }
 
   function clearUser() {
@@ -40,24 +49,21 @@ export const useUserStore = defineStore('user', () => {
     isGuest.value = true
     accessToken.value = ''
     refreshToken.value = ''
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem('access_token')
+    clearStoredAuth()
   }
 
   function restoreFromStorage() {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      try {
-        const info: UserInfo = JSON.parse(raw)
-        userId.value = info.userId
-        nickname.value = info.nickname || ''
-        avatar.value = info.avatar || ''
-        isGuest.value = info.isGuest ?? true
-        accessToken.value = info.accessToken
-        refreshToken.value = info.refreshToken || ''
-        localStorage.setItem('access_token', info.accessToken)
-      } catch {
-        clearUser()
+    const info = readStoredAuth()
+    if (info) {
+      userId.value = info.userId
+      nickname.value = info.nickname || ''
+      avatar.value = info.avatar || ''
+      isGuest.value = info.isGuest ?? true
+      accessToken.value = info.accessToken
+      refreshToken.value = info.refreshToken || ''
+      // 迁移历史双键数据：重写为单一键存储
+      if (info.accessToken) {
+        writeStoredAuth(info)
       }
     }
   }

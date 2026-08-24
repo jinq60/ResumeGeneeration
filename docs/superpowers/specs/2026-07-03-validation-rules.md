@@ -333,10 +333,20 @@ public void validateAvatarFile(MultipartFile file) {
 | 网络异常 | `NETWORK_ERROR` | 前端自定义 | “网络异常，PDF 生成失败。” |
 | 越权访问 | `ACCESS_DENIED` | `403` | “无权访问该资源。” |
 | 资源不存在 | `RESOURCE_NOT_FOUND` | `404` | “请求的资源不存在。” |
+| 简历被并发修改 | `RESUME_VERSION_CONFLICT` | `2012` | "简历已被其他编辑修改，请刷新后重试。" |
 | 参数校验失败 | `PARAM_INVALID` | `400` | “请求参数不正确，请检查。” |
 | AI 写作字段不支持 | `AI_WRITING_FIELD_INVALID` | `6007` | “该字段暂不支持 AI 写作。” |
 | AI 写作原文过长 | `AI_WRITING_CONTENT_TOO_LONG` | `6008` | “原文过长，AI 写作单次最多支持 2000 字符。” |
 | AI 每日配额用尽 | `AI_DAILY_QUOTA_EXCEEDED` | `6009` | “今日 AI 写作次数已用完，请明天再来。” |
+| 投递状态不合法 | `PARAM_INVALID` | `400` | “投递状态不合法。” |
+| 审核动作不合法 | `PARAM_INVALID` | `400` | “审核动作不合法。” |
+| 风险等级不合法 | `PARAM_INVALID` | `400` | “风险等级不合法。” |
+| 规则类型不合法 | `PARAM_INVALID` | `400` | “规则类型不合法。” |
+| 生效中规则不可删除 | `PARAM_INVALID` | `400` | “生效中的规则不可删除，请先停用。” |
+| 生效中规则直接更新 | `PARAM_INVALID` | `400` | “生效中的规则请通过「发布新版本」更新。” |
+| 手机号已被占用 | `AUTH_PHONE_REGISTERED` | `1000` | “该手机号已被其他账号使用。” |
+| 邮箱已被占用 | `AUTH_EMAIL_REGISTERED` | `1001` | “该邮箱已被其他账号使用。” |
+| 游客修改资料 | `PARAM_INVALID` | `400` | “游客账号暂不支持修改资料，请先注册。” |
 
 > **说明**：数字错误码与 `backend/src/main/java/com/resume/common/constant/ResultCode.java` 保持一致。新增错误码（如 `2007`/`2008`/`2009`/`2010`）需在 ResultCode 中同步补充。
 

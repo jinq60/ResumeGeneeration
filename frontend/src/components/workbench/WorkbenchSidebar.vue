@@ -12,7 +12,18 @@
           <Document />
         </el-icon>
       </div>
-      <span class="sidebar-brand-name">智能简历</span>
+      <span v-if="!props.collapsed" class="sidebar-brand-name">智能简历</span>
+      <button
+        class="sidebar-collapse-toggle"
+        :aria-label="props.collapsed ? '展开侧边栏' : '收起侧边栏'"
+        :title="props.collapsed ? '展开侧边栏' : '收起侧边栏'"
+        @click="emit('toggleCollapse')"
+      >
+        <el-icon size="16">
+          <DArrowRight v-if="props.collapsed" />
+          <DArrowLeft v-else />
+        </el-icon>
+      </button>
     </div>
 
     <nav
@@ -29,7 +40,7 @@
         <el-icon size="18">
           <component :is="item.icon" />
         </el-icon>
-        <span>{{ item.label }}</span>
+        <span v-if="!props.collapsed">{{ item.label }}</span>
         <span
           v-if="item.badge"
           class="sidebar-badge"
@@ -48,7 +59,7 @@
         <el-icon size="18">
           <component :is="item.icon" />
         </el-icon>
-        <span>{{ item.label }}</span>
+        <span v-if="!props.collapsed">{{ item.label }}</span>
       </RouterLink>
 
       <div class="sidebar-divider" />
@@ -63,7 +74,7 @@
         <el-icon size="18">
           <component :is="item.icon" />
         </el-icon>
-        <span>{{ item.label }}</span>
+        <span v-if="!props.collapsed">{{ item.label }}</span>
       </RouterLink>
     </nav>
 
@@ -71,7 +82,7 @@
       <div class="sidebar-user-avatar">
         {{ userInitial }}
       </div>
-      <div class="sidebar-user-meta">
+      <div v-if="!props.collapsed" class="sidebar-user-meta">
         <div class="sidebar-user-name">
           {{ userStore.nickname || '用户' }}
         </div>
@@ -80,6 +91,7 @@
         </div>
       </div>
       <button
+        v-if="!props.collapsed"
         class="sidebar-user-logout"
         title="退出登录"
         @click="handleLogout"
@@ -96,19 +108,21 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useAuthModalStore } from '@/stores/authModal'
 import {
-  Document, DataAnalysis, Files, Picture, MagicStick, Postcard,
+  Document, DataAnalysis, Files, Picture, MagicStick, Postcard, DArrowLeft, DArrowRight,
   TrendCharts, Download, Setting, Bell
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const authModalStore = useAuthModalStore()
 
-const props = withDefaults(defineProps<{ mobileOpen?: boolean }>(), {
+const props = withDefaults(defineProps<{ mobileOpen?: boolean; collapsed?: boolean }>(), {
   mobileOpen: false
 })
-const emit = defineEmits<{ closeMobile: [] }>()
+const emit = defineEmits<{ closeMobile: []; toggleCollapse: [] }>()
 
 interface NavItem { path: string; label: string; icon: any; badge?: string }
 
@@ -149,13 +163,14 @@ async function handleLogout() {
     // 服务端吊销失败不阻塞本地登出
   }
   userStore.clearUser()
-  router.push('/login')
+  authModalStore.open()
+  router.push('/')
 }
 </script>
 
 <style scoped lang="scss">
 .app-sidebar {
-  width: var(--st-sidebar-width, 220px);
+  width: var(--st-sidebar-current-width, 220px);
   height: 100vh;
   position: fixed;
   left: 0;
@@ -166,7 +181,27 @@ async function handleLogout() {
   flex-direction: column;
   z-index: 40;
   border-right: 1px solid var(--st-outline-variant);
-  transition: transform 180ms ease;
+  transition: width 180ms ease, transform 180ms ease;
+}
+
+.sidebar-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--st-radius-md);
+  color: var(--st-on-surface-variant);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sidebar-collapse-toggle:hover {
+  color: var(--st-on-surface);
+  background: var(--st-surface-container-low);
 }
 
 .sidebar-brand {
@@ -225,6 +260,16 @@ async function handleLogout() {
     background: var(--st-primary-container);
     font-weight: 600;
   }
+}
+
+.app-sidebar:has(.sidebar-collapse-toggle[aria-label='展开侧边栏']) .sidebar-brand,
+.app-sidebar:has(.sidebar-collapse-toggle[aria-label='展开侧边栏']) .sidebar-item {
+  justify-content: center;
+}
+
+.app-sidebar:has(.sidebar-collapse-toggle[aria-label='展开侧边栏']) .sidebar-item {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .sidebar-badge {
@@ -315,6 +360,10 @@ async function handleLogout() {
     &.is-mobile-open {
       transform: translateX(0);
     }
+  }
+
+  .sidebar-collapse-toggle {
+    display: none;
   }
 }
 </style>

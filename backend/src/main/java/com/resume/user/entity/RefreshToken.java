@@ -25,6 +25,12 @@ public class RefreshToken {
     private String userId;
 
     /**
+     * 令牌家族 ID：同一次登录会话内所有刷新令牌共享。
+     * 检测到令牌复用攻击时按家族整体撤销。
+     */
+    private String familyId;
+
+    /**
      * refresh token 的 SHA-256 哈希，仅存哈希避免泄露。
      */
     private String tokenHash;

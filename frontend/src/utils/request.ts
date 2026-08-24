@@ -1,4 +1,11 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
+import { useAuthModalStore } from '@/stores/authModal'
+import {
+  getAccessToken,
+  readStoredAuth,
+  updateStoredTokens,
+  clearStoredAuth
+} from '@/utils/authStorage'
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -10,7 +17,7 @@ const request = axios.create({
 
 request.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token')
+    const token = getAccessToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -21,16 +28,6 @@ request.interceptors.request.use(
 
 let refreshPromise: Promise<string> | null = null
 
-function getStoredUser(): { accessToken: string; refreshToken?: string } | null {
-  const raw = localStorage.getItem('resume_user_info')
-  if (!raw) return null
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
-}
-
 /**
  * 用 refresh token 换取新凭证（单飞：并发 401 只发起一次刷新）。
  * 使用独立 axios 实例，避免与拦截器形成循环依赖。
@@ -40,19 +37,18 @@ function refreshAccessToken(): Promise<string> {
     return refreshPromise
   }
   refreshPromise = (async () => {
-    const user = getStoredUser()
+    const user = readStoredAuth()
     if (!user?.refreshToken) {
       throw new Error('缺少刷新令牌')
     }
-    const response = await axios.post('/api/auth/refresh', { refreshToken: user.refreshToken })
+    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    const response = await axios.post(`${base}/auth/refresh`, { refreshToken: user.refreshToken })
     const data = response.data?.data
     if (!data?.accessToken || !data?.refreshToken) {
       throw new Error('刷新令牌无效')
     }
-    const next = { ...user, accessToken: data.accessToken, refreshToken: data.refreshToken }
-    localStorage.setItem('resume_user_info', JSON.stringify(next))
-    localStorage.setItem('access_token', next.accessToken)
-    return next.accessToken
+    updateStoredTokens(data.accessToken, data.refreshToken)
+    return data.accessToken as string
   })().finally(() => {
     refreshPromise = null
   })
@@ -60,11 +56,11 @@ function refreshAccessToken(): Promise<string> {
 }
 
 function handleAuthExpired() {
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('resume_user_info')
+  clearStoredAuth()
   const path = window.location.pathname
-  if (!path.startsWith('/login') && !path.startsWith('/admin/login')) {
-    window.location.href = '/login'
+  if (!path.startsWith('/admin/login')) {
+    const authModalStore = useAuthModalStore()
+    authModalStore.open()
   }
 }
 

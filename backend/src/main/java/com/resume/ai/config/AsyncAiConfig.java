@@ -20,6 +20,12 @@ import java.util.concurrent.ThreadPoolExecutor;
  * 任何 @Async("aiTaskExecutor") 方法抛出未捕获异常时，由统一处理器打印
  * 方法签名、参数列表与完整堆栈，便于生产环境排查 AI 任务静默失败的问题。
  * </p>
+ * <p>
+ * 拒绝策略使用 {@link ThreadPoolExecutor.AbortPolicy}：队列满时抛出
+ * {@link org.springframework.core.task.TaskRejectedException}，由调用方捕获并
+ * 将任务标记为 failed（用户可见），而不是降级为 HTTP 请求线程同步执行
+ * 60s+ 的 LLM 调用长时间占住请求线程。
+ * </p>
  */
 @Slf4j
 @Configuration
@@ -37,7 +43,7 @@ public class AsyncAiConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(pool.getMaxSize());
         executor.setQueueCapacity(pool.getQueueCapacity());
         executor.setThreadNamePrefix("ai-task-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();

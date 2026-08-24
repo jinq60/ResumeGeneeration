@@ -45,6 +45,7 @@ public class AiResumeReviewService {
     private final ProviderRouter providerRouter;
     private final AiPromptTemplates promptTemplates;
     private final ObjectMapper objectMapper;
+    private final com.resume.notification.service.NotificationService notificationService;
 
     @Async("aiTaskExecutor")
     public void executeReview(String reviewId, Resume resume, String jobDescription) {
@@ -78,10 +79,16 @@ public class AiResumeReviewService {
             }
             review.setUpdatedAt(LocalDateTime.now());
             resumeReviewMapper.updateById(review);
+
+            if (BizConstant.REVIEW_STATUS_SUCCESS.equals(review.getStatus())
+                    && resume.getUserId() != null) {
+                notificationService.notify(resume.getUserId(), "ai", "AI 点评完成",
+                        "你的简历《" + resume.getTitle() + "》点评已生成，综合评分 " + review.getOverallScore() + " 分，快去查看吧。");
+            }
         }
     }
 
-private void doRealReview(ResumeReview review, Resume resume, String jobDescription,
+    private void doRealReview(ResumeReview review, Resume resume, String jobDescription,
                                 LlmProvider provider, String model) {
         long start = System.currentTimeMillis();
         log.info("AI review chat -> provider={}, model={}, reviewId={}",

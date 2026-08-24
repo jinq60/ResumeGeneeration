@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getAccessToken } from '@/utils/authStorage'
 
 const previewRequest = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -6,7 +7,7 @@ const previewRequest = axios.create({
 })
 
 previewRequest.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
+  const token = getAccessToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

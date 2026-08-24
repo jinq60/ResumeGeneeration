@@ -139,11 +139,24 @@
         </el-icon>新增模板
       </el-button>
       <div class="flex gap-2">
-        <el-button>
-          <el-icon size="16">
-            <Download />
-          </el-icon>导出
-        </el-button>
+        <el-dropdown @command="handleExportAll">
+          <el-button>
+            <el-icon size="16">
+              <Download />
+            </el-icon>导出
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item
+                v-for="tpl in templateList"
+                :key="tpl.id"
+                :command="tpl"
+              >
+                {{ tpl.name }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button @click="loadTemplates">
           <el-icon size="16">
             <Refresh />
@@ -217,6 +230,9 @@
                   </el-dropdown-item>
                   <el-dropdown-item @click="handleToggleStatus(tpl)">
                     {{ tpl.status === 'active' ? '下架' : '上架' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="handleExport(tpl)">
+                    导出 JSON
                   </el-dropdown-item>
                   <el-dropdown-item
                     divided
@@ -352,6 +368,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document, Search, Plus, Download, Refresh, More } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules, UploadProps, UploadRequestOptions } from 'element-plus'
 import { templateApi, type Template, type TemplateRequest, type TemplateStats } from '@/api/admin/templates'
+import { adminDownload } from '@/utils/adminDownload'
 
 interface TemplateForm extends TemplateRequest {
   id?: string
@@ -492,6 +509,19 @@ async function handleDelete(row: Template) {
       ElMessage.error(e.message || '删除失败')
     }
   }
+}
+
+async function handleExport(row: Template) {
+  try {
+    const fileName = await adminDownload(templateApi.exportUrl(row.id), `${row.name}.json`)
+    ElMessage.success(`已导出 ${fileName}`)
+  } catch (e: any) {
+    ElMessage.error(e.message || '导出失败')
+  }
+}
+
+async function handleExportAll(row: Template) {
+  await handleExport(row)
 }
 
 function resetForm() {

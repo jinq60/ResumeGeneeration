@@ -52,6 +52,9 @@ class PdfServiceTest {
     @Mock
     private com.resume.common.service.AuditLogService auditLogService;
 
+    @Mock
+    private com.resume.notification.service.NotificationService notificationService;
+
     private ResumeSectionValidator resumeSectionValidator;
 
     private PdfService pdfService;
@@ -61,7 +64,8 @@ class PdfServiceTest {
         resumeSectionValidator = new ResumeSectionValidator();
         Executor executor = (command) -> command.run();
         pdfService = new PdfService(pdfTaskMapper, resumeService, templateService,
-                resumeRenderService, minioStorageService, resumeSectionValidator, auditLogService, executor);
+                resumeRenderService, minioStorageService, resumeSectionValidator, auditLogService,
+                notificationService, executor);
         when(minioStorageService.getBucketPdfs()).thenReturn("pdfs");
     }
 

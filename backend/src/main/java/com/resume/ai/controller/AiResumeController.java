@@ -10,12 +10,14 @@ import com.resume.resume.entity.Resume;
 import com.resume.resume.service.ResumeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * AI 功能 REST 控制器。
  */
+@Slf4j
 @RestController
 @RequestMapping("/resumes")
 @RequiredArgsConstructor
@@ -36,7 +38,13 @@ public class AiResumeController {
         ResumeOptimizeTask task = aiResumeOptimizeService.createTask(
                 userId, resumeId, resume, request.getJobDescription());
 
-        aiResumeOptimizeService.executeOptimize(task.getId(), resume, request.getJobDescription());
+        try {
+            aiResumeOptimizeService.executeOptimize(task.getId(), resume, request.getJobDescription());
+        } catch (org.springframework.core.task.TaskRejectedException e) {
+            // AI 线程池队列已满：任务无法入队，标记失败并正常返回，由前端轮询感知失败
+            log.warn("AI optimize task rejected (thread pool exhausted): taskId={}", task.getId());
+            aiResumeOptimizeService.markTaskRejected(task.getId());
+        }
 
         ResumeOptimizeResponse response = new ResumeOptimizeResponse();
         response.setTaskId(task.getId());

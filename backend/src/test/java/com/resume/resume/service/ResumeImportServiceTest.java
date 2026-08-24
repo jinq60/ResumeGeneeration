@@ -39,12 +39,15 @@ class ResumeImportServiceTest {
     @Mock
     private ResumeSectionValidator resumeSectionValidator;
 
+    @Mock
+    private com.resume.audit.service.ContentAuditService contentAuditService;
+
     private ResumeImportService service;
 
     @BeforeEach
     void setUp() {
         service = new ResumeImportService(resumeMapper, templateService,
-                resumeSectionValidator, new ObjectMapper());
+                resumeSectionValidator, new ObjectMapper(), contentAuditService);
         Template template = new Template();
         template.setId("template_1");
         when(templateService.getTemplateEntity("template_1")).thenReturn(template);

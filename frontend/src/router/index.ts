@@ -1,10 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { useAuthModalStore } from '@/stores/authModal'
+import { getAccessToken } from '@/utils/authStorage'
 import adminRoutes from './admin'
 import websiteRoutes from './website'
 import workbenchRoutes from './workbench'
 
 const routes: RouteRecordRaw[] = [
+  // /login 仅作为 OAuth 回调入口，会立即打开弹窗并跳转
   { path: '/login', name: 'Login', component: () => import('@/views/LoginView.vue'), meta: { title: '登录' } },
   { path: '/share/:token', name: 'Share', component: () => import('@/views/ShareView.vue'), meta: { title: '简历分享' } },
   ...websiteRoutes,
@@ -37,11 +40,24 @@ router.beforeEach((to, _from, next) => {
     return
   }
 
-  // Workbench routes
-  const token = localStorage.getItem('access_token')
+  const token = getAccessToken()
+
+  // /login 用于 OAuth 回调；已登录用户访问则直接进工作台
+  if (to.name === 'Login') {
+    if (token && !to.query.oauth_code && !to.query.error) {
+      next({ path: '/workbench/dashboard' })
+    } else {
+      next()
+    }
+    return
+  }
+
+  // Workbench routes: 未登录时打开登录弹窗并留在首页
   if (to.path.startsWith('/workbench')) {
     if (!token) {
-      next({ name: 'Login' })
+      const authModalStore = useAuthModalStore()
+      authModalStore.open()
+      next({ path: '/' })
     } else {
       next()
     }
@@ -50,9 +66,9 @@ router.beforeEach((to, _from, next) => {
 
   // Public website routes
   if (!token && !publicRouteNames.includes(to.name as string)) {
-    next({ name: 'Login' })
-  } else if (token && to.name === 'Login') {
-    next({ path: '/workbench/dashboard' })
+    const authModalStore = useAuthModalStore()
+    authModalStore.open()
+    next({ path: '/' })
   } else {
     next()
   }

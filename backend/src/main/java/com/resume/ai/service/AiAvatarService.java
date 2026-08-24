@@ -56,6 +56,7 @@ public class AiAvatarService {
     private final ObjectMapper objectMapper;
     @Lazy
     private final ResumeService resumeService;
+    private final com.resume.notification.service.NotificationService notificationService;
 
     @Async("aiTaskExecutor")
     public void executeOptimize(String taskId) {
@@ -155,6 +156,11 @@ public class AiAvatarService {
                     log.warn("fillAvatarUrl failed for userId={}, resumeId={}: {}",
                             task.getUserId(), task.getResumeId(), e.getMessage());
                 }
+            }
+
+            if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus()) && task.getUserId() != null) {
+                notificationService.notify(task.getUserId(), "avatar", "头像优化完成",
+                        "你的头像一寸照优化已完成，可前往下载中心查看。");
             }
 
             try {

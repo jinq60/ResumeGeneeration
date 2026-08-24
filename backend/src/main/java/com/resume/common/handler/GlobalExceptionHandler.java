@@ -84,14 +84,20 @@ public class GlobalExceptionHandler {
                  ResultCode.RESUME_NOT_FOUND,
                  ResultCode.RESUME_TEMPLATE_NOT_FOUND,
                  ResultCode.TEMPLATE_NOT_FOUND,
+                 ResultCode.AVATAR_SOURCE_NOT_FOUND,
                  ResultCode.AVATAR_TASK_NOT_FOUND,
-                 ResultCode.PDF_TASK_NOT_FOUND -> 404;
+                 ResultCode.PDF_TASK_NOT_FOUND,
+                 ResultCode.AI_TASK_NOT_FOUND -> 404;
             case ResultCode.AUTH_PHONE_REGISTERED,
                  ResultCode.AUTH_EMAIL_REGISTERED,
                  ResultCode.TEMPLATE_CODE_EXISTS,
                  ResultCode.TEMPLATE_CODE_IMMUTABLE,
-                 ResultCode.TEMPLATE_BUILTIN_PROTECTED -> 409;
-            case ResultCode.RATE_LIMITED -> 429;
+                 ResultCode.TEMPLATE_BUILTIN_PROTECTED,
+                 ResultCode.RESUME_VERSION_CONFLICT -> 409;
+            case ResultCode.IDEMPOTENCY_CONFLICT -> 425;
+            case ResultCode.RATE_LIMITED,
+                 ResultCode.AI_DAILY_QUOTA_EXCEEDED,
+                 ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED -> 429;
             case ResultCode.PDF_EXPORT_FAILED -> 500;
             case ResultCode.INTERNAL_ERROR -> 500;
             // 参数/业务类错误（含验证码错误、密码强度不足等）统一按 400 返回

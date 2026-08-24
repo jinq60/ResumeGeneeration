@@ -1,127 +1,125 @@
 /* ==========================================================================
-   Stitch 设计系统令牌（简洁化版）
-   原则：单一强调色 + 中性灰阶、细边框、少阴影（对齐 magic-resume 视觉风格）
+   Magic Resume inspired design system tokens
+   原则：暖白底 + 深炭强调、细边框、柔和阴影、衬线标题、完整 dark mode
    ========================================================================== */
 
 :root {
-  /* —— 主色（唯一强调色） —— */
-  --st-primary: #0057c2;
-  --st-primary-container: #e8f0fe;
-  --st-on-primary: #ffffff;
-  --st-on-primary-container: #0b3d91;
-  --st-primary-fixed: #e8f0fe;
-  --st-primary-fixed-dim: #cfe0fb;
-  --st-inverse-primary: #a9c8f8;
-  --st-surface-tint: #0057c2;
+  /* —— Magic Resume core palette —— */
+  --st-background: #F9F9F7;
+  --st-foreground: #1B1B18;
+  --st-card: #FFFFFF;
+  --st-card-foreground: #1B1B18;
+  --st-popover: #FFFFFF;
+  --st-popover-foreground: #1B1B18;
+  --st-primary: #1B1B18;
+  --st-primary-foreground: #F9F9F7;
+  --st-secondary: #F2F0E9;
+  --st-secondary-foreground: #1B1B18;
+  --st-muted: #91918E;
+  --st-muted-foreground: #6B6B67;
+  --st-accent: #F2F0E9;
+  --st-accent-foreground: #1B1B18;
+  --st-destructive: #D92D20;
+  --st-destructive-foreground: #FFFFFF;
+  --st-border: #E6E6E3;
+  --st-input: #E6E6E3;
+  --st-ring: #1B1B18;
 
-  /* —— 次色（仅成功语义，收敛为中性绿） —— */
-  --st-secondary: #2e7d32;
-  --st-secondary-container: #d9f0dc;
-  --st-secondary-fixed: #d9f0dc;
-  --st-secondary-fixed-dim: #b4dfba;
-  --st-on-secondary: #ffffff;
-  --st-on-secondary-container: #1b5e20;
-
-  /* —— 第三色（收敛为主色映射，不再独立成系） —— */
-  --st-tertiary: #0057c2;
-  --st-tertiary-container: #e8f0fe;
-  --st-tertiary-fixed: #e8f0fe;
-  --st-tertiary-fixed-dim: #cfe0fb;
-  --st-on-tertiary: #ffffff;
-  --st-on-tertiary-container: #0b3d91;
-
-  /* —— 中性/表面（收敛为 4 级中性灰阶） —— */
-  --st-background: #fafbfc;
-  --st-surface: #fafbfc;
-  --st-surface-bright: #ffffff;
-  --st-surface-dim: #eef0f2;
-  --st-surface-variant: #eef0f2;
-  --st-surface-container-lowest: #ffffff;
-  --st-surface-container-low: #f4f5f7;
-  --st-surface-container: #eef0f2;
-  --st-surface-container-high: #e7e9ec;
-  --st-surface-container-highest: #dfe2e6;
-  --st-inverse-surface: #2b2f33;
-  --st-inverse-on-surface: #f2f4f6;
-
-  /* —— 文字 —— */
-  --st-on-background: #1a1d21;
-  --st-on-surface: #1a1d21;
-  --st-on-surface-variant: #4b5563;
-
-  /* —— 描边 —— */
-  --st-outline: #6b7280;
-  --st-outline-variant: #d1d5db;
-
-  /* —— 错误 —— */
-  --st-error: #d92d20;
-  --st-error-container: #fee4e2;
-  --st-on-error: #ffffff;
+  /* —— Legacy surface aliases —— */
+  --st-surface: var(--st-background);
+  --st-surface-bright: var(--st-card);
+  --st-surface-container-lowest: #FFFFFF;
+  --st-surface-container-low: #F2F0E9;
+  --st-surface-container: #E6E6E3;
+  --st-surface-container-high: #DCDCD8;
+  --st-surface-container-highest: #D2D2CE;
+  --st-on-background: var(--st-foreground);
+  --st-on-surface: var(--st-foreground);
+  --st-on-surface-variant: var(--st-muted-foreground);
+  --st-outline: var(--st-muted);
+  --st-outline-variant: var(--st-border);
+  --st-error: var(--st-destructive);
+  --st-error-container: #FEE4E2;
+  --st-on-error: #FFFFFF;
   --st-on-error-container: #912018;
+  --st-primary-container: var(--st-secondary);
+  --st-primary-fixed: var(--st-secondary);
+  --st-primary-fixed-dim: var(--st-border);
+  --st-on-primary: var(--st-primary-foreground);
+  --st-on-primary-container: var(--st-foreground);
+  --st-secondary-container: var(--st-secondary);
+  --st-on-secondary: var(--st-secondary-foreground);
+  --st-on-secondary-container: var(--st-foreground);
+  --st-tertiary: var(--st-foreground);
+  --st-tertiary-container: var(--st-secondary);
 
-  /* —— 字体（系统栈，移除在线字体依赖） —— */
-  --st-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
-  --st-font-headline: var(--st-font-sans);
+  /* —— 字体 —— */
+  --st-font-sans: "Inter", -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --st-font-serif: "Newsreader", "Noto Serif SC", Georgia, 'Times New Roman', serif;
+  --st-font-headline: var(--st-font-serif);
   --st-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
 
-  --st-headline-lg: 700 30px/38px var(--st-font-headline);
-  --st-headline-md: 600 24px/32px var(--st-font-headline);
-  --st-title-lg: 600 18px/26px var(--st-font-sans);
-  --st-title-md: 600 16px/24px var(--st-font-sans);
-  --st-body-lg: 400 16px/24px var(--st-font-sans);
+  --st-headline-lg: 500 40px/48px var(--st-font-headline);
+  --st-headline-md: 500 32px/40px var(--st-font-headline);
+  --st-title-lg: 500 20px/28px var(--st-font-sans);
+  --st-title-md: 500 16px/24px var(--st-font-sans);
+  --st-body-lg: 400 16px/26px var(--st-font-sans);
   --st-body-md: 400 14px/22px var(--st-font-sans);
   --st-label-md: 500 12px/18px var(--st-font-sans);
 
   /* —— 间距 —— */
   --st-sidebar-width: 220px;
   --st-drawer-width: 400px;
-  --st-gutter: 16px;
+  --st-gutter: 20px;
   --st-margin-page: 24px;
   --st-stack-sm: 8px;
   --st-stack-md: 16px;
   --st-stack-lg: 24px;
+  --st-stack-xl: 40px;
 
   /* —— 圆角 —— */
-  --st-radius-sm: 0.375rem;
-  --st-radius-md: 0.5rem;
-  --st-radius-lg: 0.625rem;
-  --st-radius-xl: 0.75rem;
+  --st-radius-sm: 0.5rem;
+  --st-radius-md: 0.625rem;
+  --st-radius-lg: 0.75rem;
+  --st-radius-xl: 1rem;
+  --st-radius-2xl: 1.25rem;
   --st-radius-full: 9999px;
 
-  /* —— 阴影（收敛为 2 级） —— */
-  --st-shadow-xs: none;
-  --st-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --st-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --st-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
-  --st-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* —— 阴影 —— */
+  --st-shadow-xs: 0 1px 2px rgba(27, 27, 24, 0.04);
+  --st-shadow-sm: 0 1px 3px rgba(27, 27, 24, 0.05);
+  --st-shadow-md: 0 4px 12px rgba(27, 27, 24, 0.06);
+  --st-shadow-lg: 0 12px 32px rgba(27, 27, 24, 0.08);
+  --st-shadow-xl: 0 24px 48px rgba(27, 27, 24, 0.1);
+  --st-shadow-card: var(--st-shadow-md);
 
   /* —— Element Plus 主题桥接 —— */
   --el-color-primary: var(--st-primary);
-  --el-color-primary-light-3: var(--st-primary-container);
-  --el-color-primary-light-5: var(--st-primary-fixed);
-  --el-color-primary-light-7: var(--st-primary-fixed-dim);
-  --el-color-primary-light-8: var(--st-primary-fixed);
-  --el-color-primary-light-9: rgba(0, 87, 194, 0.06);
-  --el-color-primary-dark-2: #004398;
-  --el-color-success: var(--st-secondary);
+  --el-color-primary-light-3: var(--st-secondary);
+  --el-color-primary-light-5: var(--st-border);
+  --el-color-primary-light-7: var(--st-surface-container);
+  --el-color-primary-light-8: var(--st-surface-container-low);
+  --el-color-primary-light-9: rgba(27, 27, 24, 0.06);
+  --el-color-primary-dark-2: #000000;
+  --el-color-success: #2E7D32;
   --el-color-success-light-9: rgba(46, 125, 50, 0.08);
-  --el-color-warning: #d9892b;
-  --el-color-danger: var(--st-error);
-  --el-color-error: var(--st-error);
+  --el-color-warning: #D9892B;
+  --el-color-danger: var(--st-destructive);
+  --el-color-error: var(--st-destructive);
   --el-color-error-light-9: rgba(217, 45, 32, 0.08);
 
-  --el-text-color-primary: var(--st-on-background);
-  --el-text-color-regular: var(--st-on-surface);
-  --el-text-color-secondary: var(--st-on-surface-variant);
-  --el-text-color-placeholder: var(--st-outline);
+  --el-text-color-primary: var(--st-foreground);
+  --el-text-color-regular: var(--st-foreground);
+  --el-text-color-secondary: var(--st-muted-foreground);
+  --el-text-color-placeholder: var(--st-muted);
 
-  --el-border-color: var(--st-outline-variant);
+  --el-border-color: var(--st-border);
   --el-border-color-light: var(--st-surface-container);
   --el-border-color-lighter: var(--st-surface-container-low);
 
-  --el-bg-color: var(--st-surface-container-lowest);
+  --el-bg-color: var(--st-card);
   --el-bg-color-page: var(--st-background);
-  --el-fill-color-blank: var(--st-surface-container-lowest);
+  --el-fill-color-blank: var(--st-card);
   --el-fill-color-light: var(--st-surface-container-low);
 
   --el-border-radius-base: var(--st-radius-md);
@@ -130,28 +128,25 @@
   --el-box-shadow-light: var(--st-shadow-sm);
   --el-box-shadow: var(--st-shadow-md);
 
-  /* ==========================================================================
-     Arco Design Vue 主题桥接：将 --st-* 令牌映射到 Arco CSS 变量
-     （Arco 使用 --primary-6 / --color-bg-* / --color-text-* 等变量）
-     ========================================================================== */
-  --primary-1: var(--st-primary-container);
-  --primary-2: var(--st-primary-fixed-dim);
-  --primary-3: var(--st-primary-fixed-dim);
-  --primary-4: var(--st-primary);
-  --primary-5: var(--st-primary);
-  --primary-6: var(--st-primary);
-  --primary-7: var(--st-primary);
-  --primary-8: var(--st-primary);
-  --primary-9: var(--st-primary);
-  --primary-10: var(--st-primary-container);
+  /* —— Arco Design Vue 主题桥接 —— */
+  --primary-1: var(--st-secondary);
+  --primary-2: var(--st-border);
+  --primary-3: var(--st-surface-container);
+  --primary-4: var(--st-foreground);
+  --primary-5: var(--st-foreground);
+  --primary-6: var(--st-foreground);
+  --primary-7: var(--st-foreground);
+  --primary-8: var(--st-foreground);
+  --primary-9: var(--st-foreground);
+  --primary-10: var(--st-secondary);
 
-  --success-6: var(--st-secondary);
-  --danger-6: var(--st-error);
-  --warning-6: #d9892b;
+  --success-6: #2E7D32;
+  --danger-6: var(--st-destructive);
+  --warning-6: #D9892B;
 
-  --color-bg-white: var(--st-surface-container-lowest);
-  --color-bg-1: var(--st-surface-container-lowest);
-  --color-bg-2: var(--st-surface-container-lowest);
+  --color-bg-white: var(--st-card);
+  --color-bg-1: var(--st-card);
+  --color-bg-2: var(--st-card);
   --color-bg-3: var(--st-surface-container-low);
   --color-bg-4: var(--st-surface-container);
 
@@ -159,21 +154,92 @@
   --color-fill-2: var(--st-surface-container);
   --color-fill-3: var(--st-surface-container-high);
 
-  --color-text-1: var(--st-on-surface);
-  --color-text-2: var(--st-on-surface-variant);
-  --color-text-3: var(--st-outline);
-  --color-text-4: var(--st-outline);
+  --color-text-1: var(--st-foreground);
+  --color-text-2: var(--st-muted-foreground);
+  --color-text-3: var(--st-muted);
+  --color-text-4: var(--st-muted);
 
-  --color-border-1: var(--st-outline-variant);
-  --color-border-2: var(--st-outline-variant);
-  --color-border-3: var(--st-outline);
+  --color-border-1: var(--st-border);
+  --color-border-2: var(--st-border);
+  --color-border-3: var(--st-muted);
 
-  --color-white: var(--st-surface-container-lowest);
-  --color-black: var(--st-on-surface);
+  --color-white: var(--st-card);
+  --color-black: var(--st-foreground);
 
   --border-radius-small: var(--st-radius-sm);
   --border-radius-medium: var(--st-radius-md);
   --border-radius-large: var(--st-radius-lg);
+}
+
+/* Dark mode */
+.dark {
+  --st-background: #111110;
+  --st-foreground: #F9F9F7;
+  --st-card: #1B1B18;
+  --st-card-foreground: #F9F9F7;
+  --st-popover: #1B1B18;
+  --st-popover-foreground: #F9F9F7;
+  --st-primary: #F9F9F7;
+  --st-primary-foreground: #1B1B18;
+  --st-secondary: #2A2A26;
+  --st-secondary-foreground: #F9F9F7;
+  --st-muted: #6B6B67;
+  --st-muted-foreground: #91918E;
+  --st-accent: #2A2A26;
+  --st-accent-foreground: #F9F9F7;
+  --st-destructive: #EF4444;
+  --st-destructive-foreground: #FFFFFF;
+  --st-border: #2A2A26;
+  --st-input: #2A2A26;
+  --st-ring: #F9F9F7;
+
+  --st-surface: var(--st-background);
+  --st-surface-bright: var(--st-card);
+  --st-surface-container-lowest: #1B1B18;
+  --st-surface-container-low: #2A2A26;
+  --st-surface-container: #3A3A34;
+  --st-surface-container-high: #4A4A42;
+  --st-surface-container-highest: #5A5A50;
+  --st-on-background: var(--st-foreground);
+  --st-on-surface: var(--st-foreground);
+  --st-on-surface-variant: var(--st-muted-foreground);
+  --st-outline: var(--st-muted);
+  --st-outline-variant: var(--st-border);
+  --st-error: var(--st-destructive);
+  --st-error-container: #451A1A;
+  --st-on-error: #FFFFFF;
+  --st-on-error-container: #FECACA;
+  --st-primary-container: var(--st-secondary);
+  --st-primary-fixed: var(--st-secondary);
+  --st-primary-fixed-dim: var(--st-border);
+  --st-on-primary: var(--st-primary-foreground);
+  --st-on-primary-container: var(--st-foreground);
+  --st-secondary-container: var(--st-secondary);
+  --st-on-secondary: var(--st-secondary-foreground);
+  --st-on-secondary-container: var(--st-foreground);
+  --st-tertiary: var(--st-foreground);
+  --st-tertiary-container: var(--st-secondary);
+
+  --st-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --st-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --st-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --st-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --st-shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.4);
+
+  /* Element Plus dark bridge */
+  --el-color-primary: var(--st-primary);
+  --el-color-primary-light-3: var(--st-secondary);
+  --el-color-primary-light-9: rgba(249, 249, 247, 0.06);
+  --el-text-color-primary: var(--st-foreground);
+  --el-text-color-regular: var(--st-foreground);
+  --el-text-color-secondary: var(--st-muted-foreground);
+  --el-bg-color: var(--st-card);
+  --el-bg-color-page: var(--st-background);
+  --el-fill-color-blank: var(--st-card);
+  --el-fill-color-light: var(--st-surface-container-low);
+  --el-border-color: var(--st-border);
+  --el-border-color-light: var(--st-surface-container);
+  --el-border-color-lighter: var(--st-surface-container-low);
 }
 
 body {
@@ -207,10 +273,11 @@ body {
   background: var(--st-outline);
 }
 
-/* 通用卡片（简洁化：去玻璃感，细边框） */
+/* 通用卡片 */
 .st-glass-card {
-  background: #ffffff;
+  background: var(--st-card);
   border: 1px solid var(--st-outline-variant);
+  border-radius: var(--st-radius-lg);
 }
 
 /* 进度环 */

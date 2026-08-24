@@ -21,10 +21,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -137,12 +140,40 @@ public class AvatarService {
         task.setUpdatedAt(LocalDateTime.now());
         avatarTaskMapper.insert(task);
 
-        aiAvatarService.executeOptimize(task.getId());
+        // 异步任务必须在事务提交后触发：事务内立即启动 @Async 时，异步线程在 REPEATABLE READ
+        // 下读不到未提交的任务行，会误判 "task not found" 导致任务永久 pending
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    submitOptimize(task.getId());
+                }
+            });
+        } else {
+            submitOptimize(task.getId());
+        }
 
         Map<String, Object> result = new HashMap<>();
         result.put("taskId", task.getId());
         result.put("status", BizConstant.TASK_STATUS_PENDING);
         return result;
+    }
+
+    /**
+     * 提交一寸照优化到 AI 线程池；队列满时将任务标记为失败，避免永久卡在 pending。
+     */
+    private void submitOptimize(String taskId) {
+        try {
+            aiAvatarService.executeOptimize(taskId);
+        } catch (org.springframework.core.task.TaskRejectedException e) {
+            log.warn("Avatar optimize task rejected (thread pool exhausted): taskId={}", taskId);
+            AvatarTask failed = new AvatarTask();
+            failed.setId(taskId);
+            failed.setStatus(BizConstant.TASK_STATUS_FAILED);
+            failed.setErrorMsg("AI 服务繁忙，请稍后再试。");
+            failed.setUpdatedAt(LocalDateTime.now());
+            avatarTaskMapper.updateById(failed);
+        }
     }
 
     /**
@@ -162,7 +193,8 @@ public class AvatarService {
     /**
      * 删除头像及优化记录。
      * <p>
-     * 校验所有权后删除 MinIO 原图，并逻辑删除所有关联任务记录。
+     * 校验所有权后逻辑删除所有关联任务记录；MinIO 原图/结果图延迟到事务提交后
+     * 移除，若事务回滚则文件保留，避免出现"记录在、文件没了"的不一致。
      * </p>
      */
     @Transactional(rollbackFor = Exception.class)
@@ -175,29 +207,33 @@ public class AvatarService {
             throw new BusinessException(ResultCode.ACCESS_DENIED, "无权访问该资源。");
         }
 
-        String sourceImageUrl = task.getSourceImageUrl();
-        String sourceObjectName = extractObjectName(sourceImageUrl);
+        List<String> pendingRemoval = new ArrayList<>();
+        String sourceObjectName = extractObjectName(task.getSourceImageUrl());
         if (StringUtils.isNotBlank(sourceObjectName) && isOwnedObject(userId, sourceObjectName)) {
-            minioStorageService.remove(minioStorageService.getBucketAvatars(), sourceObjectName);
+            pendingRemoval.add(sourceObjectName);
         }
-        String resultImageUrl = task.getResultImageUrl();
-        String resultObjectName = extractObjectName(resultImageUrl);
+        String resultObjectName = extractObjectName(task.getResultImageUrl());
         if (StringUtils.isNotBlank(resultObjectName)
                 && !resultObjectName.equals(sourceObjectName)
                 && isOwnedObject(userId, resultObjectName)) {
-            minioStorageService.remove(minioStorageService.getBucketAvatars(), resultObjectName);
+            pendingRemoval.add(resultObjectName);
         }
 
         AvatarTask deleted = new AvatarTask();
         deleted.setDeleted(BizConstant.DELETED);
         LambdaQueryWrapper<AvatarTask> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AvatarTask::getUserId, userId)
-               .eq(AvatarTask::getSourceImageUrl, sourceImageUrl);
+               .eq(AvatarTask::getSourceImageUrl, task.getSourceImageUrl());
         avatarTaskMapper.update(deleted, wrapper);
+
+        minioStorageService.removeAfterCommit(minioStorageService.getBucketAvatars(), pendingRemoval);
     }
 
     /**
      * 清理指定简历关联的所有头像任务及 MinIO 文件。
+     * <p>
+     * 任务记录在当前事务内逻辑删除；MinIO 文件延迟到事务提交后移除。
+     * </p>
      */
     @Transactional(rollbackFor = Exception.class)
     public void cleanupTasksByResume(String userId, String resumeId) {
@@ -205,15 +241,16 @@ public class AvatarService {
         wrapper.eq(AvatarTask::getUserId, userId)
                 .eq(AvatarTask::getResumeId, resumeId);
         List<AvatarTask> tasks = avatarTaskMapper.selectList(wrapper);
-        for (AvatarTask task : tasks) {
-            String objectName = extractObjectName(task.getSourceImageUrl());
-            if (StringUtils.isNotBlank(objectName) && isOwnedObject(userId, objectName)) {
-                minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
-            }
-        }
+        List<String> pendingRemoval = tasks.stream()
+                .map(AvatarTask::getSourceImageUrl)
+                .map(this::extractObjectName)
+                .filter(StringUtils::isNotBlank)
+                .filter(objectName -> isOwnedObject(userId, objectName))
+                .toList();
         if (!tasks.isEmpty()) {
             avatarTaskMapper.delete(wrapper);
         }
+        minioStorageService.removeAfterCommit(minioStorageService.getBucketAvatars(), pendingRemoval);
     }
 
     private String extractObjectName(String sourceImageUrl) {

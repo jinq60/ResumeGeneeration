@@ -21,7 +21,7 @@
       >简历 ID：{{ resumeId }}</span>
     </header>
 
-    <div class="flex-1 max-w-[1080px] mx-auto px-margin-page pb-margin-page flex flex-col gap-gutter w-full">
+    <div class="workbench-page flex-1 px-margin-page pb-margin-page flex flex-col gap-gutter w-full">
       <!-- 输入卡 -->
       <section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
         <h2 class="text-title-lg font-title-lg text-on-surface">
@@ -216,7 +216,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, MagicStick, Loading, Check } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -327,7 +327,63 @@ async function handleAnalyze() {
 }
 
 function handleApplySuggestions() {
-  ElMessage.success('建议已生成，请根据建议在简历编辑器中对应模块修改。')
+  const skills = reviewResult.value?.missingSkills?.filter((s) => s && s.trim()) || []
+  if (skills.length === 0) {
+    ElMessage.info('当前点评没有可自动应用的技能建议，请根据文字建议手动修改')
+    return
+  }
+  applyMissingSkillsToResume()
+}
+
+async function applyMissingSkillsToResume() {
+  const skills = reviewResult.value?.missingSkills?.filter((s) => s && s.trim()) || []
+  if (skills.length === 0) {
+    ElMessage.info('当前点评没有可自动应用的技能建议，请根据文字建议手动修改')
+    return
+  }
+  const { resumeApi } = await import('@/api/resume')
+  try {
+    const resume = await resumeApi.get(resumeId)
+    const sections = (resume.sections || []).map((section: any) => ({ ...section }))
+    const skillSection = sections.find((s: any) => s.type === 'skill')
+
+    const mergeInto = (items: Array<{ name: string; level?: string; highlight?: boolean }>) => {
+      const existing = new Set(items.map((item) => item.name.trim().toLowerCase()))
+      const additions = skills.filter((skill) => !existing.has(skill.trim().toLowerCase()))
+      return [...items, ...additions.map((skill) => ({ name: skill.trim(), highlight: false }))]
+    }
+
+    if (skillSection) {
+      const data: Array<{ category: string; items: Array<{ name: string; level?: string; highlight?: boolean }> }> = Array.isArray(skillSection.data) ? skillSection.data : []
+      if (data.length === 0) {
+        skillSection.data = [{ category: '补充技能', items: mergeInto([]) }]
+      } else {
+        data[0].items = mergeInto(data[0].items || [])
+        skillSection.data = data
+      }
+    } else {
+      sections.push({
+        id: `skill_${Date.now()}`,
+        type: 'skill',
+        title: '技能清单',
+        order: sections.length,
+        visible: true,
+        data: [{ category: '补充技能', items: mergeInto([]) }]
+      })
+    }
+
+    await resumeApi.update(resumeId, { sections })
+    ElMessage.success(`已自动补充 ${skills.length} 项缺失技能到技能清单`)
+    ElMessageBox.confirm('技能已写入简历，是否立即前往编辑器查看？', '应用成功', {
+      confirmButtonText: '去编辑器',
+      cancelButtonText: '稍后再说',
+      type: 'success'
+    }).then(() => {
+      router.push(`/workbench/editor/${resumeId}`)
+    }).catch(() => {})
+  } catch (e: any) {
+    ElMessage.error(e.message || '应用建议失败，请稍后重试')
+  }
 }
 
 function handleReapply() {

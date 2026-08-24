@@ -40,6 +40,7 @@ public class ResumeImportService {
     private final TemplateService templateService;
     private final ResumeSectionValidator resumeSectionValidator;
     private final ObjectMapper objectMapper;
+    private final com.resume.audit.service.ContentAuditService contentAuditService;
 
     private static final int MAX_TITLE_LENGTH = 128;
 
@@ -78,6 +79,9 @@ public class ResumeImportService {
         resume.setCreatedAt(LocalDateTime.now());
         resume.setUpdatedAt(LocalDateTime.now());
         resumeMapper.insert(resume);
+
+        // 导入的简历同样进入内容审核队列
+        contentAuditService.createForResume(userId, resume.getId(), title);
 
         log.info("Resume imported: userId={}, resumeId={}, format={}, sections={}",
                 userId, resume.getId(), request.getFormat(), sections.size());

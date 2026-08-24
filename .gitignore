@@ -8,3 +8,8 @@ coverage/
 !.env.example
 .opencode/
 frontend_login.html
+
+# OAuth / 云服务凭据文件，一律走环境变量或服务器本地挂载
+*.json.key
+ops/google-auth.json
+.superpowers/

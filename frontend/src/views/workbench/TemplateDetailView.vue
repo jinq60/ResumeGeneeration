@@ -1,5 +1,5 @@
 <template>
-  <main class="max-w-[1280px] mx-auto px-margin-page py-stack-lg">
+  <main class="workbench-page py-stack-lg">
     <div class="flex justify-between items-center mb-stack-lg">
       <div class="flex items-center gap-3">
         <button

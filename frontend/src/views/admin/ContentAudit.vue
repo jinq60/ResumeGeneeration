@@ -35,12 +35,6 @@
           <h3 class="text-headline-md font-bold">
             {{ stat.value }}
           </h3>
-          <span
-            class="text-[12px] flex items-center gap-0.5"
-            :class="stat.growthClass"
-          >
-            <el-icon size="14"><component :is="stat.growthIcon" /></el-icon>{{ stat.growth }}
-          </span>
         </div>
       </div>
     </div>
@@ -50,33 +44,39 @@
       <div class="flex-1 flex flex-col gap-gutter">
         <!-- Filters -->
         <div class="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant shadow-sm">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div class="lg:col-span-1 space-y-2">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="space-y-2">
               <label class="text-label-md font-bold text-on-surface-variant">搜索</label>
               <el-input
                 v-model="filters.keyword"
-                placeholder="简历名称 / 用户昵称"
+                placeholder="简历名称 / 用户ID"
                 clearable
+                @keyup.enter="handleSearch"
               />
             </div>
             <div class="space-y-2">
-              <label class="text-label-md font-bold text-on-surface-variant">简历类型</label>
+              <label class="text-label-md font-bold text-on-surface-variant">风险等级</label>
               <el-select
-                v-model="filters.type"
+                v-model="filters.riskLevel"
                 placeholder="全部"
                 clearable
+                @change="handleSearch"
               >
                 <el-option
                   label="全部"
                   value=""
                 />
                 <el-option
-                  label="标准简历"
-                  value="standard"
+                  label="低风险"
+                  value="low"
                 />
                 <el-option
-                  label="设计简历"
-                  value="design"
+                  label="中风险"
+                  value="medium"
+                />
+                <el-option
+                  label="高风险"
+                  value="high"
                 />
               </el-select>
             </div>
@@ -86,6 +86,7 @@
                 v-model="filters.status"
                 placeholder="全部"
                 clearable
+                @change="handleSearch"
               >
                 <el-option
                   label="全部"
@@ -109,33 +110,12 @@
                 />
               </el-select>
             </div>
-            <div class="space-y-2">
-              <label class="text-label-md font-bold text-on-surface-variant">公开状态</label>
-              <el-select
-                v-model="filters.public"
-                placeholder="全部"
-                clearable
-              >
-                <el-option
-                  label="全部"
-                  value=""
-                />
-                <el-option
-                  label="公开"
-                  value="public"
-                />
-                <el-option
-                  label="未公开"
-                  value="private"
-                />
-              </el-select>
-            </div>
             <div class="space-y-2 flex flex-col justify-end">
               <div class="flex gap-2">
                 <el-button
                   type="primary"
                   class="flex-1"
-                  @click="loadList"
+                  @click="handleSearch"
                 >
                   <el-icon size="16">
                     <Search />
@@ -158,10 +138,6 @@
             @row-click="selectItem"
           >
             <el-table-column
-              type="selection"
-              width="48"
-            />
-            <el-table-column
               label="简历名称"
               min-width="180"
             >
@@ -176,7 +152,7 @@
                   <span
                     class="font-bold"
                     :class="row.id === currentItem?.id ? 'text-primary' : ''"
-                  >{{ row.title }}</span>
+                  >{{ row.targetTitle || '未命名简历' }}</span>
                 </div>
               </template>
             </el-table-column>
@@ -186,9 +162,6 @@
             >
               <template #default="{ row }">
                 <div>
-                  <p class="font-medium">
-                    {{ row.userName }}
-                  </p>
                   <p class="text-[12px] text-on-surface-variant">
                     ID: {{ row.userId }}
                   </p>
@@ -196,15 +169,14 @@
               </template>
             </el-table-column>
             <el-table-column
-              label="岗位类型"
-              prop="jobType"
-              width="130"
-            />
-            <el-table-column
-              label="更新时间"
-              prop="updatedAt"
+              label="提交时间"
+              prop="createdAt"
               width="170"
-            />
+            >
+              <template #default="{ row }">
+                {{ formatDate(row.createdAt) }}
+              </template>
+            </el-table-column>
             <el-table-column
               label="状态"
               width="110"
@@ -214,7 +186,7 @@
                   :type="statusTagType(row.status)"
                   size="small"
                 >
-                  {{ row.statusLabel }}
+                  {{ statusLabel(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -224,10 +196,10 @@
             >
               <template #default="{ row }">
                 <el-tag
-                  :type="riskTagType(row.risk)"
+                  :type="riskTagType(row.riskLevel)"
                   size="small"
                 >
-                  {{ row.riskLabel }}
+                  {{ riskLabel(row.riskLevel) }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -240,14 +212,14 @@
                 <el-button
                   link
                   type="primary"
-                  @click.stop="selectItem(row)"
+                  @click.stop="selectItem(row as AuditItem)"
                 >
                   查看
                 </el-button>
                 <el-button
                   link
                   type="primary"
-                  @click.stop="auditItem(row)"
+                  @click.stop="auditItem(row as AuditItem)"
                 >
                   审核
                 </el-button>
@@ -255,7 +227,7 @@
             </el-table-column>
           </el-table>
           <div class="px-6 py-4 bg-surface-container-low border-t border-outline-variant flex items-center justify-between">
-            <span class="text-label-md text-on-surface-variant">共 {{ total }} 条，当前显示 1-10 条</span>
+            <span class="text-label-md text-on-surface-variant">共 {{ total }} 条</span>
             <el-pagination
               v-model:current-page="page"
               v-model:page-size="pageSize"
@@ -264,6 +236,8 @@
               layout="sizes, prev, pager, next"
               background
               small
+              @current-change="loadList"
+              @size-change="handleSizeChange"
             />
           </div>
         </div>
@@ -278,13 +252,13 @@
           <div class="p-6 border-b border-outline-variant flex items-center justify-between">
             <div class="flex items-center gap-3">
               <h2 class="text-title-md font-bold">
-                {{ currentItem.title }}
+                {{ currentItem.targetTitle || '未命名简历' }}
               </h2>
               <el-tag
                 :type="statusTagType(currentItem.status)"
                 size="small"
               >
-                {{ currentItem.statusLabel }}
+                {{ statusLabel(currentItem.status) }}
               </el-tag>
             </div>
             <el-button
@@ -297,11 +271,9 @@
             </el-button>
           </div>
           <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-6">
-            <!-- User info -->
             <div class="flex items-center gap-4 p-4 bg-surface-container-low rounded-xl border border-outline-variant">
               <el-avatar
                 :size="48"
-                :src="currentItem.avatarUrl"
               >
                 <el-icon size="20">
                   <User />
@@ -310,38 +282,29 @@
               <div class="flex-1">
                 <div class="flex items-center justify-between">
                   <h3 class="font-bold">
-                    {{ currentItem.userName }}
+                    用户 {{ currentItem.userId }}
                   </h3>
-                  <span class="text-[12px] text-primary font-medium">{{ currentItem.vip }}</span>
                 </div>
-                <p class="text-[12px] text-on-surface-variant">
-                  ID: {{ currentItem.userId }}
-                </p>
                 <div class="mt-2 flex gap-2">
-                  <span class="px-1.5 py-0.5 bg-white border border-outline-variant rounded text-[10px]">标准简历</span>
-                  <span class="px-1.5 py-0.5 bg-white border border-outline-variant rounded text-[10px]">用户上传</span>
+                  <span class="px-1.5 py-0.5 bg-white border border-outline-variant rounded text-[10px]">
+                    风险等级：{{ riskLabel(currentItem.riskLevel) }}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <!-- Preview thumbnail -->
             <div class="relative group cursor-pointer overflow-hidden rounded-xl border border-outline-variant shadow-sm aspect-[3/4] bg-surface-container flex items-center justify-center">
-              <img
-                v-if="currentItem.thumbnail"
-                :src="currentItem.thumbnail"
-                class="w-full h-full object-cover"
-              >
-              <div
-                v-else
-                class="flex flex-col items-center gap-3 text-outline"
-              >
+              <div class="flex flex-col items-center gap-3 text-outline">
                 <el-icon size="48">
                   <Document />
                 </el-icon>
-                <span class="text-label-md">暂无预览</span>
+                <span class="text-label-md">简历预览</span>
               </div>
               <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <el-button type="primary">
+                <el-button
+                  type="primary"
+                  @click="previewFull(currentItem)"
+                >
                   <el-icon size="18">
                     <View />
                   </el-icon>预览全文
@@ -349,8 +312,10 @@
               </div>
             </div>
 
-            <!-- AI insights -->
-            <div class="space-y-4">
+            <div
+              v-if="currentItem.reviewNote || currentItem.reviewerId"
+              class="space-y-4"
+            >
               <div class="flex items-center gap-2">
                 <el-icon
                   class="text-tertiary"
@@ -359,29 +324,18 @@
                   <MagicStick />
                 </el-icon>
                 <h4 class="text-title-md font-bold">
-                  问题点摘要 (AI 智能识别)
+                  审核记录
                 </h4>
               </div>
-              <div
-                v-for="issue in currentItem.issues"
-                :key="issue.title"
-                class="p-4 rounded-xl border"
-                :class="issueBorderClass(issue.level)"
-              >
-                <div class="flex items-center gap-2 mb-2">
-                  <el-icon
-                    size="18"
-                    :class="issueColorClass(issue.level)"
-                  >
-                    <component :is="issue.icon" />
-                  </el-icon>
-                  <span
-                    class="font-bold"
-                    :class="issueColorClass(issue.level)"
-                  >{{ issue.title }}</span>
-                </div>
+              <div class="p-4 rounded-xl border border-outline-variant bg-surface-container-low">
                 <p class="text-body-md text-on-surface-variant">
-                  {{ issue.desc }}
+                  审核人：{{ currentItem.reviewerId }} · {{ formatDate(currentItem.reviewedAt) }}
+                </p>
+                <p
+                  v-if="currentItem.reviewNote"
+                  class="text-body-md text-on-surface-variant mt-1"
+                >
+                  备注：{{ currentItem.reviewNote }}
                 </p>
               </div>
             </div>
@@ -402,7 +356,7 @@
             <el-button @click="markWarning(currentItem)">
               标记风险
             </el-button>
-            <el-button @click="preview(currentItem)">
+            <el-button @click="previewFull(currentItem)">
               预览
             </el-button>
           </div>
@@ -415,6 +369,55 @@
         </div>
       </div>
     </div>
+
+    <!-- 标记风险 Dialog -->
+    <el-dialog
+      v-model="warningDialogVisible"
+      title="标记风险"
+      width="420px"
+    >
+      <el-form label-width="90px">
+        <el-form-item label="风险等级">
+          <el-select
+            v-model="warningRiskLevel"
+            class="w-full"
+          >
+            <el-option
+              label="低风险"
+              value="low"
+            />
+            <el-option
+              label="中风险"
+              value="medium"
+            />
+            <el-option
+              label="高风险"
+              value="high"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="warningNote"
+            type="textarea"
+            :rows="3"
+            placeholder="风险说明（可选）"
+            maxlength="512"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="warningDialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          @click="confirmMarkWarning"
+        >
+          确认
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -422,42 +425,50 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Document, Search, WarningFilled, CircleCheckFilled, ArrowUp, ArrowDown,
-  Close, User, View, MagicStick, InfoFilled, Delete
+  Document, Search, WarningFilled, CircleCheckFilled, Close, User, View, MagicStick, Delete
 } from '@element-plus/icons-vue'
-
-interface AuditItem {
-  id: string
-  title: string
-  userName: string
-  userId: string
-  avatarUrl: string
-  vip: string
-  jobType: string
-  updatedAt: string
-  status: 'pending' | 'approved' | 'rejected' | 'warning'
-  statusLabel: string
-  risk: 'low' | 'medium' | 'high'
-  riskLabel: string
-  thumbnail: string
-  issues: { title: string; desc: string; level: 'low' | 'medium' | 'high'; icon: any }[]
-}
+import { auditApi, adminResumePreviewUrl, type AuditItem, type AuditStats } from '@/api/admin/audits'
 
 const loading = ref(false)
-const filters = reactive({ keyword: '', type: '', status: '', public: '' })
+const filters = reactive({ keyword: '', riskLevel: '', status: '' })
 const auditList = ref<AuditItem[]>([])
 const currentItem = ref<AuditItem | null>(null)
 const page = ref(1)
 const pageSize = ref(10)
-const total = ref(12894)
+const total = ref(0)
 
-const stats = [
-  { label: '简历总数', value: '128,945', growth: '12.4%', growthIcon: ArrowUp, growthClass: 'text-secondary', icon: Document, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
-  { label: '待审核', value: '2,346', growth: '8.7%', growthIcon: ArrowUp, growthClass: 'text-secondary', icon: WarningFilled, iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
-  { label: '已公开', value: '96,182', growth: '10.6%', growthIcon: ArrowUp, growthClass: 'text-secondary', icon: CircleCheckFilled, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-  { label: '风险预警', value: '1,275', growth: '5.2%', growthIcon: ArrowUp, growthClass: 'text-secondary', icon: WarningFilled, iconBg: 'bg-rose-100', iconColor: 'text-rose-600' },
-  { label: '今日删除', value: '382', growth: '3.6%', growthIcon: ArrowDown, growthClass: 'text-error', icon: Delete, iconBg: 'bg-surface-container-high', iconColor: 'text-on-surface-variant' }
-]
+const warningDialogVisible = ref(false)
+const warningRiskLevel = ref('medium')
+const warningNote = ref('')
+
+const stats = ref([
+  { label: '待审核', value: '-', icon: WarningFilled, iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
+  { label: '已通过', value: '-', icon: CircleCheckFilled, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+  { label: '风险预警', value: '-', icon: WarningFilled, iconBg: 'bg-rose-100', iconColor: 'text-rose-600' },
+  { label: '已驳回', value: '-', icon: Close, iconBg: 'bg-surface-container-high', iconColor: 'text-on-surface-variant' },
+  { label: '今日已审', value: '-', icon: Delete, iconBg: 'bg-surface-container-high', iconColor: 'text-on-surface-variant' }
+])
+
+const statusLabelsMap: Record<string, string> = {
+  pending: '待审核',
+  approved: '已通过',
+  rejected: '已驳回',
+  warning: '风险预警'
+}
+
+const riskLabelsMap: Record<string, string> = {
+  low: '低风险',
+  medium: '中风险',
+  high: '高风险'
+}
+
+function statusLabel(status: string) {
+  return statusLabelsMap[status] || status
+}
+
+function riskLabel(risk: string) {
+  return riskLabelsMap[risk] || risk
+}
 
 function statusTagType(status: string) {
   switch (status) {
@@ -476,11 +487,9 @@ function riskTagType(risk: string) {
     default: return 'info'
   }
 }
-function issueBorderClass(level: string) {
-  return level === 'high' ? 'border-error/20 bg-error/5' : level === 'medium' ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'
-}
-function issueColorClass(level: string) {
-  return level === 'high' ? 'text-error' : level === 'medium' ? 'text-amber-600' : 'text-emerald-600'
+
+function formatDate(date: string | null | undefined) {
+  return date ? date.replace('T', ' ').substring(0, 19) : '-'
 }
 
 function selectItem(row: AuditItem) {
@@ -491,47 +500,106 @@ function auditItem(row: AuditItem) {
   currentItem.value = row
 }
 
-function approve(row: AuditItem) {
-  ElMessage.success(`已通过 ${row.title}`)
-  loadList()
+function previewFull(row: AuditItem) {
+  if (!row.targetId) return
+  window.open(adminResumePreviewUrl(row.targetId), '_blank')
 }
 
-function reject(row: AuditItem) {
-  ElMessage.warning(`已驳回 ${row.title}`)
-  loadList()
+async function approve(row: AuditItem) {
+  try {
+    await auditApi.approve(row.id)
+    ElMessage.success(`已通过 ${row.targetTitle || row.id}`)
+    await loadList()
+  } catch (e: any) {
+    ElMessage.error(e.message || '操作失败')
+  }
+}
+
+async function reject(row: AuditItem) {
+  try {
+    await auditApi.reject(row.id)
+    ElMessage.warning(`已驳回 ${row.targetTitle || row.id}`)
+    await loadList()
+  } catch (e: any) {
+    ElMessage.error(e.message || '操作失败')
+  }
 }
 
 function markWarning(row: AuditItem) {
-  ElMessage.warning(`已标记风险 ${row.title}`)
+  warningRiskLevel.value = row.riskLevel || 'medium'
+  warningNote.value = ''
+  warningDialogVisible.value = true
 }
 
-function preview(row: AuditItem) {
-  ElMessage.info(`预览 ${row.title}`)
+async function confirmMarkWarning() {
+  if (!currentItem.value) return
+  try {
+    await auditApi.markWarning(currentItem.value.id, warningRiskLevel.value, warningNote.value || undefined)
+    warningDialogVisible.value = false
+    ElMessage.warning('已标记风险')
+    await loadList()
+  } catch (e: any) {
+    ElMessage.error(e.message || '操作失败')
+  }
 }
 
 function resetFilters() {
   filters.keyword = ''
-  filters.type = ''
+  filters.riskLevel = ''
   filters.status = ''
-  filters.public = ''
+  page.value = 1
   loadList()
 }
 
-function loadList() {
-  loading.value = true
-  setTimeout(() => {
-    auditList.value = [
-      { id: 'A1001', title: '产品经理求职简历', userName: '王小明', userId: '188****6621', avatarUrl: '', vip: '普通会员', jobType: '产品 / 经理', updatedAt: '2025-05-15 10:28', status: 'pending', statusLabel: '待审核', risk: 'low', riskLabel: '低风险', thumbnail: '', issues: [{ title: '个人信息泄露风险', desc: '简历中包含了完整身份证号，建议脱敏处理。', level: 'medium', icon: InfoFilled }] },
-      { id: 'A1002', title: '资深前端工程师简历', userName: '李雨桐', userId: '157****3310', avatarUrl: '', vip: '高级会员', jobType: '技术 / 前端', updatedAt: '2025-05-15 09:56', status: 'approved', statusLabel: '已通过', risk: 'low', riskLabel: '低风险', thumbnail: '', issues: [] },
-      { id: 'A1003', title: '运维工程师简历', userName: '张伟', userId: '139****8822', avatarUrl: '', vip: '普通会员', jobType: '技术 / 运维', updatedAt: '2025-05-15 09:31', status: 'rejected', statusLabel: '已驳回', risk: 'medium', riskLabel: '中风险', thumbnail: '', issues: [{ title: '敏感公司信息', desc: '包含前公司内部机密项目代号，建议删除。', level: 'medium', icon: WarningFilled }] },
-      { id: 'A1004', title: 'UI设计师作品简历', userName: '陈一凡', userId: '186****7721', avatarUrl: '', vip: 'SVIP', jobType: '设计 / UI', updatedAt: '2025-05-15 09:12', status: 'warning', statusLabel: '风险预警', risk: 'high', riskLabel: '高风险', thumbnail: '', issues: [{ title: '违规联系方式', desc: '简历中放置了外部引流二维码。', level: 'high', icon: WarningFilled }] }
-    ]
-    currentItem.value = auditList.value[0]
-    loading.value = false
-  }, 500)
+function handleSearch() {
+  page.value = 1
+  loadList()
 }
 
-onMounted(loadList)
+function handleSizeChange() {
+  page.value = 1
+  loadList()
+}
+
+async function loadStats() {
+  try {
+    const s: AuditStats = await auditApi.stats()
+    stats.value[0].value = String(s.pending)
+    stats.value[1].value = String(s.approved)
+    stats.value[2].value = String(s.warning)
+    stats.value[3].value = String(s.rejected)
+    stats.value[4].value = String(s.todayReviewed)
+  } catch {
+    // 统计失败保持占位
+  }
+}
+
+async function loadList() {
+  loading.value = true
+  try {
+    const res = await auditApi.list({
+      page: page.value,
+      size: pageSize.value,
+      keyword: filters.keyword || undefined,
+      status: filters.status || undefined,
+      riskLevel: filters.riskLevel || undefined
+    })
+    auditList.value = res.records || []
+    total.value = res.total || 0
+    if (currentItem.value) {
+      currentItem.value = auditList.value.find(i => i.id === currentItem.value?.id) || null
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载审核列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadStats()
+  loadList()
+})
 </script>
 
 <style scoped lang="scss">

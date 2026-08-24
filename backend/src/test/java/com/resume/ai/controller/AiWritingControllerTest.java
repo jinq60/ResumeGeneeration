@@ -102,7 +102,7 @@ class AiWritingControllerTest {
         mockMvc.perform(post("/resumes/resume123/ai/write")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(buildRequest())))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value(ResultCode.AI_DAILY_QUOTA_EXCEEDED));
     }
 

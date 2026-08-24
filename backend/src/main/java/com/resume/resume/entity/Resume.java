@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Data;
 
 import com.resume.resume.dto.SectionDTO;
@@ -44,6 +45,12 @@ public class Resume {
      */
     @TableLogic
     private Integer deleted;
+
+    /**
+     * 乐观锁版本号：整行更新时自动校验与自增，防止自动保存并发丢失更新。
+     */
+    @Version
+    private Integer version;
 
     private LocalDateTime lastEditedAt;
     private LocalDateTime createdAt;

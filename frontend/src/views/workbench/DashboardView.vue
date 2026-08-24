@@ -253,7 +253,7 @@
             <button
               class="tool-item"
               type="button"
-              @click="router.push('/workbench/resumes')"
+              @click="goGrammarCheck"
             >
               <span class="tool-dot tool-dot-blue" />
               <span class="tool-text">
@@ -428,6 +428,18 @@ function createResume() {
   router.push('/workbench/templates')
 }
 
+function goGrammarCheck() {
+  if (resumes.value.length === 0) {
+    ElMessage.info('请先创建一份简历，再进行语法检查')
+    router.push('/workbench/templates')
+    return
+  }
+  const latest = [...resumes.value].sort(
+    (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+  )[0]
+  router.push(`/workbench/editor/${latest.id}?grammar=1`)
+}
+
 function openEditor(resume: Resume) {
   router.push(`/workbench/editor/${resume.id}`)
 }
@@ -511,8 +523,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 1280px;
-  margin: 0 auto;
+  width: 100%;
+  min-width: 0;
 }
 
 .dashboard-header {
@@ -578,7 +590,7 @@ onMounted(async () => {
 
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 
   @media (max-width: 768px) {
@@ -608,11 +620,11 @@ onMounted(async () => {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 25vw, 380px);
   gap: 16px;
   align-items: start;
 
-  @media (max-width: 1024px) {
+  @media (max-width: 1100px) {
     grid-template-columns: 1fr;
   }
 }

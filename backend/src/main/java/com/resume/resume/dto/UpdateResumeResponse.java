@@ -12,4 +12,5 @@ public class UpdateResumeResponse {
 
     private String id;
     private LocalDateTime updatedAt;
+    private Integer version;
 }

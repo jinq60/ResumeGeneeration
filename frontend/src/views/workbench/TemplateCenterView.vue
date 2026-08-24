@@ -1,5 +1,5 @@
 <template>
-  <main class="max-w-[1440px] mx-auto px-margin-page py-stack-lg">
+  <main class="workbench-page py-stack-lg">
     <div class="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-stack-lg">
       <div>
         <h1 class="text-headline-md font-headline-md text-on-surface">

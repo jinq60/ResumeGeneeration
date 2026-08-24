@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # 前端运行镜像
 # 运行前需先执行 `npm run build` 生成 dist
 FROM nginx:alpine

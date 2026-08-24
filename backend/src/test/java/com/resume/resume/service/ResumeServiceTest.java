@@ -47,6 +47,9 @@ class ResumeServiceTest {
     @Mock
     private com.resume.resume.share.service.ShareService shareService;
 
+    @Mock
+    private com.resume.audit.service.ContentAuditService contentAuditService;
+
     private ResumeSectionValidator resumeSectionValidator;
 
     private ResumeService resumeService;
@@ -55,7 +58,8 @@ class ResumeServiceTest {
     void setUp() {
         resumeSectionValidator = new ResumeSectionValidator();
         resumeService = new ResumeService(resumeMapper, templateService,
-                pdfService, avatarService, resumeSectionValidator, auditLogService, shareService);
+                pdfService, avatarService, resumeSectionValidator, auditLogService, shareService, contentAuditService);
+        lenient().when(resumeMapper.updateById(any(Resume.class))).thenReturn(1);
     }
 
     @Test
@@ -86,6 +90,52 @@ class ResumeServiceTest {
 
         assertDoesNotThrow(() -> resumeService.updateResume(userId, resumeId, request));
         verify(resumeMapper).updateById(any(Resume.class));
+    }
+
+    @Test
+    void updateResume_shouldThrowConflictWhenVersionStale() {
+        String resumeId = "resume_1";
+        String userId = "user_1";
+
+        Resume existing = new Resume();
+        existing.setId(resumeId);
+        existing.setUserId(userId);
+        existing.setTitle("我的简历");
+        existing.setTemplateId("template_1");
+        existing.setVersion(3);
+        existing.setSections(List.of());
+        when(resumeMapper.selectById(resumeId)).thenReturn(existing);
+        // 乐观锁未命中：影响行数为 0
+        when(resumeMapper.updateById(any(Resume.class))).thenReturn(0);
+
+        UpdateResumeRequest request = new UpdateResumeRequest();
+        request.setTargetPosition("后端工程师");
+
+        com.resume.common.exception.BusinessException ex = assertThrows(
+                com.resume.common.exception.BusinessException.class,
+                () -> resumeService.updateResume(userId, resumeId, request));
+        assertEquals(com.resume.common.constant.ResultCode.RESUME_VERSION_CONFLICT, ex.getErrorCode());
+    }
+
+    @Test
+    void updateResume_shouldReturnNewVersionOnSuccess() {
+        String resumeId = "resume_1";
+        String userId = "user_1";
+
+        Resume existing = new Resume();
+        existing.setId(resumeId);
+        existing.setUserId(userId);
+        existing.setTitle("我的简历");
+        existing.setTemplateId("template_1");
+        existing.setVersion(2);
+        existing.setSections(List.of());
+        when(resumeMapper.selectById(resumeId)).thenReturn(existing);
+
+        UpdateResumeRequest request = new UpdateResumeRequest();
+        request.setTargetPosition("后端工程师");
+
+        var response = resumeService.updateResume(userId, resumeId, request);
+        assertEquals(3, response.getVersion());
     }
 
     private SectionDTO createSection(String type, String title, int order, Object data) {

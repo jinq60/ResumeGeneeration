@@ -7,12 +7,15 @@ import com.resume.common.service.AuditLogService;
 import com.resume.user.dto.*;
 import com.resume.user.entity.RefreshToken;
 import com.resume.user.entity.User;
+import com.resume.user.entity.UserPreference;
 import com.resume.user.mapper.RefreshTokenMapper;
 import com.resume.user.mapper.UserMapper;
+import com.resume.user.mapper.UserPreferenceMapper;
 import com.resume.user.security.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -31,6 +34,7 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -41,6 +45,9 @@ class UserServiceTest {
 
     @Mock
     private RefreshTokenMapper refreshTokenMapper;
+
+    @Mock
+    private UserPreferenceMapper userPreferenceMapper;
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
@@ -58,11 +65,11 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userMapper, refreshTokenMapper, jwtTokenProvider, passwordEncoder,
-                loginAttemptGuard, auditLogService);
+        userService = new UserService(userMapper, refreshTokenMapper, userPreferenceMapper, jwtTokenProvider,
+                passwordEncoder, loginAttemptGuard, auditLogService);
         lenient().when(jwtTokenProvider.generateAccessToken(anyString(), anyBoolean())).thenReturn("access_token");
         lenient().when(jwtTokenProvider.generateAccessToken(anyString(), anyBoolean(), anyString())).thenReturn("access_token");
-        lenient().when(jwtTokenProvider.generateRefreshToken(anyString())).thenReturn("refresh_token");
+        lenient().when(jwtTokenProvider.generateRefreshToken(anyString(), any())).thenReturn("refresh_token");
         lenient().when(jwtTokenProvider.getAccessTokenExpiration()).thenReturn(3600000L);
         lenient().when(jwtTokenProvider.getRefreshTokenExpiration()).thenReturn(604800000L);
         lenient().when(refreshTokenMapper.insert(any(RefreshToken.class))).thenReturn(1);
@@ -164,8 +171,8 @@ class UserServiceTest {
         ReflectionTestUtils.setField(realProvider, "accessTokenExpiration", 3600000L);
         ReflectionTestUtils.setField(realProvider, "refreshTokenExpiration", 604800000L);
 
-        UserService service = new UserService(userMapper, refreshTokenMapper, realProvider, passwordEncoder,
-                loginAttemptGuard, auditLogService);
+        UserService service = new UserService(userMapper, refreshTokenMapper, userPreferenceMapper, realProvider,
+                passwordEncoder, loginAttemptGuard, auditLogService);
         User user = new User();
         user.setId("user_1");
         user.setStatus(BizConstant.USER_STATUS_ACTIVE);
@@ -221,6 +228,7 @@ class UserServiceTest {
         RefreshToken stored = new RefreshToken();
         stored.setId("rt_1");
         stored.setUserId("user_1");
+        stored.setFamilyId("family_1");
         stored.setExpiresAt(LocalDateTime.now().plusDays(1));
         when(refreshTokenMapper.selectOne(any())).thenReturn(stored);
 
@@ -237,6 +245,66 @@ class UserServiceTest {
         assertEquals("access_token", response.getAccessToken());
         assertEquals("refresh_token", response.getRefreshToken());
         verify(refreshTokenMapper).delete(any());
+        // 轮换后的新令牌沿用同一家族 ID
+        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenMapper).insert(captor.capture());
+        assertEquals("family_1", captor.getValue().getFamilyId());
+    }
+
+    @Test
+    void refresh_shouldRevokeWholeFamilyOnReuse() {
+        RefreshRequest request = new RefreshRequest();
+        request.setRefreshToken("reused_token");
+
+        when(jwtTokenProvider.validateRefreshToken("reused_token")).thenReturn(true);
+        when(jwtTokenProvider.getUserId("reused_token")).thenReturn("user_1");
+
+        RefreshToken stored = new RefreshToken();
+        stored.setId("rt_1");
+        stored.setUserId("user_1");
+        stored.setFamilyId("family_1");
+        stored.setExpiresAt(LocalDateTime.now().plusDays(1));
+        when(refreshTokenMapper.selectOne(any())).thenReturn(stored);
+        // 并发复用：先删后验影响 0 行 → 触发家族撤销
+        when(refreshTokenMapper.delete(any())).thenReturn(0);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> userService.refresh(request));
+        assertEquals(ResultCode.AUTH_REFRESH_TOKEN_INVALID, ex.getErrorCode());
+        // 第一次 delete 消费失败，第二次 delete 为家族撤销
+        verify(refreshTokenMapper, times(2)).delete(any());
+    }
+
+    @Test
+    void refresh_shouldRevokeWholeFamilyOnSequentialReplay() {
+        // 失窃令牌在合法客户端刷新后被重放：签名合法但哈希查无记录（已被轮换消费）
+        RefreshRequest request = new RefreshRequest();
+        request.setRefreshToken("stolen_old_token");
+
+        when(jwtTokenProvider.validateRefreshToken("stolen_old_token")).thenReturn(true);
+        when(jwtTokenProvider.getUserId("stolen_old_token")).thenReturn("user_1");
+        when(jwtTokenProvider.getFamilyId("stolen_old_token")).thenReturn("family_1");
+        when(refreshTokenMapper.selectOne(any())).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> userService.refresh(request));
+        assertEquals(ResultCode.AUTH_REFRESH_TOKEN_INVALID, ex.getErrorCode());
+        // 必须按 claim 中的家族 ID 撤销整个家族，使被盗会话的新令牌一并失效
+        verify(refreshTokenMapper).delete(any());
+    }
+
+    @Test
+    void refresh_shouldRejectWithoutFamilyRevokeForLegacyToken() {
+        // 历史令牌无 familyId claim：仅拒绝，不触发家族撤销
+        RefreshRequest request = new RefreshRequest();
+        request.setRefreshToken("legacy_token");
+
+        when(jwtTokenProvider.validateRefreshToken("legacy_token")).thenReturn(true);
+        when(jwtTokenProvider.getUserId("legacy_token")).thenReturn("user_1");
+        when(jwtTokenProvider.getFamilyId("legacy_token")).thenReturn(null);
+        when(refreshTokenMapper.selectOne(any())).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> userService.refresh(request));
+        assertEquals(ResultCode.AUTH_REFRESH_TOKEN_INVALID, ex.getErrorCode());
+        verify(refreshTokenMapper, never()).delete(any());
     }
 
     @Test
@@ -312,5 +380,126 @@ class UserServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> userService.changePassword("guest_1", request));
         assertEquals(ResultCode.PARAM_INVALID, ex.getErrorCode());
+    }
+
+    @Test
+    void updateProfile_shouldUpdateNicknameAndPhone() {
+        User user = new User();
+        user.setId("user_1");
+        user.setIsGuest(0);
+        when(userMapper.selectById("user_1")).thenReturn(user);
+        when(userMapper.selectOne(any())).thenReturn(null);
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setNickname("新昵称");
+        request.setPhone("13800138000");
+
+        UserInfoResponse response = userService.updateProfile("user_1", request);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userMapper).updateById(captor.capture());
+        assertEquals("新昵称", captor.getValue().getNickname());
+        assertEquals("13800138000", captor.getValue().getPhone());
+        assertNotNull(response);
+    }
+
+    @Test
+    void updateProfile_shouldRejectDuplicatePhone() {
+        User user = new User();
+        user.setId("user_1");
+        user.setIsGuest(0);
+        when(userMapper.selectById("user_1")).thenReturn(user);
+
+        User other = new User();
+        other.setId("user_2");
+        when(userMapper.selectOne(any())).thenReturn(other);
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setPhone("13800138000");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> userService.updateProfile("user_1", request));
+        assertEquals(ResultCode.AUTH_PHONE_REGISTERED, ex.getErrorCode());
+    }
+
+    @Test
+    void updateProfile_shouldRejectGuest() {
+        User user = new User();
+        user.setId("guest_1");
+        user.setIsGuest(1);
+        when(userMapper.selectById("guest_1")).thenReturn(user);
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setNickname("昵称");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> userService.updateProfile("guest_1", request));
+        assertEquals(ResultCode.PARAM_INVALID, ex.getErrorCode());
+    }
+
+    @Test
+    void getPreferences_shouldReturnStoredValues() {
+        User user = new User();
+        user.setId("user_1");
+        when(userMapper.selectById("user_1")).thenReturn(user);
+
+        UserPreference preference = new UserPreference();
+        preference.setUserId("user_1");
+        preference.setPreferences(Map.of("emailNotify", true));
+        when(userPreferenceMapper.selectById("user_1")).thenReturn(preference);
+
+        Map<String, Object> result = userService.getPreferences("user_1");
+
+        assertEquals(Boolean.TRUE, result.get("emailNotify"));
+    }
+
+    @Test
+    void savePreferences_shouldInsertWhenMissing() {
+        User user = new User();
+        user.setId("user_1");
+        when(userMapper.selectById("user_1")).thenReturn(user);
+        when(userPreferenceMapper.selectById("user_1")).thenReturn(null);
+
+        Map<String, Object> result = userService.savePreferences("user_1", Map.of("emailNotify", false));
+
+        ArgumentCaptor<UserPreference> captor = ArgumentCaptor.forClass(UserPreference.class);
+        verify(userPreferenceMapper).insert(captor.capture());
+        assertEquals(Boolean.FALSE, captor.getValue().getPreferences().get("emailNotify"));
+        assertEquals(Map.of("emailNotify", false), result);
+    }
+
+    @Test
+    void adminCreateUser_shouldGenerateTemporaryPassword() {
+        when(userMapper.selectOne(any())).thenReturn(null);
+        when(userMapper.insert(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            u.setId("user_new");
+            return 1;
+        });
+
+        AdminCreateUserRequest request = new AdminCreateUserRequest();
+        request.setEmail("new@example.com");
+        request.setNickname("新用户");
+
+        AdminCreateUserResponse response = userService.adminCreateUser(request);
+
+        assertEquals("user_new", response.getUserId());
+        assertNotNull(response.getTemporaryPassword());
+        assertEquals(10, response.getTemporaryPassword().length());
+    }
+
+    @Test
+    void adminCreateUser_shouldRejectDuplicateEmail() {
+        User existing = new User();
+        existing.setId("user_existing");
+        existing.setEmail("dup@example.com");
+        when(userMapper.selectOne(any())).thenReturn(existing);
+
+        AdminCreateUserRequest request = new AdminCreateUserRequest();
+        request.setEmail("dup@example.com");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> userService.adminCreateUser(request));
+        assertEquals(ResultCode.AUTH_EMAIL_REGISTERED, ex.getErrorCode());
     }
 }

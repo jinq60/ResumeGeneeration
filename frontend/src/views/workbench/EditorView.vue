@@ -10,28 +10,28 @@
     <div class="editor-secondary-header">
       <div class="editor-header-leading flex items-center gap-6">
         <button
-          class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors"
+          class="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           @click="handleBack"
         >
           <el-icon><ArrowLeft /></el-icon>
           <span class="header-back-label">返回简历库</span>
         </button>
-        <div class="h-6 w-px bg-outline-variant" />
+        <div class="h-6 w-px bg-border" />
         <div class="flex items-center gap-2">
-          <h1 class="text-title-lg font-title-lg text-on-surface">
+          <h1 class="text-headline-md font-serif text-foreground">
             {{ resume?.title || '新建简历' }}
           </h1>
           <el-icon
-            class="text-on-surface-variant cursor-pointer hover:text-primary"
+            class="text-muted-foreground cursor-pointer hover:text-foreground"
             @click="startRename"
           >
             <Edit />
           </el-icon>
         </div>
-        <div class="editor-save-status flex items-center gap-2 text-label-md text-outline">
+        <div class="editor-save-status flex items-center gap-2 text-label-md text-muted">
           <span
             class="w-2 h-2 rounded-full"
-            :class="saveStatus === 'saved' ? 'bg-secondary' : 'bg-primary'"
+            :class="saveStatus === 'saved' ? 'bg-secondary' : 'bg-foreground'"
           />
           <span>{{ saveStatusLabel }}</span>
         </div>
@@ -48,7 +48,7 @@
             <DArrowLeft v-else />
           </el-icon>
         </button>
-        <div class="flex items-center gap-1 border-r border-outline-variant pr-3">
+        <div class="flex items-center gap-1 border-r border-border pr-3">
           <button
             class="editor-header-icon"
             :disabled="!canUndo"
@@ -69,14 +69,14 @@
           </button>
         </div>
         <button
-          class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-lg hover:bg-surface-container-high transition-all text-on-surface"
+          class="flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-all text-foreground"
           @click="handlePreview"
         >
           <el-icon><View /></el-icon>
           <span class="header-action-label">预览</span>
         </button>
         <button
-          class="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 shadow-sm active:scale-[0.98] transition-transform"
+          class="editor-export-button flex items-center gap-2 px-6 py-2 bg-foreground rounded-lg hover:opacity-90 shadow-sm active:scale-[0.98] transition-transform"
           @click="handleExport"
         >
           <el-icon><Document /></el-icon>
@@ -110,42 +110,33 @@
 
     <!-- Main Workspace -->
     <main class="editor-workspace">
-      <!-- Left Edit Panel -->
+      <EditorModuleRail
+        v-if="resume"
+        :sections="resume.sections"
+        :active-section-id="activeSectionId"
+        :theme-color="activeThemeColor"
+        @select-section="selectSection"
+        @toggle-visibility="updateSectionVisibility"
+        @remove-section="removeSection"
+        @reorder-sections="reorderSections"
+        @add-custom-section="addCustomSection"
+        @select-theme="applyThemeColor"
+        @open-settings="openRenderSettings"
+      />
+
+      <!-- Module form panel -->
       <section
         class="editor-form-panel"
         :class="{ 'is-collapsed': editPanelCollapsed }"
       >
-        <div class="editor-tabs custom-scrollbar">
-          <button
-            v-for="tab in tabs"
-            :key="tab.name"
-            :class="[
-              'editor-tab flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors text-sm whitespace-nowrap',
-              activeTab === tab.name
-                ? 'bg-primary/10 text-primary font-semibold'
-                : 'text-on-surface-variant hover:bg-surface-container-low'
-            ]"
-            @click="activeTab = tab.name"
-          >
-            <el-icon :size="14">
-              <component :is="tab.icon" />
-            </el-icon>
-            <span>{{ tab.label }}</span>
-          </button>
-          <button
-            class="editor-tab flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors text-sm whitespace-nowrap text-on-surface-variant hover:bg-surface-container-low"
-            @click="sectionsDialogVisible = true"
-          >
-            <el-icon :size="14">
-              <Menu />
-            </el-icon>
-            <span>模块</span>
-          </button>
+        <div class="form-panel-heading">
+          <el-icon><component :is="sectionIcon(activeTab)" /></el-icon>
+          <strong>{{ activeSectionTitle }}</strong>
         </div>
         <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
           <div
             v-if="loading"
-            class="h-full flex items-center justify-center gap-2 text-on-surface-variant"
+            class="h-full flex items-center justify-center gap-2 text-muted-foreground"
           >
             <el-icon
               class="is-spin"
@@ -228,7 +219,7 @@
               >
                 <el-icon
                   size="28"
-                  class="text-outline"
+                  class="text-muted"
                 >
                   <Document />
                 </el-icon>
@@ -240,22 +231,22 @@
 
         <!-- Floating Toolbar -->
         <div class="floating-toolbar">
-          <div class="flex items-center gap-3 pr-8 border-r border-outline-variant">
+          <div class="flex items-center gap-3 pr-8 border-r border-border">
             <button
-              class="w-8 h-8 rounded-full hover:bg-surface-container-high flex items-center justify-center"
+              class="w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center"
               @click="zoomOut"
             >
               <el-icon><Minus /></el-icon>
             </button>
             <span class="font-bold text-sm">{{ zoom }}%</span>
             <button
-              class="w-8 h-8 rounded-full hover:bg-surface-container-high flex items-center justify-center"
+              class="w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center"
               @click="zoomIn"
             >
               <el-icon><Plus /></el-icon>
             </button>
           </div>
-          <div class="flex items-center gap-2 text-label-md text-on-surface-variant">
+          <div class="flex items-center gap-2 text-label-md text-muted-foreground">
             <button
               class="page-button"
               :disabled="currentPage <= 1"
@@ -276,9 +267,9 @@
               <el-icon><ArrowRight /></el-icon>
             </button>
           </div>
-          <div class="h-6 w-px bg-outline-variant" />
+          <div class="h-6 w-px bg-border" />
           <div
-            class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+            class="flex items-center gap-2 cursor-pointer hover:text-foreground transition-colors"
             @click="aiDrawerVisible = true"
           >
             <el-icon size="14">
@@ -287,7 +278,7 @@
             <span class="text-label-md">AI 评估</span>
           </div>
           <div
-            class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+            class="flex items-center gap-2 cursor-pointer hover:text-foreground transition-colors"
             @click="runGrammarCheck"
           >
             <el-icon size="14">
@@ -296,7 +287,7 @@
             <span class="text-label-md">语法检查</span>
           </div>
           <div
-            class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+            class="flex items-center gap-2 cursor-pointer hover:text-foreground transition-colors"
             @click="templateDialogVisible = true"
           >
             <span class="text-label-md">模板：{{ templateName(resume?.templateId) }}</span>
@@ -305,7 +296,7 @@
             </el-icon>
           </div>
           <div
-            class="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+            class="flex items-center gap-2 cursor-pointer hover:text-foreground transition-colors"
             @click="openRenderSettings"
           >
             <el-icon size="14">
@@ -352,16 +343,16 @@
     <div
       v-for="(sec, idx) in resume?.sections || []"
       :key="sec.id"
-      class="flex items-center gap-2 py-2 border-b border-outline-variant/30"
+      class="flex items-center gap-2 py-2 border-b border-border/30"
     >
-      <span class="text-xs text-outline w-5 text-center font-mono">{{ idx + 1 }}</span>
+      <span class="text-xs text-muted w-5 text-center font-mono">{{ idx + 1 }}</span>
       <el-input
         :model-value="sec.title"
         size="small"
         style="flex: 1"
         @update:model-value="updateSectionTitle(sec.id, $event)"
       />
-      <span class="text-xs text-outline w-16">
+      <span class="text-xs text-muted w-16">
         {{ typeLabel(sec.type) }}
       </span>
       <el-button
@@ -387,7 +378,16 @@
         @update:model-value="updateSectionVisibility(sec.id, $event)"
       />
     </div>
-    <p class="text-xs text-outline mt-3">
+    <el-button
+      type="primary"
+      plain
+      class="mt-3"
+      @click="addCustomSection"
+    >
+      <el-icon><Plus /></el-icon>
+      添加自定义模块
+    </el-button>
+    <p class="text-xs text-muted mt-3">
       隐藏的模块不会出现在预览与导出 PDF 中；个人信息模块不可隐藏。
     </p>
   </el-dialog>
@@ -404,13 +404,13 @@
         v-for="t in templates"
         :key="t.id"
         class="cursor-pointer rounded-xl border-2 overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md"
-        :class="resume?.templateId === t.id ? 'border-primary' : 'border-outline-variant'"
+        :class="resume?.templateId === t.id ? 'border-foreground' : 'border-border'"
         @click="selectTemplate(t)"
       >
         <img
           :src="t.thumbnailUrl"
           :alt="t.name"
-          class="w-full aspect-[3/4] object-cover bg-surface-container-low"
+          class="w-full aspect-[3/4] object-cover bg-secondary"
           @error="onThumbnailError"
         >
         <div class="p-2 text-center text-sm font-medium">
@@ -535,46 +535,98 @@
     v-model="aiDrawerVisible"
     title="AI 简历评估"
     size="380px"
+    @open="loadAiAssessment"
   >
-    <div class="flex items-baseline gap-1 mb-2">
-      <span class="text-4xl font-bold text-primary">{{ aiScore }}</span>
-      <span class="text-outline text-xl">/ 100</span>
+    <div
+      v-if="aiAssessmentLoading"
+      class="flex items-center justify-center gap-2 text-muted-foreground py-16"
+    >
+      <el-icon class="is-spin">
+        <Loading />
+      </el-icon>
+      <span class="text-sm">正在加载最新点评…</span>
     </div>
-    <p class="text-label-md text-on-surface-variant mb-4">
-      整体不错，继续优化可显著提升竞争力
-    </p>
-    <div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden mb-6">
-      <div
-        class="h-full bg-primary"
-        :style="{ width: aiScore + '%' }"
-      />
-    </div>
-    <div class="space-y-4">
-      <div class="p-4 border border-outline-variant rounded-lg">
-        <div class="flex items-center gap-2 text-sm font-semibold mb-2 text-error">
-          <el-icon size="14">
-            <WarningFilled />
-          </el-icon>
-          <span>最值得修改</span>
-        </div>
-        <ul class="text-xs space-y-2 text-on-surface-variant">
-          <li>在项目经历中补充量化结果，用数据展示影响力。</li>
-          <li>把"会员管理"改为具体成果表述。</li>
-        </ul>
+
+    <template v-else-if="aiAssessment">
+      <div class="flex items-baseline gap-1 mb-2">
+        <span class="text-4xl font-bold text-foreground">{{ aiAssessment.overallScore ?? '—' }}</span>
+        <span class="text-muted text-xl">/ 100</span>
       </div>
-      <div class="p-4 border border-outline-variant rounded-lg">
-        <div class="flex items-center gap-2 text-sm font-semibold mb-2 text-secondary">
-          <el-icon size="14">
-            <Opportunity />
-          </el-icon>
-          <span>可增强</span>
-        </div>
-        <ul class="text-xs space-y-2 text-on-surface-variant">
-          <li>在个人简介中加入技术优势关键词。</li>
-          <li>补充一个代表性 GitHub 链接或技术作品。</li>
-        </ul>
+      <p class="text-label-md text-muted-foreground mb-4">
+        {{ aiAssessmentComment }}
+      </p>
+      <div class="h-1.5 w-full bg-background-container rounded-full overflow-hidden mb-6">
+        <div
+          class="h-full bg-foreground"
+          :style="{ width: Math.min(100, aiAssessment.overallScore ?? 0) + '%' }"
+        />
       </div>
-    </div>
+      <div class="space-y-4">
+        <div
+          v-if="aiAssessment.highlights?.length"
+          class="p-4 border border-border rounded-lg"
+        >
+          <div class="flex items-center gap-2 text-sm font-semibold mb-2 text-muted-foreground">
+            <el-icon size="14">
+              <Opportunity />
+            </el-icon>
+            <span>已做得好</span>
+          </div>
+          <ul class="text-xs space-y-2 text-muted-foreground">
+            <li
+              v-for="(h, i) in aiAssessment.highlights"
+              :key="i"
+            >
+              {{ h }}
+            </li>
+          </ul>
+        </div>
+        <div
+          v-if="aiAssessment.suggestions?.length"
+          class="p-4 border border-border rounded-lg"
+        >
+          <div class="flex items-center gap-2 text-sm font-semibold mb-2 text-destructive">
+            <el-icon size="14">
+              <WarningFilled />
+            </el-icon>
+            <span>最值得修改</span>
+          </div>
+          <ul class="text-xs space-y-2 text-muted-foreground">
+            <li
+              v-for="(s, i) in aiAssessment.suggestions.slice(0, 5)"
+              :key="i"
+            >
+              {{ s.title || s.advice || s.problem }}
+            </li>
+          </ul>
+        </div>
+        <div
+          v-if="aiAssessment.missingSkills?.length"
+          class="p-4 border border-border rounded-lg"
+        >
+          <div class="flex items-center gap-2 text-sm font-semibold mb-2 text-muted-foreground">
+            <el-icon size="14">
+              <CollectionTag />
+            </el-icon>
+            <span>建议补充的技能</span>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="(skill, i) in aiAssessment.missingSkills"
+              :key="i"
+              class="bg-secondary text-muted-foreground px-2.5 py-1 text-xs rounded-full"
+            >{{ skill }}</span>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <el-empty
+      v-else
+      description="暂无 AI 点评结果，去生成一份点评报告吧"
+      :image-size="90"
+    />
+
     <div class="mt-6">
       <el-button
         type="primary"
@@ -662,13 +714,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
   Edit,
   View,
+  Hide,
   Document,
   User,
   School,
@@ -690,7 +743,8 @@ import {
   Opportunity,
   MagicStick,
   Loading,
-  Setting
+  Setting,
+  Delete
 } from '@element-plus/icons-vue'
 import { resumeApi, type GrammarCheckResponse, type GrammarIssue } from '@/api/resume'
 import { templateApi } from '@/api/template'
@@ -710,6 +764,7 @@ import WorkForm from '@/components/editor/WorkForm.vue'
 import SkillForm from '@/components/editor/SkillForm.vue'
 import IntroductionForm from '@/components/editor/IntroductionForm.vue'
 import CustomForm from '@/components/editor/CustomForm.vue'
+import EditorModuleRail from '@/components/editor/EditorModuleRail.vue'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useResumeDraft } from '@/composables/useResumeDraft'
 import { useResumeHistory } from '@/composables/useResumeHistory'
@@ -719,14 +774,22 @@ const route = useRoute()
 
 const resume = ref<Resume | null>(null)
 const activeTab = ref('profile')
+const activeSectionId = ref('profile')
 const loading = ref(true)
-const zoom = ref(100)
+const desktopDefaultZoom = typeof window !== 'undefined' && window.innerWidth <= 1440 ? 60 : 85
+const zoom = ref(desktopDefaultZoom)
 const editPanelCollapsed = ref(false)
 const mobileView = ref<'edit' | 'preview'>('edit')
 const currentPage = ref(1)
 const pageCount = ref(1)
 const canvasScrollRef = ref<HTMLElement | null>(null)
-const aiScore = ref(82)
+const aiAssessment = ref<{
+  overallScore?: number
+  highlights?: string[]
+  suggestions?: Array<{ title?: string; advice?: string; problem?: string }>
+  missingSkills?: string[]
+} | null>(null)
+const aiAssessmentLoading = ref(false)
 const renameVisible = ref(false)
 const renameTitle = ref('')
 const sectionsDialogVisible = ref(false)
@@ -772,6 +835,9 @@ const a4PageShellStyle = computed(() => ({
 const a4PageStyle = computed(() => ({
   transform: `scale(${a4PageScale.value})`
 }))
+const activeSection = computed(() => resume.value?.sections.find(section => section.id === activeSectionId.value))
+const activeSectionTitle = computed(() => activeSection.value?.title || typeLabel(activeTab.value))
+const activeThemeColor = computed(() => normalizeRenderSettings(resume.value?.renderSettings).accentColor)
 
 const saveStatusLabel = computed(() => {
   switch (saveStatus.value) {
@@ -831,6 +897,7 @@ async function restoreDraftIfAvailable(serverResume: Resume) {
       }
     )
     resume.value = cloneResumeState(draft.data)
+    resetActiveSection(resume.value)
     resetHistory()
     record(serverResume, 'draft-restore')
     triggerAutoSave()
@@ -858,6 +925,7 @@ async function loadResume() {
         templateId
       })
       resume.value = newResume
+      resetActiveSection(newResume)
       resetHistory()
       router.replace(`/workbench/editor/${newResume.id}`)
     } catch (e: any) {
@@ -871,6 +939,7 @@ async function loadResume() {
   try {
     const serverResume = await resumeApi.get(id)
     resume.value = serverResume
+    resetActiveSection(serverResume)
     resetHistory()
     await restoreDraftIfAvailable(serverResume)
   } catch (e: any) {
@@ -900,6 +969,30 @@ function goAiReview() {
   if (!resume.value) return
   router.push(`/workbench/resumes/${resume.value.id}/review`)
 }
+
+async function loadAiAssessment() {
+  if (!resume.value) return
+  aiAssessmentLoading.value = true
+  aiAssessment.value = null
+  try {
+    const review = await resumeApi.getLatestReview(resume.value.id)
+    if (review?.overallScore != null) {
+      aiAssessment.value = review
+    }
+  } catch {
+    // 点评数据加载失败时展示空状态
+  } finally {
+    aiAssessmentLoading.value = false
+  }
+}
+
+const aiAssessmentComment = computed(() => {
+  const score = aiAssessment.value?.overallScore
+  if (score == null) return '暂无 AI 点评结果'
+  if (score >= 80) return '整体不错，继续优化可显著提升竞争力'
+  if (score >= 60) return '简历基础扎实，按建议优化后可明显提升匹配度'
+  return '建议根据下方点评逐项优化，快速提升竞争力'
+})
 
 function startRename() {
   if (!resume.value) return
@@ -950,6 +1043,8 @@ function focusGrammarIssue(issue: GrammarIssue) {
   const supportedTabs = tabs.map((tab) => tab.name)
   if (supportedTabs.includes(issue.sectionType)) {
     activeTab.value = issue.sectionType
+    const matchingSection = resume.value?.sections.find(section => section.type === issue.sectionType)
+    if (matchingSection) activeSectionId.value = matchingSection.id
   }
   grammarDrawerVisible.value = false
 }
@@ -1059,12 +1154,106 @@ function updateSectionTitle(sectionId: string, title: string) {
   }, 'section-title')
 }
 
-function updateSectionVisibility(sectionId: string, visible: boolean) {
+function updateSectionVisibility(sectionId: string, visible: string | number | boolean) {
   if (sectionId === 'profile') return
   applyResumeChange((current) => {
     const section = current.sections.find((item) => item.id === sectionId)
-    if (section) section.visible = visible
+    if (section) section.visible = Boolean(visible)
   }, 'section-visibility')
+}
+
+function resetActiveSection(current: Resume) {
+  const profile = current.sections.find(section => section.type === 'profile') || current.sections[0]
+  if (!profile) return
+  activeSectionId.value = profile.id
+  activeTab.value = profile.type
+}
+
+function selectSection(sectionId: string) {
+  const section = resume.value?.sections.find(item => item.id === sectionId)
+  if (!section) return
+  activeSectionId.value = section.id
+  activeTab.value = section.type
+}
+
+function applyThemeColor(color: string) {
+  if (!resume.value) return
+  applyResumeChange((current) => {
+    current.renderSettings = { ...normalizeRenderSettings(current.renderSettings), accentColor: color }
+  }, 'theme-color')
+}
+
+function reorderSections(orderedIds: string[]) {
+  if (!resume.value) return
+  const byId = new Map(resume.value.sections.map(section => [section.id, section]))
+  const profile = resume.value.sections.filter(section => section.type === 'profile')
+  const ordered = orderedIds.map(id => byId.get(id)).filter((section): section is Section => Boolean(section))
+  const remaining = resume.value.sections.filter(section => section.type !== 'profile' && !orderedIds.includes(section.id))
+  handleSectionsUpdate([...profile, ...ordered, ...remaining].map((section, index) => ({ ...section, order: index })))
+}
+
+function sectionIcon(type: string) {
+  const iconMap: Record<string, typeof User> = {
+    profile: User,
+    education: School,
+    project: DocumentChecked,
+    work: Briefcase,
+    skill: CollectionTag,
+    introduction: CirclePlus,
+    custom: CirclePlus
+  }
+  return iconMap[type] || CirclePlus
+}
+
+function removeSection(sectionId: string) {
+  if (!resume.value) return
+  const target = resume.value.sections.find(section => section.id === sectionId)
+  if (!target || target.type === 'profile') return
+  const remaining = resume.value.sections.filter(section => section.id !== sectionId)
+  handleSectionsUpdate(remaining)
+  if (activeSectionId.value === sectionId) activeSectionId.value = 'profile'
+  if (activeTab.value === target.type && !remaining.some(section => section.type === target.type)) {
+    activeTab.value = 'profile'
+  }
+}
+
+const draggedSectionId = ref<string | null>(null)
+
+function startSectionDrag(sectionId: string, event: DragEvent) {
+  draggedSectionId.value = sectionId
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', sectionId)
+  }
+}
+
+function dropSection(targetId: string) {
+  if (!resume.value || !draggedSectionId.value || draggedSectionId.value === targetId) return
+  const sections = [...resume.value.sections]
+  const fromIndex = sections.findIndex(section => section.id === draggedSectionId.value)
+  const toIndex = sections.findIndex(section => section.id === targetId)
+  if (fromIndex < 0 || toIndex < 0) return
+  const [moved] = sections.splice(fromIndex, 1)
+  sections.splice(toIndex, 0, moved)
+  handleSectionsUpdate(sections.map((section, index) => ({ ...section, order: index })))
+  draggedSectionId.value = null
+}
+
+function addCustomSection() {
+  if (!resume.value) return
+  const count = resume.value.sections.filter(section => section.type === 'custom').length
+  const section: Section = {
+    id: `custom_${Date.now()}`,
+    type: 'custom',
+    title: `自定义模块 ${count + 1}`,
+    order: resume.value.sections.length,
+    visible: true,
+    data: { content: '' }
+  }
+  handleSectionsUpdate([...resume.value.sections, section])
+  activeTab.value = 'custom'
+  activeSectionId.value = section.id
+  sectionsDialogVisible.value = false
 }
 
 function undoEdit() {
@@ -1178,6 +1367,13 @@ onMounted(() => {
   loadTemplates()
 })
 
+watch(() => loading.value, (isLoading) => {
+  if (!isLoading && route.query.grammar === '1' && resume.value) {
+    runGrammarCheck()
+    router.replace({ query: {} })
+  }
+})
+
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleEditorKeydown)
 })
@@ -1189,18 +1385,18 @@ onBeforeUnmount(() => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  height: calc(100vh - 2 * var(--st-margin-page));
-  background: var(--st-surface);
+  height: calc(100vh - 2 * var(--spacing-margin-page));
+  background: #f6f6f4;
   overflow: hidden;
-  margin: calc(-1 * var(--st-margin-page));
+  margin: calc(-1 * var(--spacing-margin-page));
 }
 
 .editor-secondary-header {
-  height: 56px;
+  height: 64px;
   flex-shrink: 0;
-  background: var(--st-surface);
-  border-bottom: 1px solid var(--st-outline-variant);
-  padding: 0 var(--st-margin-page);
+  background: #fff;
+  border-bottom: 1px solid #e7e7e4;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1213,12 +1409,12 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--st-on-surface-variant);
+  color: var(--color-muted-foreground);
   transition: background-color 160ms ease, color 160ms ease;
 
   &:hover:not(:disabled) {
-    background: var(--st-surface-container-high);
-    color: var(--st-primary);
+    background: var(--color-secondary);
+    color: var(--color-foreground);
   }
 
   &:disabled {
@@ -1240,6 +1436,12 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
+.editor-export-button,
+.editor-export-button .el-icon,
+.editor-export-button .header-action-label {
+  color: #fff;
+}
+
 .editor-mobile-switcher {
   display: none;
 }
@@ -1248,25 +1450,66 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   overflow: hidden;
+  overflow-x: hidden;
+  margin-top: 16px;
+  border-top: 1px solid #e4e4e1;
 }
 
 .editor-tabs {
   display: flex;
-  gap: 4px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--st-outline-variant);
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: #fafaf8;
+  border-right: 1px solid #e4e4e1;
+  overflow-y: auto;
+  overflow-x: hidden;
   flex-shrink: 0;
 }
 
 .editor-tab {
   flex-shrink: 0;
+  width: 100%;
+  min-height: 58px;
+  justify-content: flex-start;
+  padding: 0 14px !important;
+  border: 1px solid #e3e3df;
+  border-radius: 14px !important;
+  background: #fff;
+  color: #22221f;
+
+  &:hover {
+    border-color: #b8b8b1;
+    background: #fff;
+  }
+
+  &.bg-secondary {
+    border: 2px solid #20201d;
+    background: #fff;
+  }
+}
+
+.editor-tab-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.editor-tab-delete,
+.editor-tab-visibility {
+  flex: 0 0 auto;
+  color: #777771;
+}
+
+.editor-tab-delete:hover {
+  color: #d92d20;
 }
 
 .editor-form-panel {
-  width: 400px;
-  border-right: 1px solid var(--st-outline-variant);
-  background: var(--st-surface-container-lowest);
+  width: clamp(390px, 31vw, 520px);
+  border-right: 1px solid var(--color-border);
+  background: #fffdf9;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -1281,6 +1524,25 @@ onBeforeUnmount(() => {
   }
 }
 
+.form-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 0 24px;
+  border-bottom: 1px solid #e8e7e2;
+  background: #fff;
+  color: #22211d;
+  font-size: 16px;
+}
+
+.editor-form-panel > .flex-1 {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
@@ -1290,13 +1552,13 @@ onBeforeUnmount(() => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--st-outline-variant);
+  background: var(--color-border);
   border-radius: 4px;
 }
 
 .editor-canvas {
   flex: 1;
-  background: var(--st-surface-container-low);
+  background: #f0f1f0;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -1306,7 +1568,8 @@ onBeforeUnmount(() => {
 .canvas-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: var(--st-stack-lg);
+  overflow-x: hidden;
+  padding: 32px 40px;
   display: flex;
   justify-content: center;
 }
@@ -1334,11 +1597,11 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--st-on-surface-variant);
+  color: var(--color-muted-foreground);
 
   &:hover:not(:disabled) {
-    background: var(--st-surface-container-high);
-    color: var(--st-primary);
+    background: var(--color-secondary);
+    color: var(--color-foreground);
   }
 
   &:disabled {
@@ -1353,14 +1616,14 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: var(--st-on-surface-variant);
+  color: var(--color-muted-foreground);
 }
 
 .setting-control-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--st-on-surface-variant);
+  color: var(--color-muted-foreground);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -1372,9 +1635,9 @@ onBeforeUnmount(() => {
 .render-settings-note {
   margin: 0;
   padding: 10px 12px;
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-container-low);
-  color: var(--st-on-surface-variant);
+  border-radius: var(--radius-md);
+  background: var(--color-secondary);
+  color: var(--color-muted-foreground);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -1382,9 +1645,9 @@ onBeforeUnmount(() => {
 .grammar-summary {
   padding: 10px 12px;
   margin-bottom: 10px;
-  border-radius: var(--st-radius-md);
-  color: var(--st-on-surface-variant);
-  background: var(--st-surface-container-low);
+  border-radius: var(--radius-md);
+  color: var(--color-muted-foreground);
+  background: var(--color-secondary);
   font-size: 13px;
 }
 
@@ -1398,14 +1661,14 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: 14px;
   text-align: left;
-  border: 1px solid var(--st-outline-variant);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-bright);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 
   &:hover {
-    border-color: var(--st-primary-fixed-dim);
-    box-shadow: var(--st-shadow-sm);
+    border-color: var(--color-secondary);
+    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -1414,7 +1677,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: var(--st-on-surface);
+  color: var(--color-foreground);
   font-size: 13px;
   font-weight: 600;
 }
@@ -1428,15 +1691,15 @@ onBeforeUnmount(() => {
 }
 
 .grammar-original {
-  color: var(--st-error);
+  color: var(--color-destructive);
 }
 
 .grammar-suggestion {
-  color: var(--st-secondary);
+  color: var(--color-muted-foreground);
 }
 
 .grammar-explanation {
-  color: var(--st-on-surface-variant);
+  color: var(--color-muted-foreground);
 }
 
 .a4-placeholder {
@@ -1446,8 +1709,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--st-stack-md);
-  color: var(--st-outline);
+  gap: var(--spacing-stack-md);
+  color: var(--color-muted);
 }
 
 .floating-toolbar {
@@ -1457,10 +1720,10 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   backdrop-filter: blur(8px);
   background: rgba(255, 255, 255, 0.9);
-  border: 1px solid var(--st-outline-variant);
+  border: 1px solid var(--color-border);
   padding: 12px 24px;
   border-radius: 9999px;
-  box-shadow: var(--st-shadow-md);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
   gap: 20px;
@@ -1534,20 +1797,20 @@ onBeforeUnmount(() => {
     display: flex;
     gap: 4px;
     padding: 8px 12px;
-    background: var(--st-surface);
-    border-bottom: 1px solid var(--st-outline-variant);
+    background: var(--color-background);
+    border-bottom: 1px solid var(--color-border);
 
     button {
       flex: 1;
       padding: 8px 12px;
-      border-radius: var(--st-radius-md);
-      color: var(--st-on-surface-variant);
+      border-radius: var(--radius-md);
+      color: var(--color-muted-foreground);
       font-size: 13px;
       font-weight: 600;
 
       &.is-active {
-        color: var(--st-primary);
-        background: var(--st-primary-container);
+        color: var(--color-foreground);
+        background: var(--color-secondary);
       }
     }
   }
@@ -1560,6 +1823,7 @@ onBeforeUnmount(() => {
     display: none;
     position: static;
     width: 100%;
+    grid-template-columns: 1fr;
     border-right: 0;
 
     &.is-collapsed {
@@ -1568,6 +1832,18 @@ onBeforeUnmount(() => {
       overflow: visible;
       pointer-events: auto;
     }
+  }
+
+  .editor-tabs {
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .editor-tab {
+    width: auto;
   }
 
   .editor-canvas {

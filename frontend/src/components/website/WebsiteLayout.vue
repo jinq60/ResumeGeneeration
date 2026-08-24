@@ -31,18 +31,20 @@
         </div>
 
         <div class="header-right">
-          <RouterLink
-            to="/login"
+          <button
+            type="button"
             class="header-link"
+            @click="authModalStore.open()"
           >
             登录
-          </RouterLink>
-          <RouterLink
-            to="/login"
+          </button>
+          <button
+            type="button"
             class="header-cta"
+            @click="authModalStore.open()"
           >
             免费试用
-          </RouterLink>
+          </button>
         </div>
       </div>
     </header>
@@ -123,9 +125,11 @@
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import { useAuthModalStore } from '@/stores/authModal'
 import { Document } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const authModalStore = useAuthModalStore()
 const currentYear = new Date().getFullYear()
 
 const navItems = [
@@ -151,7 +155,7 @@ function isActive(path: string) {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--st-surface-container-lowest);
+  background: var(--st-background);
 }
 
 .website-header {
@@ -159,9 +163,13 @@ function isActive(path: string) {
   top: 0;
   z-index: 50;
   height: 64px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(249, 249, 247, 0.85);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--st-outline-variant);
+  border-bottom: 1px solid var(--st-border);
+}
+
+.dark .website-header {
+  background: rgba(17, 17, 16, 0.85);
 }
 
 .header-inner {
@@ -219,13 +227,13 @@ function isActive(path: string) {
 .header-link {
   font-size: 14px;
   font-weight: 500;
-  color: var(--st-on-surface-variant);
+  color: var(--st-muted-foreground);
   text-decoration: none;
   transition: color 0.2s ease;
 
   &:hover,
   &.is-active {
-    color: var(--st-primary);
+    color: var(--st-foreground);
   }
 }
 
@@ -236,17 +244,18 @@ function isActive(path: string) {
 }
 
 .header-cta {
-  padding: 8px 16px;
+  padding: 8px 18px;
   border-radius: var(--st-radius-md);
-  background: var(--st-primary);
-  color: var(--st-on-primary);
+  background: var(--st-foreground);
+  color: var(--st-primary-foreground);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 
   &:hover {
     opacity: 0.9;
+    transform: translateY(-1px);
   }
 }
 
@@ -255,9 +264,9 @@ function isActive(path: string) {
 }
 
 .website-footer {
-  background: var(--st-on-surface);
-  color: var(--st-surface-variant);
-  padding: 48px var(--st-margin-page);
+  background: var(--st-foreground);
+  color: var(--st-muted-foreground);
+  padding: 64px var(--st-margin-page);
 }
 
 .footer-inner {
@@ -277,21 +286,21 @@ function isActive(path: string) {
   align-items: center;
   gap: 8px;
   font-size: 18px;
-  font-weight: 700;
-  color: #fff;
+  font-weight: 600;
+  color: var(--st-primary-foreground);
   margin-bottom: 12px;
 }
 
 .footer-title {
   font-size: 16px;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 500;
+  color: var(--st-primary-foreground);
   margin-bottom: 16px;
 }
 
 .footer-desc {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.64);
+  color: var(--st-muted-foreground);
   line-height: 1.6;
 }
 
@@ -305,12 +314,12 @@ function isActive(path: string) {
 
   a {
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.64);
+    color: var(--st-muted-foreground);
     text-decoration: none;
     transition: color 0.2s ease;
 
     &:hover {
-      color: #fff;
+      color: var(--st-primary-foreground);
     }
   }
 }

@@ -13,6 +13,8 @@ public final class ResultCode {
     public static final int UNAUTHORIZED = 401;
     public static final int ACCESS_DENIED = 403;
     public static final int RESOURCE_NOT_FOUND = 404;
+    // 幂等冲突（同一 Idempotency-Key 的请求仍在处理中，等待超时后拒绝执行而非放行重放）
+    public static final int IDEMPOTENCY_CONFLICT = 425;
     public static final int RATE_LIMITED = 429;
     public static final int INTERNAL_ERROR = 500;
 
@@ -56,6 +58,7 @@ public final class ResultCode {
     public static final int RESUME_PROFILE_URL_INVALID = 2009;
     public static final int RESUME_CONTENT_TOO_LONG = 2010;
     public static final int RESUME_IMPORT_INVALID = 2011;
+    public static final int RESUME_VERSION_CONFLICT = 2012;
 
     /**
      * 模板模块错误码：3000-3099

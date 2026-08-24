@@ -9,6 +9,27 @@ spring:
     init:
       mode: never
 
+  # 邮箱验证码 SMTP（开发环境：建议通过 ops/.env 或环境变量注入真实授权码）
+  mail:
+    host: ${SMTP_HOST:smtp.qq.com}
+    port: ${SMTP_PORT:465}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    default-encoding: UTF-8
+    protocol: ${SMTP_PROTOCOL:smtp}
+    properties:
+      mail.smtp.auth: true
+      # QQ 邮箱 465 端口须开启 SSL；587 端口须开启 STARTTLS
+      mail.smtp.ssl.enable: ${SMTP_SSL_ENABLE:true}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS_ENABLE:false}
+      mail.smtp.starttls.required: ${SMTP_STARTTLS_ENABLE:false}
+      # 465 隐式 SSL 场景建议设置 socketFactory（QQ/163 等国内邮箱常见；Spring Boot 3 使用 jakarta.net.ssl.SSLSocketFactory）
+      mail.smtp.socketFactory.class: ${SMTP_SOCKET_FACTORY_CLASS:}
+      mail.smtp.socketFactory.port: ${SMTP_SOCKET_FACTORY_PORT:}
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+
 logging:
   level:
     com.resume: debug
@@ -24,3 +45,17 @@ app:
       pdfs: resume-pdfs
       templates: resume-templates
     presigned-url-expiration: 3600
+  auth:
+    smtp:
+      # EmailCodeService 依赖此段判断 SMTP 是否就绪，须与 spring.mail 保持一致
+      host: ${SMTP_HOST:smtp.qq.com}
+      port: ${SMTP_PORT:465}
+      username: ${SMTP_USERNAME:}
+      password: ${SMTP_PASSWORD:}
+      from: ${SMTP_FROM:}
+    oauth:
+      github:
+        # 回调 http://localhost:8080/api/auth/oauth/github/callback
+        # 凭证一律经环境变量注入，禁止在配置文件中提供真实默认值（历史泄露的凭证已作废）
+        client-id: ${GITHUB_CLIENT_ID:}
+        client-secret: ${GITHUB_CLIENT_SECRET:}

@@ -1,6 +1,6 @@
 <template>
   <main class="min-h-screen bg-surface-container">
-    <div class="max-w-[1080px] mx-auto px-margin-page py-stack-lg">
+    <div class="workbench-page px-margin-page py-stack-lg">
       <header class="flex justify-between items-center mb-stack-lg">
         <div class="flex items-center gap-3">
           <button
@@ -263,6 +263,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useAuthModalStore } from '@/stores/authModal'
+import type { UserPreferences } from '@/api/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
@@ -276,6 +278,7 @@ import {
 
 const router = useRouter()
 const userStore = useUserStore()
+const authModalStore = useAuthModalStore()
 
 const activeTab = ref<'profile' | 'security' | 'preference'>('profile')
 const saving = ref(false)
@@ -327,21 +330,62 @@ const preferenceForm = ref({
   keepGuestData: true
 })
 
-onMounted(() => {
+onMounted(async () => {
   profileForm.value.nickname = userStore.nickname || ''
+  try {
+    const { userApi } = await import('@/api/user')
+    const [info, rawPreferences] = await Promise.all([
+      userApi.me(),
+      userApi.getPreferences().catch(() => ({}))
+    ])
+    const preferences = rawPreferences as UserPreferences
+    if (info?.nickname) {
+      profileForm.value.nickname = info.nickname
+      userStore.setUser({
+        userId: userStore.userId || info.userId,
+        nickname: info.nickname,
+        accessToken: userStore.accessToken,
+        refreshToken: userStore.refreshToken,
+        isGuest: userStore.isGuest
+      })
+    }
+    preferenceForm.value = {
+      emailNotify: preferences.emailNotify !== false,
+      autoSaveNotify: preferences.autoSaveNotify !== false,
+      keepGuestData: preferences.keepGuestData !== false
+    }
+  } catch {
+    // 资料加载失败时保持本地已有信息
+  }
 })
 
 function goAvatarUpload() {
   router.push('/workbench/avatar/upload')
 }
 
+const PHONE_PATTERN = /^1[3-9]\d{9}$/
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 async function saveProfile() {
   saving.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 600))
+    const { userApi } = await import('@/api/user')
+    const payload: { nickname?: string; phone?: string; email?: string } = {}
+    if (profileForm.value.nickname.trim()) payload.nickname = profileForm.value.nickname.trim()
+    if (profileForm.value.phone && PHONE_PATTERN.test(profileForm.value.phone.trim())) {
+      payload.phone = profileForm.value.phone.trim()
+    }
+    if (profileForm.value.email && EMAIL_PATTERN.test(profileForm.value.email.trim())) {
+      payload.email = profileForm.value.email.trim()
+    }
+    if (Object.keys(payload).length === 0) {
+      ElMessage.warning('请先修改昵称、手机号或邮箱')
+      return
+    }
+    const info = await userApi.updateProfile(payload)
     userStore.setUser({
-      userId: userStore.userId || '',
-      nickname: profileForm.value.nickname,
+      userId: userStore.userId || info.userId,
+      nickname: info.nickname || userStore.nickname,
       accessToken: userStore.accessToken,
       refreshToken: userStore.refreshToken,
       isGuest: userStore.isGuest
@@ -377,9 +421,10 @@ async function savePassword() {
     await authApi.changePassword(securityForm.value.oldPassword, securityForm.value.newPassword)
     ElMessage.success('密码修改成功，请重新登录')
     securityForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
-    // 改密后旧会话已全部吊销，跳转登录页
+    // 改密后旧会话已全部吊销，打开登录弹窗
     userStore.clearUser()
-    router.push('/login')
+    authModalStore.open()
+    router.push('/')
   } catch (e: any) {
     ElMessage.error(e.message || '修改失败')
   } finally {
@@ -390,7 +435,8 @@ async function savePassword() {
 async function savePreference() {
   saving.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 400))
+    const { userApi } = await import('@/api/user')
+    await userApi.savePreferences({ ...preferenceForm.value })
     ElMessage.success('偏好设置已保存')
   } catch (e: any) {
     ElMessage.error(e.message || '保存失败')
@@ -414,7 +460,8 @@ function handleLogout() {
       // 服务端吊销失败不阻塞本地登出
     }
     userStore.clearUser()
-    router.push('/login')
+    authModalStore.open()
+    router.push('/')
   })
 }
 </script>
