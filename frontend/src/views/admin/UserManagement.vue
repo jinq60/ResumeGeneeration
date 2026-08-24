@@ -217,16 +217,39 @@
         </el-table-column>
         <el-table-column
           label="角色"
-          width="110"
+          width="130"
           align="center"
         >
           <template #default="{ row }">
-            <span
-              class="px-2 py-0.5 rounded text-[10px] font-bold"
-              :class="roleClass(row.role)"
+            <el-dropdown
+              trigger="click"
+              @command="(cmd: string) => handleRoleChange(row as User, cmd as 'USER' | 'ADMIN')"
             >
-              {{ row.role === 'ADMIN' ? '管理员' : '普通用户' }}
-            </span>
+              <span
+                class="px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer hover:opacity-80 inline-flex items-center gap-1"
+                :class="roleClass(row.role)"
+                title="点击调整角色"
+              >
+                {{ row.role === 'ADMIN' ? '管理员' : '普通用户' }}
+                <el-icon size="10"><ArrowDown /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                    command="USER"
+                    :disabled="row.role === 'USER'"
+                  >
+                    设为普通用户
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    command="ADMIN"
+                    :disabled="row.role === 'ADMIN'"
+                  >
+                    设为管理员
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
         </el-table-column>
         <el-table-column
@@ -267,7 +290,7 @@
         </el-table-column>
         <el-table-column
           label="操作"
-          width="140"
+          width="170"
           align="right"
           fixed="right"
         >
@@ -279,6 +302,13 @@
                 @click="handleViewDetail(row as User)"
               >
                 查看
+              </el-button>
+              <el-button
+                link
+                type="warning"
+                @click="handleResetPassword(row as User)"
+              >
+                重置密码
               </el-button>
               <el-dropdown>
                 <el-icon
@@ -464,6 +494,38 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 重置密码结果 Dialog -->
+    <el-dialog
+      v-model="resetPasswordVisible"
+      title="密码重置成功"
+      width="480px"
+    >
+      <div class="space-y-4">
+        <p class="text-body-md text-on-surface-variant">
+          已为用户 {{ resetTargetLabel }} 重置密码，其原有登录会话已全部失效。
+        </p>
+        <div class="p-4 bg-surface-container-low rounded-lg border border-outline-variant">
+          <p class="text-label-md font-bold text-on-surface-variant mb-2">
+            一次性临时密码（仅显示一次，请立即转交用户）
+          </p>
+          <p class="text-headline-md font-bold text-primary font-mono">
+            {{ resetResult?.temporaryPassword }}
+          </p>
+        </div>
+        <p class="text-body-md text-on-surface-variant">
+          请提醒用户使用临时密码登录后立即修改。
+        </p>
+      </div>
+      <template #footer>
+        <el-button
+          type="primary"
+          @click="resetPasswordVisible = false"
+        >
+          知道了
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -471,7 +533,7 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { userApi, type User, type UserStats, type CreateUserResponse } from '@/api/admin/users'
+import { userApi, type User, type UserStats, type CreateUserResponse, type ResetPasswordResponse } from '@/api/admin/users'
 import { adminDownload } from '@/utils/adminDownload'
 import {
   User as UserIcon,
@@ -526,6 +588,10 @@ const createRules: FormRules = {
 const tempPasswordVisible = ref(false)
 const createdResult = ref<CreateUserResponse | null>(null)
 const exporting = ref(false)
+
+const resetPasswordVisible = ref(false)
+const resetResult = ref<ResetPasswordResponse | null>(null)
+const resetTargetLabel = ref('')
 
 const stats = reactive([
   { label: '用户总数', value: '-', growth: '', compare: '', icon: UserIcon, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
@@ -591,6 +657,47 @@ async function handleToggleStatus(row: User) {
     if (e !== 'cancel') {
       ElMessage.error(e.message || `${action}失败`)
     }
+  }
+}
+
+async function handleRoleChange(row: User, role: 'USER' | 'ADMIN') {
+  if (row.role === role) return
+  const label = role === 'ADMIN' ? '管理员' : '普通用户'
+  try {
+    await ElMessageBox.confirm(
+      `确定将该用户调整为「${label}」吗？${role === 'USER' ? '降权后其已有的管理端会话将随令牌过期失效。' : ''}`,
+      '调整角色',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await userApi.updateUserRole(row.userId, role)
+    row.role = role
+    ElMessage.success(`角色已调整为${label}`)
+  } catch (e: any) {
+    ElMessage.error(e.message || '角色调整失败')
+  }
+}
+
+async function handleResetPassword(row: User) {
+  const label = row.nickname || formatContact(row)
+  try {
+    await ElMessageBox.confirm(
+      `确定重置用户「${label}」的密码吗？原密码将立即失效。`,
+      '重置密码',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  try {
+    resetResult.value = await userApi.resetUserPassword(row.userId)
+    resetTargetLabel.value = label
+    resetPasswordVisible.value = true
+  } catch (e: any) {
+    ElMessage.error(e.message || '重置密码失败')
   }
 }
 

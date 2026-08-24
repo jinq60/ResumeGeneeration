@@ -38,32 +38,55 @@
           placeholder="请粘贴目标岗位的职位描述（JD）..."
         />
 
-        <button
-          class="mt-4 bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="analyzing"
-          @click="handleAnalyze"
-        >
-          <el-icon
-            v-if="analyzing"
-            class="animate-spin"
-            size="14"
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="analyzing || optimizing"
+            @click="handleAnalyze"
           >
-            <Loading />
-          </el-icon>
-          <el-icon
-            v-else
-            size="14"
+            <el-icon
+              v-if="analyzing"
+              class="animate-spin"
+              size="14"
+            >
+              <Loading />
+            </el-icon>
+            <el-icon
+              v-else
+              size="14"
+            >
+              <MagicStick />
+            </el-icon>
+            <span>{{ analyzing ? '分析中…' : '开始点评' }}</span>
+          </button>
+          <button
+            class="bg-secondary text-on-secondary px-4 py-2 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="analyzing || optimizing || !reviewForm.jobDescription.trim()"
+            title="AI 将逐模块给出针对该 JD 的改写建议与匹配度分析"
+            @click="handleOptimize()"
           >
-            <MagicStick />
-          </el-icon>
-          <span>{{ analyzing ? '分析中…' : '开始分析' }}</span>
-        </button>
+            <el-icon
+              v-if="optimizing"
+              class="animate-spin"
+              size="14"
+            >
+              <Loading />
+            </el-icon>
+            <el-icon
+              v-else
+              size="14"
+            >
+              <Aim />
+            </el-icon>
+            <span>{{ optimizing ? '优化分析中…' : 'JD 匹配深度优化' }}</span>
+          </button>
+        </div>
 
         <p
-          v-if="analyzing"
+          v-if="analyzing || optimizing"
           class="mt-3 text-xs text-on-surface-variant"
         >
-          AI 生成点评需要几秒钟，期间你的简历内容不会丢失。
+          AI 生成需要几秒钟到一分钟，期间你的简历内容不会丢失。
         </p>
       </section>
 
@@ -209,20 +232,177 @@
           </button>
         </footer>
       </section>
+
+      <!-- JD 匹配深度优化结果卡 -->
+      <section
+        v-if="optimizeResult && optimizeResult.status !== 'failed'"
+        class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm"
+      >
+        <header class="flex items-end justify-between pb-4 mb-5 border-b border-outline-variant">
+          <div>
+            <h2 class="text-title-lg font-title-lg text-on-surface">
+              JD 匹配深度优化
+            </h2>
+            <p
+              v-if="optimizePending"
+              class="mt-1 text-xs text-on-surface-variant"
+            >
+              AI 正在逐模块分析简历与岗位的匹配度…
+            </p>
+          </div>
+          <div
+            v-if="optimizeResult.matchScore != null"
+            class="flex items-baseline gap-1 bg-secondary-container px-3.5 py-2 rounded-lg"
+          >
+            <span class="text-[28px] font-bold text-secondary leading-none tracking-tight font-mono tabular-nums">{{ optimizeResult.matchScore }}</span>
+            <span class="text-xs text-on-surface-variant">/ 100 匹配度</span>
+          </div>
+        </header>
+
+        <!-- 匹配维度评分 -->
+        <div
+          v-if="optimizeResult.dimensionScores && Object.keys(optimizeResult.dimensionScores).length"
+          class="mb-5"
+        >
+          <h3 class="text-sm font-semibold text-on-surface tracking-wide pl-2 border-l-[3px] border-secondary mb-3">
+            匹配维度
+          </h3>
+          <div class="flex flex-col gap-3">
+            <div
+              v-for="(score, key) in (optimizeResult.dimensionScores as Record<string, number>)"
+              :key="key"
+              class="flex flex-col gap-1.5"
+            >
+              <div class="flex justify-between">
+                <span class="text-sm text-on-surface-variant">{{ getOptimizeDimensionLabel(String(key)) }}</span>
+                <span class="text-sm font-semibold text-on-surface font-mono tabular-nums">{{ score }}</span>
+              </div>
+              <div class="h-1.5 rounded-full bg-surface-container overflow-hidden">
+                <div
+                  class="h-full rounded-full transition-all duration-300 bg-secondary"
+                  :style="{ width: score + '%' }"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 逐模块优化建议 -->
+        <div
+          v-if="optimizeResult.optimizations?.length"
+          class="mb-5"
+        >
+          <h3 class="text-sm font-semibold text-on-surface tracking-wide pl-2 border-l-[3px] border-primary mb-3">
+            逐模块改写建议
+          </h3>
+          <ul class="list-none p-0 flex flex-col gap-3">
+            <li
+              v-for="(opt, i) in optimizeResult.optimizations"
+              :key="i"
+              class="p-3 bg-surface-container-low rounded-lg"
+            >
+              <div class="text-[11px] text-on-surface-variant mb-1">
+                {{ sectionTypeLabel(opt.sectionType) }}
+              </div>
+              <p
+                v-if="opt.originalSummary"
+                class="text-xs text-on-surface-variant leading-relaxed line-through decoration-outline mb-2"
+              >
+                {{ opt.originalSummary }}
+              </p>
+              <p class="text-sm text-on-surface leading-relaxed whitespace-pre-wrap">
+                {{ opt.optimizedContent }}
+              </p>
+              <p
+                v-if="opt.reasoning"
+                class="text-xs text-secondary mt-2"
+              >
+                理由：{{ opt.reasoning }}
+              </p>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 整体建议 -->
+        <div
+          v-if="optimizeResult.recommendations?.length"
+          class="mb-5"
+        >
+          <h3 class="text-sm font-semibold text-on-surface tracking-wide pl-2 border-l-[3px] border-primary mb-3">
+            整体提升建议
+          </h3>
+          <ol class="list-decimal pl-5 flex flex-col gap-1.5 text-sm text-on-surface-variant leading-relaxed">
+            <li
+              v-for="(rec, i) in optimizeResult.recommendations"
+              :key="i"
+            >
+              {{ rec }}
+            </li>
+          </ol>
+        </div>
+
+        <!-- 缺失技能 -->
+        <div
+          v-if="optimizeResult.missingSkills?.length"
+          class="mb-5"
+        >
+          <h3 class="text-sm font-semibold text-on-surface tracking-wide pl-2 border-l-[3px] border-error mb-3">
+            相对目标 JD 缺失的技能
+          </h3>
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="(skill, i) in optimizeResult.missingSkills"
+              :key="i"
+              class="bg-error-container text-error px-2.5 py-1 text-xs rounded-full"
+            >{{ skill }}</span>
+          </div>
+        </div>
+
+        <footer
+          v-if="!optimizePending"
+          class="mt-6 pt-4 border-t border-outline-variant flex justify-end"
+        >
+          <button
+            class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2"
+            @click="handleOptimize()"
+          >
+            重新优化
+          </button>
+        </footer>
+      </section>
+
+      <!-- 优化失败提示 -->
+      <section
+        v-if="optimizeResult?.status === 'failed'"
+        class="bg-error-container border border-error/30 rounded-xl p-6 shadow-sm"
+      >
+        <h2 class="text-title-md font-bold text-error">
+          JD 优化生成失败
+        </h2>
+        <p class="mt-1 text-sm text-on-surface-variant">
+          {{ optimizeResult.errorMsg || '请稍后重试，或先使用上方点评功能。' }}
+        </p>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, MagicStick, Loading, Check } from '@element-plus/icons-vue'
+import { ArrowLeft, MagicStick, Loading, Check, Aim } from '@element-plus/icons-vue'
+import { resumeApi, type ResumeOptimizeResult } from '@/api/resume'
 
 const router = useRouter()
 const route = useRoute()
 const resumeId = (route.params.id || route.query.resumeId) as string
 const analyzing = ref(false)
+const optimizing = ref(false)
+
+// 轮询取消令牌：离开页面或重新发起时使旧轮询失效（防止组件卸载后继续请求）
+let reviewPollToken = 0
+let optimizePollToken = 0
 
 interface ReviewSuggestion {
   priority?: 'high' | 'medium' | 'low'
@@ -250,6 +430,36 @@ function safeDecode(value: string): string {
 
 const reviewForm = ref({ jobDescription: (route.query.jd as string) ? safeDecode(route.query.jd as string) : '' })
 const reviewResult = ref<ReviewResult | null>(null)
+const optimizeResult = ref<ResumeOptimizeResult | null>(null)
+
+const optimizePending = computed(() =>
+  optimizeResult.value?.status === 'pending' || optimizeResult.value?.status === 'processing'
+)
+
+const optimizeDimensionLabels: Record<string, string> = {
+  skills: '技能匹配',
+  experience: '经历相关度',
+  education: '教育背景',
+  projects: '项目契合度'
+}
+
+function getOptimizeDimensionLabel(k: string) {
+  return optimizeDimensionLabels[k] || dimensionLabels[k] || k
+}
+
+const sectionTypeLabels: Record<string, string> = {
+  profile: '基本信息',
+  education: '教育经历',
+  work: '工作经历',
+  project: '项目经历',
+  skill: '技能清单',
+  introduction: '自我介绍',
+  custom: '自定义模块'
+}
+
+function sectionTypeLabel(t: string) {
+  return sectionTypeLabels[t] || t
+}
 
 const dimensionLabels: Record<string, string> = {
   content: '内容完整性',
@@ -302,11 +512,12 @@ async function handleAnalyze() {
   }
   analyzing.value = true
   reviewResult.value = null
+  const token = ++reviewPollToken
   try {
-    const { resumeApi } = await import('@/api/resume')
     await resumeApi.review(resumeId, { jobDescription: reviewForm.value.jobDescription })
-    // 点评为异步任务：轮询最新结果（最长 60 秒）
+    // 点评为异步任务：轮询最新结果（最长 60 秒，页面离开/重新发起即取消）
     for (let i = 0; i < 60; i++) {
+      if (token !== reviewPollToken) return
       const latest = await resumeApi.getLatestReview(resumeId)
       if (latest?.overallScore) {
         reviewResult.value = latest as ReviewResult
@@ -314,17 +525,82 @@ async function handleAnalyze() {
       }
       await new Promise((r) => setTimeout(r, 1000))
     }
+    if (token !== reviewPollToken) return
     if (reviewResult.value) {
       ElMessage.success('分析完成')
     } else {
-      ElMessage.warning('点评生成较慢，请稍后在点评中心查看')
+      ElMessage.warning('点评生成较慢，请稍后重新查看')
     }
   } catch (e: any) {
     ElMessage.error(e.message || '暂时无法生成点评；你的简历内容不会丢失。')
   } finally {
-    analyzing.value = false
+    if (token === reviewPollToken) {
+      analyzing.value = false
+    }
   }
 }
+
+/**
+ * 发起 JD 匹配深度优化任务并轮询结果。
+ * 后端限制每用户最多 3 个进行中任务（6004），失败时给出明确提示。
+ */
+async function handleOptimize() {
+  if (!reviewForm.value.jobDescription.trim()) {
+    ElMessage.warning('请输入目标岗位描述')
+    return
+  }
+  optimizing.value = true
+  optimizeResult.value = null
+  const token = ++optimizePollToken
+  try {
+    const created = await resumeApi.createOptimizeTask(resumeId, {
+      jobDescription: reviewForm.value.jobDescription.trim()
+    })
+    // 轮询任务状态（最长 120 秒：LLM 逐模块改写耗时较长）
+    for (let i = 0; i < 120; i++) {
+      if (token !== optimizePollToken) return
+      const task = await resumeApi.getOptimizeTask(resumeId, created.taskId)
+      optimizeResult.value = task
+      if (task.status === 'success' || task.status === 'failed') break
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+    if (token !== optimizePollToken) return
+    if (optimizeResult.value?.status === 'success') {
+      ElMessage.success('优化分析完成')
+    } else if (optimizeResult.value?.status !== 'failed') {
+      ElMessage.warning('优化生成较慢，可稍后点击重新优化查看')
+    }
+  } catch (e: any) {
+    optimizeResult.value = null
+    const msg = e?.message || ''
+    if (msg.includes('6004') || msg.includes('并发')) {
+      ElMessage.warning('你已有多个优化任务在进行中，请稍后再试')
+    } else {
+      ElMessage.error(msg || '暂时无法生成优化分析；你的简历内容不会丢失。')
+    }
+  } finally {
+    if (token === optimizePollToken) {
+      optimizing.value = false
+    }
+  }
+}
+
+onMounted(async () => {
+  // 进入页面时回显最近一次优化结果（无则静默忽略）
+  try {
+    const latest = await resumeApi.getLatestOptimize(resumeId)
+    if (latest && latest.status !== 'pending' && latest.status !== 'processing') {
+      optimizeResult.value = latest
+    }
+  } catch {
+    // 静默：历史结果加载失败不影响主流程
+  }
+})
+
+onBeforeUnmount(() => {
+  ++reviewPollToken
+  ++optimizePollToken
+})
 
 function handleApplySuggestions() {
   const skills = reviewResult.value?.missingSkills?.filter((s) => s && s.trim()) || []

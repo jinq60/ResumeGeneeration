@@ -58,6 +58,32 @@ export interface GrammarCheckResponse {
   checkedAt?: string
 }
 
+export interface ResumeOptimizeRequest {
+  jobDescription: string
+  focusSections?: string[]
+}
+
+export interface SectionOptimization {
+  sectionId: string
+  sectionType: string
+  originalSummary: string
+  optimizedContent: string
+  reasoning: string
+}
+
+export interface ResumeOptimizeResult {
+  taskId: string
+  resumeId: string
+  matchScore?: number | null
+  dimensionScores?: Record<string, number> | null
+  optimizations?: SectionOptimization[] | null
+  missingSkills?: string[] | null
+  recommendations?: string[] | null
+  status: 'pending' | 'processing' | 'success' | 'failed' | string
+  errorMsg?: string | null
+  createdAt?: string
+}
+
 export const resumeApi = {
   create(data: CreateResumeRequest): Promise<Resume> {
     return request.post('/resumes', data) as Promise<Resume>
@@ -88,6 +114,15 @@ export const resumeApi = {
   },
   getLatestReview(id: string): Promise<any> {
     return request.get(`/resumes/${id}/reviews/latest`) as Promise<any>
+  },
+  createOptimizeTask(id: string, data: ResumeOptimizeRequest): Promise<{ taskId: string; resumeId: string; status: string }> {
+    return request.post(`/resumes/${id}/optimize`, data) as Promise<{ taskId: string; resumeId: string; status: string }>
+  },
+  getOptimizeTask(id: string, taskId: string): Promise<ResumeOptimizeResult> {
+    return request.get(`/resumes/${id}/optimize/${taskId}`) as Promise<ResumeOptimizeResult>
+  },
+  getLatestOptimize(id: string): Promise<ResumeOptimizeResult | null> {
+    return request.get(`/resumes/${id}/optimize/latest`) as Promise<ResumeOptimizeResult | null>
   },
   grammarCheck(id: string): Promise<GrammarCheckResponse> {
     return request.post(`/resumes/${id}/grammar-check`) as Promise<GrammarCheckResponse>

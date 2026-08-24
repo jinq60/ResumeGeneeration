@@ -41,10 +41,15 @@ export interface CreateUserRequest {
 export interface CreateUserResponse {
   userId: string
   nickname?: string
-  email: string
+  email?: string
   phone?: string
   temporaryPassword?: string
-  message: string
+  message?: string
+}
+
+export interface ResetPasswordResponse {
+  userId: string
+  temporaryPassword: string
 }
 
 export const userApi = {
@@ -66,6 +71,16 @@ export const userApi = {
   // 更新用户状态
   updateUserStatus: (id: string, status: string): Promise<void> => {
     return adminRequest.patch(`/admin/users/${id}/status`, { status })
+  },
+
+  // 调整用户角色（USER / ADMIN）
+  updateUserRole: (id: string, role: 'USER' | 'ADMIN'): Promise<void> => {
+    return adminRequest.patch(`/admin/users/${id}/role`, { role })
+  },
+
+  // 重置用户密码，返回一次性临时密码
+  resetUserPassword: (id: string): Promise<ResetPasswordResponse> => {
+    return adminRequest.post(`/admin/users/${id}/reset-password`)
   },
 
   // 获取用户统计
