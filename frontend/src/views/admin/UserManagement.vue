@@ -88,7 +88,7 @@
             <el-button
               type="primary"
               class="flex-1"
-              @click="loadUserList"
+              @click="handleSearch"
             >
               <el-icon size="16">
                 <Search />
@@ -118,7 +118,7 @@
         </el-button>
         <el-divider direction="vertical" />
         <el-dropdown @command="handleBatchCommand">
-          <el-button>
+          <el-button :loading="batchLoading">
             批量操作<el-icon
               class="ml-1"
               size="16"
@@ -551,6 +551,7 @@ import {
 
 const loading = ref(false)
 const selectedIds = ref<string[]>([])
+const batchLoading = ref(false)
 const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -708,6 +709,15 @@ function resetFilters() {
   loadUserList()
 }
 
+/** 查询：先回到第一页再加载，避免筛选结果落在后续页 */
+function handleSearch() {
+  if (page.value === 1) {
+    loadUserList()
+  } else {
+    page.value = 1
+  }
+}
+
 async function loadUserList() {
   loading.value = true
   try {
@@ -781,18 +791,31 @@ async function handleBatchCommand(command: string) {
       return
     }
   }
+  if (batchLoading.value) return
+  batchLoading.value = true
+  // 逐条执行但收集每个 id 的成败，避免中途失败即中断导致剩余项被跳过
+  const failedIds: string[] = []
   try {
     for (const id of selectedIds.value) {
-      if (command === 'enable' || command === 'disable') {
-        await userApi.updateUserStatus(id, command === 'enable' ? 'active' : 'disabled')
-      } else if (command === 'delete') {
-        await userApi.deleteUser(id)
+      try {
+        if (command === 'enable' || command === 'disable') {
+          await userApi.updateUserStatus(id, command === 'enable' ? 'active' : 'disabled')
+        } else if (command === 'delete') {
+          await userApi.deleteUser(id)
+        }
+      } catch {
+        failedIds.push(id)
       }
     }
-    ElMessage.success('批量操作完成')
+    const successCount = selectedIds.value.length - failedIds.length
+    if (failedIds.length === 0) {
+      ElMessage.success(`批量操作完成：${successCount} 成功`)
+    } else {
+      ElMessage.warning(`批量操作完成：${successCount} 成功 / ${failedIds.length} 失败（${failedIds.join('、')}）`)
+    }
     loadUserList()
-  } catch (e: any) {
-    ElMessage.error(e.message || '批量操作失败')
+  } finally {
+    batchLoading.value = false
   }
 }
 

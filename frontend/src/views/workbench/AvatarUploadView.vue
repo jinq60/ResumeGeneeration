@@ -494,9 +494,11 @@ async function handleOptimize() {
 
 function startTaskPolling(taskId: string) {
   if (taskPollingTimer) clearInterval(taskPollingTimer)
+  let consecutiveFailures = 0
   taskPollingTimer = window.setInterval(async () => {
     try {
       const task = await avatarApi.getTask(taskId)
+      consecutiveFailures = 0
       optimizeTask.value = task
       updateAvatarTask(taskId, task)
       if (task.status === 'success' || task.status === 'failed') {
@@ -505,7 +507,12 @@ function startTaskPolling(taskId: string) {
         else ElMessage.error('优化失败')
       }
     } catch {
-      /* swallow polling error */
+      // 连续失败超过 5 次停止轮询，避免网络异常时无限空转
+      consecutiveFailures++
+      if (consecutiveFailures >= 5) {
+        if (taskPollingTimer) { clearInterval(taskPollingTimer); taskPollingTimer = null }
+        ElMessage.error('网络异常，请稍后刷新查看结果')
+      }
     }
   }, 2000)
 }
@@ -525,15 +532,27 @@ function handleApplyToResume() {
   router.push(`/workbench/editor/${resumeId}`)
 }
 
-function handleDownload() {
-  if (!optimizeTask.value?.resultImageUrl) return
-  const link = document.createElement('a')
-  link.href = optimizeTask.value.resultImageUrl
-  link.download = 'optimized-avatar.jpg'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  ElMessage.success('下载成功')
+async function handleDownload() {
+  const url = optimizeTask.value?.resultImageUrl
+  if (!url) return
+  try {
+    // MinIO 跨域 URL 上 link.download 属性无效，改为 blob 下载
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(`下载失败（${response.status}）`)
+    const blob = await response.blob()
+    const objectUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = 'optimized-avatar.jpg'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(objectUrl)
+    ElMessage.success('下载成功')
+  } catch {
+    // blob 下载失败（如网络/跨域限制）时回退到新窗口打开
+    window.open(url, '_blank')
+  }
 }
 
 onUnmounted(() => {

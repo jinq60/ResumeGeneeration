@@ -138,6 +138,130 @@ class ResumeServiceTest {
         assertEquals(3, response.getVersion());
     }
 
+    @Test
+    void updateResume_shouldApplyRequestVersionForCas() {
+        String resumeId = "resume_1";
+        String userId = "user_1";
+
+        Resume existing = new Resume();
+        existing.setId(resumeId);
+        existing.setUserId(userId);
+        existing.setTitle("我的简历");
+        existing.setTemplateId("template_1");
+        existing.setVersion(7);
+        existing.setSections(List.of());
+        when(resumeMapper.selectById(resumeId)).thenReturn(existing);
+
+        // 客户端携带的版本号应被设入实体，参与 WHERE version=? 比较（CAS）
+        UpdateResumeRequest request = new UpdateResumeRequest();
+        request.setTargetPosition("后端工程师");
+        request.setVersion(7);
+        // 用 Answer 快照调用时刻的版本号（实体引用在成功后被 incrementVersion 原地修改）
+        java.util.concurrent.atomic.AtomicInteger capturedVersion =
+                new java.util.concurrent.atomic.AtomicInteger(-1);
+        when(resumeMapper.updateById(any(Resume.class))).thenAnswer(inv -> {
+            Resume r = inv.getArgument(0);
+            capturedVersion.set(r.getVersion());
+            return 1;
+        });
+
+        var response = resumeService.updateResume(userId, resumeId, request);
+
+        assertEquals(7, capturedVersion.get());
+        assertEquals(8, response.getVersion());
+    }
+
+    @Test
+    void updateResume_shouldThrowConflictWhenRequestVersionMismatch() {
+        String resumeId = "resume_1";
+        String userId = "user_1";
+
+        Resume existing = new Resume();
+        existing.setId(resumeId);
+        existing.setUserId(userId);
+        existing.setTitle("我的简历");
+        existing.setTemplateId("template_1");
+        existing.setVersion(7);
+        existing.setSections(List.of());
+        when(resumeMapper.selectById(resumeId)).thenReturn(existing);
+
+        // 请求携带过期版本号：实体以请求值为准，updateById 未命中 → 2012 冲突
+        UpdateResumeRequest request = new UpdateResumeRequest();
+        request.setTargetPosition("后端工程师");
+        request.setVersion(3);
+        when(resumeMapper.updateById(any(Resume.class))).thenReturn(0);
+
+        com.resume.common.exception.BusinessException ex = assertThrows(
+                com.resume.common.exception.BusinessException.class,
+                () -> resumeService.updateResume(userId, resumeId, request));
+        assertEquals(com.resume.common.constant.ResultCode.RESUME_VERSION_CONFLICT, ex.getErrorCode());
+
+        ArgumentCaptor<Resume> captor = ArgumentCaptor.forClass(Resume.class);
+        verify(resumeMapper).updateById(captor.capture());
+        assertEquals(3, captor.getValue().getVersion());
+    }
+
+    @Test
+    void updateResume_shouldKeepLegacyBehaviorWhenVersionNull() {
+        String resumeId = "resume_1";
+        String userId = "user_1";
+
+        Resume existing = new Resume();
+        existing.setId(resumeId);
+        existing.setUserId(userId);
+        existing.setTitle("我的简历");
+        existing.setTemplateId("template_1");
+        existing.setVersion(4);
+        existing.setSections(List.of());
+        when(resumeMapper.selectById(resumeId)).thenReturn(existing);
+
+        // 不携带 version：保持"读最新实体→写回"旧行为，使用库中当前版本号
+        UpdateResumeRequest request = new UpdateResumeRequest();
+        request.setTargetPosition("后端工程师");
+        // 用 Answer 快照调用时刻的版本号（实体引用在成功后被 incrementVersion 原地修改）
+        java.util.concurrent.atomic.AtomicInteger capturedVersion =
+                new java.util.concurrent.atomic.AtomicInteger(-1);
+        when(resumeMapper.updateById(any(Resume.class))).thenAnswer(inv -> {
+            Resume r = inv.getArgument(0);
+            capturedVersion.set(r.getVersion());
+            return 1;
+        });
+
+        var response = resumeService.updateResume(userId, resumeId, request);
+
+        assertEquals(4, capturedVersion.get());
+        assertEquals(5, response.getVersion());
+    }
+
+    @Test
+    void updateResume_shouldPreserveExistingSectionsWhenRequestEmpty() {
+        String resumeId = "resume_1";
+        String userId = "user_1";
+
+        List<SectionDTO> storedSections = List.of(
+                createSection("profile", "个人信息", 0, new HashMap<String, Object>()),
+                createSection("education", "教育经历", 1, new java.util.ArrayList<>()));
+        Resume existing = new Resume();
+        existing.setId(resumeId);
+        existing.setUserId(userId);
+        existing.setTitle("我的简历");
+        existing.setTemplateId("template_1");
+        existing.setVersion(1);
+        existing.setSections(storedSections);
+        when(resumeMapper.selectById(resumeId)).thenReturn(existing);
+
+        // 库中章节非空而请求携带空数组：视为异常路径，拒绝覆盖、保留原值（防数据丢失）
+        UpdateResumeRequest request = new UpdateResumeRequest();
+        request.setTitle("我的简历");
+        request.setSections(List.of());
+
+        assertDoesNotThrow(() -> resumeService.updateResume(userId, resumeId, request));
+
+        ArgumentCaptor<Resume> captor = ArgumentCaptor.forClass(Resume.class);
+        verify(resumeMapper).updateById(captor.capture());
+        assertSame(storedSections, captor.getValue().getSections());
+    }
+
     private SectionDTO createSection(String type, String title, int order, Object data) {
         SectionDTO section = new SectionDTO();
         section.setId("sec_" + order);

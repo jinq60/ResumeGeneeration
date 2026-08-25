@@ -135,10 +135,8 @@ public class NotificationService {
         if (!userId.equals(notification.getUserId())) {
             throw new BusinessException(ResultCode.ACCESS_DENIED, "无权访问该资源。");
         }
-        Notification update = new Notification();
-        update.setId(notificationId);
-        update.setDeleted(BizConstant.DELETED);
-        update.setUpdatedAt(LocalDateTime.now());
-        notificationMapper.updateById(update);
+        // @TableLogic 下 deleteById 自动转为 UPDATE deleted=1；
+        // setDeleted+updateById 会把逻辑删除字段排除在 SET 外导致静默失效，禁止使用
+        notificationMapper.deleteById(notificationId);
     }
 }

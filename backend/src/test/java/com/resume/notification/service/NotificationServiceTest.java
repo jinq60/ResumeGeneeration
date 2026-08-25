@@ -109,7 +109,7 @@ class NotificationServiceTest {
     }
 
     @Test
-    void delete_shouldLogicalDelete() {
+    void delete_shouldLogicalDeleteViaDeleteById() {
         Notification notification = new Notification();
         notification.setId("n_1");
         notification.setUserId("user_1");
@@ -117,8 +117,8 @@ class NotificationServiceTest {
 
         notificationService.delete("user_1", "n_1");
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationMapper).updateById(captor.capture());
-        assertEquals(1, captor.getValue().getDeleted());
+        // @TableLogic 下必须走 deleteById（自动转 UPDATE deleted=1）
+        verify(notificationMapper).deleteById("n_1");
+        verify(notificationMapper, never()).updateById(any(Notification.class));
     }
 }

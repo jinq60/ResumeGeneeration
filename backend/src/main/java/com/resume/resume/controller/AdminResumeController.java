@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -40,6 +41,12 @@ public class AdminResumeController {
     private final TemplateService templateService;
     private final PdfService pdfService;
 
+    /**
+     * 允许嵌入预览 iframe 的前端来源（取配置的第一个），避免硬编码开发环境地址。
+     */
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOrigins;
+
     @GetMapping
     public R<Page<AdminResumeListItemResponse>> list(
             @RequestParam(defaultValue = "1") @Min(1) int page,
@@ -59,15 +66,28 @@ public class AdminResumeController {
     @GetMapping("/{id}/preview")
     public void preview(@PathVariable String id, HttpServletResponse response) throws IOException {
         Resume resume = resumeService.getResumeForPreview(id);
-        Template template = templateService.getTemplateEntity(resume.getTemplateId());
+        // 渲染场景容忍 inactive/deleted 模板，历史简历仍可预览
+        Template template = templateService.getTemplateEntityForRender(resume.getTemplateId());
         String html = resumeRenderService.render(resume, template);
         response.setContentType(MediaType.TEXT_HTML_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setHeader("Content-Security-Policy",
-                "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self' http://localhost:5173");
+                "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors " + buildFrameAncestors());
         response.getWriter().write(html);
+    }
+
+    /**
+     * frame-ancestors 指令值：'self' 加上配置的前端来源（app.cors.allowed-origins 第一个）。
+     */
+    private String buildFrameAncestors() {
+        String first = java.util.Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .findFirst()
+                .orElse(null);
+        return "'self'" + (first != null ? " " + first : "");
     }
 
     /**

@@ -309,6 +309,21 @@
           <span class="text-sm text-muted-foreground">选择模板，快速创建</span>
         </button>
       </div>
+
+      <!-- Pagination -->
+      <div
+        v-if="!loading && total > pageSize"
+        class="flex justify-center mt-6"
+      >
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-sizes="[12, 24, 48]"
+          layout="total, sizes, prev, pager, next"
+          background
+        />
+      </div>
     </div>
 
     <!-- Sidebar / Inspector Drawer -->
@@ -384,7 +399,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Message, Modal } from '@arco-design/web-vue'
 import { resumeApi } from '@/api/resume'
@@ -413,6 +428,9 @@ const route = useRoute()
 
 const loading = ref(true)
 const resumes = ref<Resume[]>([])
+const page = ref(1)
+const pageSize = ref(12)
+const total = ref(0)
 const keyword = ref((route.query.q as string) || '')
 const sceneFilter = ref('')
 const currentTab = ref<'recent' | 'all'>('recent')
@@ -606,8 +624,9 @@ async function handleRenameConfirm() {
 
 async function fetchResumes() {
   try {
-    const data = await resumeApi.list(1, 50)
+    const data = await resumeApi.list(page.value, pageSize.value)
     resumes.value = data?.records || []
+    total.value = data?.total || resumes.value.length
   } catch {
     // ignore
   }
@@ -637,6 +656,10 @@ async function loadLatestReview() {
     // 点评数据为非关键信息，失败时保持默认文案
   }
 }
+
+watch([page, pageSize], () => {
+  fetchResumes()
+})
 
 onMounted(async () => {
   loading.value = true

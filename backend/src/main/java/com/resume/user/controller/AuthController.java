@@ -51,8 +51,10 @@ public class AuthController {
     private final AuthProperties authProperties;
 
     @PostMapping("/login")
-    public R<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return R.success(userService.login(request));
+    public R<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+                                 HttpServletRequest servletRequest) {
+        // 传入客户端 IP 用于 IP 维度暴力破解/密码喷洒防御（与游客限额同口径：getRemoteAddr）
+        return R.success(userService.login(request, resolveClientIp(servletRequest)));
     }
 
     /**

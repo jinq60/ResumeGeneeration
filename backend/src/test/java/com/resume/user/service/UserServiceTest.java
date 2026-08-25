@@ -84,24 +84,77 @@ class UserServiceTest {
         request.setLoginType("email");
 
         when(userMapper.selectOne(any())).thenReturn(null);
+        // 抹平时序：账号不存在分支也要执行一次真实 bcrypt 比对
+        lenient().when(passwordEncoder.encode(anyString())).thenReturn("dummy_hash");
 
         BusinessException ex = assertThrows(BusinessException.class, () -> userService.login(request));
-        assertEquals(ResultCode.AUTH_ACCOUNT_NOT_FOUND, ex.getErrorCode());
+        // 统一凭证错误码与文案，防止注册邮箱枚举
+        assertEquals(ResultCode.AUTH_CREDENTIALS_INVALID, ex.getErrorCode());
+        assertEquals("账号或密码不正确。", ex.getMessage());
+        verify(passwordEncoder, atLeastOnce()).matches(anyString(), anyString());
         verify(userMapper, never()).insert(any(User.class));
     }
 
     @Test
-    void login_shouldKeepRejectingUnknownPhone() {
+    void login_shouldKeepRejectingUnknownPhoneWithUnifiedError() {
         LoginRequest request = new LoginRequest();
         request.setAccount("13800000000");
         request.setPassword("Passw0rd123");
         request.setLoginType("phone");
 
         when(userMapper.selectOne(any())).thenReturn(null);
+        lenient().when(passwordEncoder.encode(anyString())).thenReturn("dummy_hash");
 
         BusinessException ex = assertThrows(BusinessException.class, () -> userService.login(request));
-        assertEquals(ResultCode.AUTH_ACCOUNT_NOT_FOUND, ex.getErrorCode());
+        // 与"密码错误"同错误码同文案，无法据此枚举注册手机号
+        assertEquals(ResultCode.AUTH_CREDENTIALS_INVALID, ex.getErrorCode());
+        assertEquals("账号或密码不正确。", ex.getMessage());
+        verify(passwordEncoder, atLeastOnce()).matches(anyString(), anyString());
+        verify(loginAttemptGuard, never()).recordFailure(anyString());
         verify(userMapper, never()).insert(any(User.class));
+    }
+
+    @Test
+    void login_shouldNotLeakGuestIdentity() {
+        LoginRequest request = new LoginRequest();
+        request.setAccount("13800138000");
+        request.setPassword("whatever123");
+        request.setLoginType("phone");
+
+        User guest = new User();
+        guest.setId("guest_1");
+        guest.setPhone("13800138000");
+        guest.setIsGuest(1);
+        guest.setStatus("active");
+        when(userMapper.selectOne(any())).thenReturn(guest);
+        lenient().when(passwordEncoder.encode(anyString())).thenReturn("dummy_hash");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> userService.login(request));
+        // 游客账号与普通凭证错误同错误码同文案，不再暴露游客身份
+        assertEquals(ResultCode.AUTH_CREDENTIALS_INVALID, ex.getErrorCode());
+        assertEquals("账号或密码不正确。", ex.getMessage());
+        verify(passwordEncoder, atLeastOnce()).matches(anyString(), anyString());
+        verify(loginAttemptGuard, never()).recordFailure(anyString());
+    }
+
+    @Test
+    void login_shouldBlockIpWhenIpFailuresExceeded() {
+        LoginRequest request = new LoginRequest();
+        request.setAccount("13800000000");
+        request.setPassword("wrong");
+        request.setLoginType("phone");
+        when(loginAttemptGuard.isLocked(anyString())).thenReturn(false);
+        when(loginAttemptGuard.isIpBlocked("10.0.0.8")).thenReturn(true);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> userService.login(request, "10.0.0.8"));
+        assertEquals(ResultCode.RATE_LIMITED, ex.getErrorCode());
+        verify(userMapper, never()).selectOne(any());
+
+        // 未传 IP 时跳过 IP 维度校验，走正常流程
+        when(userMapper.selectOne(any())).thenReturn(null);
+        BusinessException ex2 = assertThrows(BusinessException.class, () -> userService.login(request));
+        assertNotEquals(ResultCode.RATE_LIMITED, ex2.getErrorCode());
     }
 
     @Test
@@ -143,7 +196,10 @@ class UserServiceTest {
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> userService.login(request));
-        assertEquals(ResultCode.AUTH_PASSWORD_INCORRECT, ex.getErrorCode());
+        // 密码错误与账号不存在共用统一错误码与文案
+        assertEquals(ResultCode.AUTH_CREDENTIALS_INVALID, ex.getErrorCode());
+        assertEquals("账号或密码不正确。", ex.getMessage());
+        verify(loginAttemptGuard).recordFailure("13800000000");
     }
 
     @Test
@@ -275,8 +331,87 @@ class UserServiceTest {
     }
 
     @Test
+    void refresh_benignMultiTabRaceWithinGraceWindowReturnsSameResult() {
+        // 多标签页并发刷新：第二个请求携带刚被消费的旧令牌（记录已删除），
+        // 但仍在 5 秒宽限窗口内 → 视为良性竞态，直接返回最近一次轮换结果，
+        // 不触发整族吊销
+        RefreshRequest request = new RefreshRequest();
+        request.setRefreshToken("valid_stored_token");
+
+        when(jwtTokenProvider.validateRefreshToken("valid_stored_token")).thenReturn(true);
+        when(jwtTokenProvider.getUserId("valid_stored_token")).thenReturn("user_1");
+        when(jwtTokenProvider.getFamilyId("valid_stored_token")).thenReturn("family_1");
+
+        RefreshToken stored = new RefreshToken();
+        stored.setId("rt_1");
+        stored.setUserId("user_1");
+        stored.setFamilyId("family_1");
+        stored.setExpiresAt(LocalDateTime.now().plusDays(1));
+        // 第一个请求查到记录并消费成功；第二个请求（并发竞态）查不到记录
+        when(refreshTokenMapper.selectOne(any())).thenReturn(stored, (RefreshToken) null);
+        when(refreshTokenMapper.delete(any())).thenReturn(1);
+
+        User user = new User();
+        user.setId("user_1");
+        user.setIsGuest(0);
+        user.setStatus("active");
+        when(userMapper.selectById("user_1")).thenReturn(user);
+
+        AuthResponse first = userService.refresh(request);
+        AuthResponse second = userService.refresh(request);
+
+        assertNotNull(second);
+        // 良性竞态返回与首次轮换相同的结果（同一对令牌）
+        assertEquals(first.getRefreshToken(), second.getRefreshToken());
+        // 只有一次消费删除 + 一次落库插入，绝无家族撤销的第二次 delete
+        verify(refreshTokenMapper, times(1)).delete(any());
+        verify(refreshTokenMapper, times(1)).insert(any(RefreshToken.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void refresh_replayBeyondGraceWindowStillRevokesWholeFamily() {
+        // 宽限窗口过期后的旧令牌重放仍判定为失窃重放 → 整族吊销
+        RefreshRequest request = new RefreshRequest();
+        request.setRefreshToken("valid_stored_token");
+
+        when(jwtTokenProvider.validateRefreshToken("valid_stored_token")).thenReturn(true);
+        when(jwtTokenProvider.getUserId("valid_stored_token")).thenReturn("user_1");
+        when(jwtTokenProvider.getFamilyId("valid_stored_token")).thenReturn("family_1");
+
+        RefreshToken stored = new RefreshToken();
+        stored.setId("rt_1");
+        stored.setUserId("user_1");
+        stored.setFamilyId("family_1");
+        stored.setExpiresAt(LocalDateTime.now().plusDays(1));
+        when(refreshTokenMapper.selectOne(any())).thenReturn(stored, (RefreshToken) null);
+        when(refreshTokenMapper.delete(any())).thenReturn(1, 0);
+
+        User user = new User();
+        user.setId("user_1");
+        user.setIsGuest(0);
+        user.setStatus("active");
+        lenient().when(userMapper.selectById("user_1")).thenReturn(user);
+
+        userService.refresh(request);
+
+        // 手动将宽限缓存条目置为已过期，模拟超出 5 秒窗口后的重放
+        Map<String, UserService.RotationGrace> cache =
+                (Map<String, UserService.RotationGrace>) ReflectionTestUtils.getField(userService, "rotationGraceCache");
+        cache.put(com.resume.user.security.TokenHashUtil.hash("valid_stored_token"),
+                new UserService.RotationGrace(System.currentTimeMillis() - 1000,
+                        new AuthResponse()));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> userService.refresh(request));
+        assertEquals(ResultCode.AUTH_REFRESH_TOKEN_INVALID, ex.getErrorCode());
+        // 第二次 delete 为家族撤销
+        verify(refreshTokenMapper, times(2)).delete(any());
+    }
+
+    @Test
     void refresh_shouldRevokeWholeFamilyOnSequentialReplay() {
-        // 失窃令牌在合法客户端刷新后被重放：签名合法但哈希查无记录（已被轮换消费）
+        // 失窃令牌在合法客户端刷新后被重放：签名合法但哈希查无记录（已被轮换消费），
+        // 且从未进入宽限缓存（非并发竞态）→ 整族吊销
         RefreshRequest request = new RefreshRequest();
         request.setRefreshToken("stolen_old_token");
 

@@ -66,4 +66,38 @@ describe('useAutoSave', () => {
     await vi.runAllTimersAsync()
     expect(saveStatus.value).toBe('error')
   })
+
+  it('should restore saved status when a later queued save succeeds', async () => {
+    const { triggerSave, saveStatus } = useAutoSave()
+    const saveFn = vi.fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(undefined)
+
+    triggerSave(saveFn)
+    vi.advanceTimersByTime(2000)
+    await vi.runAllTimersAsync()
+    expect(saveStatus.value).toBe('error')
+
+    // 后续保存成功后应从 error 恢复，而不是永久卡死在 error
+    triggerSave(saveFn)
+    vi.advanceTimersByTime(2000)
+    await vi.runAllTimersAsync()
+    expect(saveStatus.value).toBe('saved')
+  })
+
+  it('retry re-enqueues the last save function', async () => {
+    const { triggerSave, retry, saveStatus } = useAutoSave()
+    const saveFn = vi.fn().mockRejectedValue(new Error('boom'))
+
+    triggerSave(saveFn)
+    vi.advanceTimersByTime(2000)
+    await vi.runAllTimersAsync()
+    expect(saveFn).toHaveBeenCalledTimes(1)
+
+    saveFn.mockResolvedValue(undefined)
+    retry()
+    await vi.runAllTimersAsync()
+    expect(saveFn).toHaveBeenCalledTimes(2)
+    expect(saveStatus.value).toBe('saved')
+  })
 })

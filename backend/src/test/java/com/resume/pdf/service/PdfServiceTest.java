@@ -198,15 +198,54 @@ class PdfServiceTest {
     }
 
     @Test
-    void exportPdf_shouldRejectWhenTemplateInactive() {
+    void exportPdf_shouldRejectWhenTemplateMissing() {
         Resume resume = buildResume("user_1", profileSection("张三", "13800000000", ""));
         when(resumeService.getResumeEntity("user_1", "resume_1")).thenReturn(resume);
-        when(templateService.getTemplateEntity("tpl_1"))
+        // 导出为渲染场景，使用容忍 inactive/deleted 的查询；仅模板彻底不存在时报错
+        when(templateService.getTemplateEntityForRender("tpl_1"))
                 .thenThrow(new BusinessException(ResultCode.TEMPLATE_NOT_FOUND, "模板不存在。"));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> pdfService.exportPdf("user_1", "resume_1", "tpl_1"));
         assertEquals(ResultCode.TEMPLATE_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    void exportPdf_shouldReuseRunningTaskForSameResume() {
+        Resume resume = buildResume("user_1", profileSection("张三", "13800000000", "zhang@example.com"));
+        when(resumeService.getResumeEntity("user_1", "resume_1")).thenReturn(resume);
+
+        PdfTask running = new PdfTask();
+        running.setId("task_running");
+        running.setUserId("user_1");
+        running.setResumeId("resume_1");
+        running.setStatus(BizConstant.TASK_STATUS_PENDING);
+        when(pdfTaskMapper.selectList(any())).thenReturn(List.of(running));
+
+        Map<String, Object> result = pdfService.exportPdf("user_1", "resume_1", null);
+
+        // 已有进行中任务时直接复用既有 taskId，不再新建
+        assertEquals("task_running", result.get("taskId"));
+        assertEquals(BizConstant.TASK_STATUS_PENDING, result.get("status"));
+        verify(pdfTaskMapper, never()).insert(any(PdfTask.class));
+    }
+
+    @Test
+    void exportPdf_shouldCreateNewTaskWhenNoRunningTask() {
+        Resume resume = buildResume("user_1", profileSection("张三", "13800000000", "zhang@example.com"));
+        when(resumeService.getResumeEntity("user_1", "resume_1")).thenReturn(resume);
+        when(pdfTaskMapper.selectList(any())).thenReturn(List.of());
+        when(pdfTaskMapper.insert(any(PdfTask.class))).thenAnswer(inv -> {
+            PdfTask t = inv.getArgument(0);
+            t.setId("task_new");
+            return 1;
+        });
+        lenient().when(templateService.getTemplateEntityForRender("tpl_1")).thenReturn(new com.resume.template.entity.Template());
+
+        Map<String, Object> result = pdfService.exportPdf("user_1", "resume_1", null);
+
+        assertEquals("task_new", result.get("taskId"));
+        verify(pdfTaskMapper).insert(any(PdfTask.class));
     }
 
     private Resume buildResume(String userId, List<SectionDTO> sections) {

@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -55,7 +56,8 @@ class AiGrammarControllerTest {
         issue.setSuggestion("主导订单系统架构设计与开发");
         issue.setExplanation("建议补充成果和范围。");
         response.setIssues(List.of(issue));
-        when(aiGrammarService.check(eq("user123"), eq("resume123"))).thenReturn(response);
+        // @WithMockJwt 的 credentials 为字符串 token，getGuest mock 返回 false → 非游客
+        when(aiGrammarService.check(eq("user123"), anyBoolean(), eq("resume123"))).thenReturn(response);
 
         mockMvc.perform(post("/resumes/resume123/grammar-check"))
                 .andExpect(status().isOk())

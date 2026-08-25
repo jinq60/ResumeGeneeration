@@ -229,11 +229,27 @@ public class ResumeService {
             resume.setTemplateId(request.getTemplateId());
         }
         if (request.getSections() != null) {
-            resumeSectionValidator.validateDraft(request.getSections());
-            resume.setSections(request.getSections());
+            // 防护：当前产品没有"清空全部章节"的功能。若请求携带空 sections 而库中已有内容，
+            // 视为上游异常路径（如 TypeHandler 反序列化失败被静默吞掉后回传），拒绝覆盖，
+            // 保留库中原值并记 error 日志，防止把空数组写回 DB 造成不可逆数据丢失。
+            if (request.getSections().isEmpty()
+                    && resume.getSections() != null && !resume.getSections().isEmpty()) {
+                log.error("Rejected update with empty sections to protect existing data: userId={}, resumeId={}",
+                        userId, resumeId);
+            } else {
+                resumeSectionValidator.validateDraft(request.getSections());
+                resume.setSections(request.getSections());
+            }
         }
         if (request.getRenderSettings() != null) {
             resume.setRenderSettings(RenderSettings.sanitized(request.getRenderSettings()));
+        }
+
+        // 乐观锁 CAS：请求携带 version 时以请求值为准参与 WHERE version=? 比较
+        // （OptimisticLockerInnerInterceptor 生成条件，不匹配时 updateById 返回 0 → 抛 2012 冲突）；
+        // 未携带 version 时保持"读最新实体→写回"的旧行为，向后兼容旧客户端。
+        if (request.getVersion() != null) {
+            resume.setVersion(request.getVersion());
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -462,6 +478,7 @@ public class ResumeService {
         response.setSections(resume.getSections());
         response.setRenderSettings(RenderSettings.copyOf(resume.getRenderSettings()));
         response.setExportCount(resume.getExportCount());
+        response.setVersion(resume.getVersion());
         response.setLastEditedAt(resume.getLastEditedAt());
         response.setCreatedAt(resume.getCreatedAt());
         response.setUpdatedAt(resume.getUpdatedAt());

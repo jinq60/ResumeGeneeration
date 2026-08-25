@@ -42,6 +42,9 @@ public final class ResultCode {
     public static final int AUTH_SMS_CODE_INVALID = 1014;
     public static final int AUTH_SMS_CODE_SEND_FAILED = 1015;
     public static final int AUTH_SMS_CODE_TOO_FREQUENT = 1016;
+    // 统一凭证错误（登录账号不存在 / 密码错误 / 游客账号不可密码登录共用同一错误码与文案，
+    // 防止账号枚举与时序侧信道）
+    public static final int AUTH_CREDENTIALS_INVALID = 1017;
 
     /**
      * 简历模块错误码：2000-2099

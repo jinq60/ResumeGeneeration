@@ -45,15 +45,22 @@ public class RenderSettingsTypeHandler extends BaseTypeHandler<RenderSettings> {
         return parse(cs.getString(columnIndex));
     }
 
-    private RenderSettings parse(String json) {
+    private RenderSettings parse(String json) throws SQLException {
         if (json == null || json.isBlank()) {
             return null;
         }
         try {
+            // 兼容被二次编码的数据（如 H2 JSON 列 getString 返回带引号的字符串字面量）
+            if (json.charAt(0) == '"') {
+                json = MAPPER.readValue(json, String.class);
+                if (json == null || json.isBlank()) {
+                    return null;
+                }
+            }
             return MAPPER.readValue(json, RenderSettings.class);
         } catch (Exception e) {
             log.error("Failed to deserialize render settings: {}", json, e);
-            return null;
+            throw new SQLException("Failed to deserialize resume render settings", e);
         }
     }
 }

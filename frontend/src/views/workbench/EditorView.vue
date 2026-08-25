@@ -34,6 +34,13 @@
             :class="saveStatus === 'saved' ? 'bg-secondary' : 'bg-foreground'"
           />
           <span>{{ saveStatusLabel }}</span>
+          <button
+            v-if="saveStatus === 'error'"
+            class="text-label-md text-primary hover:underline"
+            @click="retry"
+          >
+            重试
+          </button>
         </div>
       </div>
       <div class="editor-header-actions flex items-center gap-3">
@@ -768,6 +775,7 @@ import EditorModuleRail from '@/components/editor/EditorModuleRail.vue'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useResumeDraft } from '@/composables/useResumeDraft'
 import { useResumeHistory } from '@/composables/useResumeHistory'
+import { useResumeConflict, isVersionConflictError } from '@/composables/useResumeConflict'
 
 const router = useRouter()
 const route = useRoute()
@@ -819,7 +827,8 @@ const tabs: TabDef[] = [
   { name: 'custom', label: '补充信息', icon: CirclePlus }
 ]
 
-const { saveStatus, triggerSave, flush } = useAutoSave()
+const { saveStatus, triggerSave, flush, retry } = useAutoSave()
+const { resolveConflict } = useResumeConflict()
 const saveError = ref('')
 const { canUndo, canRedo, reset: resetHistory, record, undo, redo } = useResumeHistory<Resume>()
 const draftStorage = useResumeDraft<Resume>()
@@ -1090,6 +1099,30 @@ function confirmRenderSettings() {
   ElMessage.success('排版设置已应用')
 }
 
+/**
+ * 乐观锁冲突（业务码 2012 / HTTP 409）处理：
+ * 询问用户是否加载服务器最新版本；确认前先把当前草稿备份到本地存储以便恢复。
+ */
+async function handleSaveConflict() {
+  if (!resume.value) return
+  await resolveConflict({
+    backupDraft: () => {
+      if (resume.value) {
+        draftStorage.save(resume.value.id, cloneResumeState(resume.value))
+      }
+    },
+    fetchLatest: async () => {
+      const current = resume.value!
+      const serverResume = await resumeApi.get(current.id)
+      resume.value = serverResume
+      resetActiveSection(serverResume)
+      resetHistory()
+      record(serverResume, 'conflict-restore')
+      saveError.value = ''
+    }
+  })
+}
+
 function triggerAutoSave() {
   if (resume.value) {
     triggerSave(async () => {
@@ -1101,13 +1134,18 @@ function triggerAutoSave() {
           targetPosition: snapshot.targetPosition,
           templateId: snapshot.templateId,
           sections: snapshot.sections,
-          renderSettings: snapshot.renderSettings || undefined
+          renderSettings: snapshot.renderSettings || undefined,
+          // 期望版本号：后端 V13 乐观锁校验，冲突返回业务码 2012/HTTP 409
+          version: (snapshot as unknown as { version?: number }).version
         })
         if (resume.value && JSON.stringify(resume.value) === JSON.stringify(snapshot)) {
           draftStorage.clear(snapshot.id)
         }
       } catch (e: any) {
         saveError.value = e.message || '未知错误'
+        if (isVersionConflictError(e)) {
+          void handleSaveConflict()
+        }
         throw e
       }
     })
@@ -1122,9 +1160,20 @@ function zoomOut() {
   if (zoom.value > 60) zoom.value -= 10
 }
 
+let previewInitialized = false
 function handlePreviewLoaded(contentHeight: number) {
-  pageCount.value = Math.max(1, Math.ceil(contentHeight / A4_PAGE_HEIGHT_PX))
-  currentPage.value = 1
+  const nextCount = Math.max(1, Math.ceil(contentHeight / A4_PAGE_HEIGHT_PX))
+  const countChanged = nextCount !== pageCount.value
+  pageCount.value = nextCount
+  if (!previewInitialized) {
+    // 首次加载定位到第一页
+    previewInitialized = true
+    currentPage.value = 1
+  } else if (countChanged) {
+    // 仅页数变化时同步，保留用户当前页（越界时收敛到有效范围），
+    // 避免预览每次刷新回调都把用户正在查看的页码强制归 1
+    currentPage.value = Math.min(pageCount.value, Math.max(1, currentPage.value))
+  }
 }
 
 function handleCanvasScroll(event: Event) {

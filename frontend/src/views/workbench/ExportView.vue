@@ -352,9 +352,11 @@ async function exportPdf() {
 
 function startTaskPolling(taskId: string) {
   if (taskPollingTimer) clearInterval(taskPollingTimer)
+  let consecutiveFailures = 0
   taskPollingTimer = window.setInterval(async () => {
     try {
       const task = await pdfApi.getTask(taskId)
+      consecutiveFailures = 0
       exportTask.value = task
       updatePdfTask(taskId, task)
       if (task.status === 'success' || task.status === 'failed') {
@@ -363,7 +365,12 @@ function startTaskPolling(taskId: string) {
         else ElMessage.error('导出失败')
       }
     } catch {
-      /* swallow polling error */
+      // 连续失败超过 5 次停止轮询，避免网络异常时无限空转
+      consecutiveFailures++
+      if (consecutiveFailures >= 5) {
+        if (taskPollingTimer) { clearInterval(taskPollingTimer); taskPollingTimer = null }
+        ElMessage.error('网络异常，请稍后刷新查看结果')
+      }
     }
   }, 2000)
 }

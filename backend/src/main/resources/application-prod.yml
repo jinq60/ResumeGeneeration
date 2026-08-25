@@ -61,15 +61,12 @@ app:
       templates: ${APP_MINIO_BUCKET_TEMPLATES}
     presigned-url-expiration: 3600
   jwt:
-    secret: ${APP_JWT_SECRET:}
+    secret: ${JWT_SECRET:}
     access-token-expiration: 3600000
     refresh-token-expiration: 604800000
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
   auth:
-    verify-code:
-      # 生产必须显式 strict：未接入真实验证码服务时注册将被拒绝（禁止占位验证码裸奔上线）
-      mode: strict
     smtp:
       # 邮箱验证码 SMTP：须与 spring.mail.* 保持同步；host 为空时 EmailCodeService 降级为日志输出
       host: ${SMTP_HOST:}

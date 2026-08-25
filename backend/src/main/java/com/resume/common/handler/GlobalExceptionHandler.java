@@ -60,6 +60,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(403).body(R.error(ResultCode.ACCESS_DENIED, "无权访问该资源。"));
     }
 
+    /**
+     * 唯一索引冲突兜底：转换为 409 资源冲突，而非落入通用 Exception 处理返回 500。
+     */
+    @ExceptionHandler(org.springframework.dao.DuplicateKeyException.class)
+    public ResponseEntity<R<Void>> handleDuplicateKeyException(org.springframework.dao.DuplicateKeyException e) {
+        log.warn("Duplicate key conflict: {}", e.getMessage());
+        return ResponseEntity.status(409).body(R.error(ResultCode.TEMPLATE_CODE_EXISTS, "资源已存在或唯一性冲突，请检查后重试。"));
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<R<Void>> handleNoResourceFoundException(NoResourceFoundException e) {
         return ResponseEntity.status(404).body(R.error(ResultCode.RESOURCE_NOT_FOUND, "请求的资源不存在。"));
@@ -78,6 +87,7 @@ public class GlobalExceptionHandler {
                  ResultCode.AUTH_ACCOUNT_NOT_FOUND,
                  ResultCode.AUTH_PASSWORD_INCORRECT,
                  ResultCode.AUTH_ACCOUNT_LOCKED,
+                 ResultCode.AUTH_CREDENTIALS_INVALID,
                  ResultCode.AUTH_REFRESH_TOKEN_INVALID -> 401;
             case ResultCode.ACCESS_DENIED -> 403;
             case ResultCode.RESOURCE_NOT_FOUND,

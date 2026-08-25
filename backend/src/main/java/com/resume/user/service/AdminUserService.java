@@ -268,14 +268,13 @@ public class AdminUserService {
             throw new BusinessException(ResultCode.ACCESS_DENIED, "不能删除自己的账号。");
         }
         assertNotLastAdmin(user);
-        User update = new User();
-        update.setId(user.getId());
-        update.setStatus(BizConstant.USER_STATUS_DISABLED);
-        update.setDeleted(BizConstant.DELETED);
-        update.setUpdatedAt(LocalDateTime.now());
+        // 逻辑删除字段必须用 UpdateWrapper.set 显式写入：实体方式会被 MP 从 SET 子句排除导致静默失效
         LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(User::getId, userId);
-        userMapper.update(update, wrapper);
+        wrapper.eq(User::getId, userId)
+                .set(User::getStatus, BizConstant.USER_STATUS_DISABLED)
+                .set(User::getDeleted, BizConstant.DELETED)
+                .set(User::getUpdatedAt, LocalDateTime.now());
+        userMapper.update(null, wrapper);
         revokeUserRefreshTokens(userId);
         auditLogService.record(operatorId, "admin_delete_user", userId, null);
     }

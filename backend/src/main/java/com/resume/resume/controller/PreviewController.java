@@ -12,6 +12,7 @@ import com.resume.template.service.TemplateService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,6 +47,12 @@ public class PreviewController {
     private final ResumeSectionValidator resumeSectionValidator;
 
     /**
+     * 允许嵌入预览 iframe 的前端来源（取配置的第一个），避免硬编码开发环境地址。
+     */
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOrigins;
+
+    /**
      * 预览简历 HTML。
      *
      * @param userId     当前用户 ID
@@ -61,7 +68,8 @@ public class PreviewController {
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
 
         String previewTemplateId = StringUtils.isNotBlank(templateId) ? templateId : resume.getTemplateId();
-        Template template = templateService.getTemplateEntity(previewTemplateId);
+        // 渲染场景容忍 inactive/deleted 模板，历史简历仍可预览
+        Template template = templateService.getTemplateEntityForRender(previewTemplateId);
 
         String html = resumeRenderService.render(resume, template);
         writeHtml(response, html);
@@ -91,7 +99,8 @@ public class PreviewController {
 
         String previewTemplateId = StringUtils.isNotBlank(request.getTemplateId())
                 ? request.getTemplateId() : resume.getTemplateId();
-        Template template = templateService.getTemplateEntity(previewTemplateId);
+        // 渲染场景容忍 inactive/deleted 模板（如简历引用的模板刚被下架/删除）
+        Template template = templateService.getTemplateEntityForRender(previewTemplateId);
 
         String html = resumeRenderService.render(resume, template);
         writeHtml(response, html);
@@ -106,12 +115,26 @@ public class PreviewController {
         // iframe 内以 sandbox=allow-same-origin 加载，禁脚本执行；CSP 兜底
         response.setHeader("Content-Security-Policy",
                 "default-src 'none'; " + buildImgSrcCsp()
-                        + "; style-src 'unsafe-inline'; frame-ancestors 'self' http://localhost:5173");
+                        + "; style-src 'unsafe-inline'; frame-ancestors " + buildFrameAncestors());
         response.getWriter().write(html);
     }
 
     private String buildImgSrcCsp() {
         String origin = resumeRenderService.publicBaseOrigin();
         return "img-src 'self' data:" + (origin != null ? " " + origin : "");
+    }
+
+    /**
+     * frame-ancestors 指令值：'self' 加上配置的前端来源（app.cors.allowed-origins 第一个）。
+     */
+    private String buildFrameAncestors() {
+        return "'self'" + firstAllowedOrigin().map(" "::concat).orElse("");
+    }
+
+    private java.util.Optional<String> firstAllowedOrigin() {
+        return java.util.Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .findFirst();
     }
 }

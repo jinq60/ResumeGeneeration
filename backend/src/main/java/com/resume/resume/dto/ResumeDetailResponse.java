@@ -21,6 +21,7 @@ public class ResumeDetailResponse {
     private List<SectionDTO> sections;
     private RenderSettings renderSettings;
     private Integer exportCount;
+    private Integer version;
     private LocalDateTime lastEditedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

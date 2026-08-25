@@ -174,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { MagicStick, CircleCheckFilled, Loading } from '@element-plus/icons-vue'
@@ -191,9 +191,9 @@ const analyzing = ref(false)
 const sceneMap: Record<string, string> = {
   campus_recruitment: '校园招聘',
   social_recruitment: '社会招聘',
-  postgraduate: '考研复试',
   internship: '实习',
-  internal: '内部晋升',
+  postgraduate_reexam: '考研复试',
+  project_application: '项目申请',
   custom: '自定义'
 }
 
@@ -222,6 +222,8 @@ function goReview(id: string) {
   router.push({ path: `/workbench/resumes/${id}/review` })
 }
 
+let navigateTimer: ReturnType<typeof setTimeout> | null = null
+
 function startReview() {
   if (!selectedResumeId.value) {
     ElMessage.warning('请选择简历')
@@ -232,14 +234,26 @@ function startReview() {
     return
   }
   analyzing.value = true
-  setTimeout(() => {
+  // vue-router 跳转时会自动对 query 编码/解码一次，这里无需再手动 encodeURIComponent
+  const jd = jobDescription.value.trim()
+  const targetId = selectedResumeId.value
+  if (navigateTimer) clearTimeout(navigateTimer)
+  navigateTimer = setTimeout(() => {
+    navigateTimer = null
     analyzing.value = false
     router.push({
-      path: `/workbench/resumes/${selectedResumeId.value}/review`,
-      query: { jd: encodeURIComponent(jobDescription.value.trim()) }
+      path: `/workbench/resumes/${targetId}/review`,
+      query: { jd }
     })
   }, 400)
 }
+
+onUnmounted(() => {
+  if (navigateTimer) {
+    clearTimeout(navigateTimer)
+    navigateTimer = null
+  }
+})
 
 onMounted(() => { loadResumes() })
 </script>

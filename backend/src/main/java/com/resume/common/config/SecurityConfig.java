@@ -44,9 +44,13 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private String allowedOrigins;
 
+    /**
+     * bcrypt cost=12：相较默认 10 显著提升离线爆破成本；
+     * 哈希自带 cost 参数，存量 cost=10 哈希仍可正常校验，无需迁移。
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(12);
     }
 
     @Bean

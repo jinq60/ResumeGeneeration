@@ -147,7 +147,7 @@ class DeliveryServiceTest {
     }
 
     @Test
-    void delete_shouldLogicalDelete() {
+    void delete_shouldLogicalDeleteViaDeleteById() {
         DeliveryRecord record = new DeliveryRecord();
         record.setId("delivery_1");
         record.setUserId("user_1");
@@ -155,9 +155,60 @@ class DeliveryServiceTest {
 
         deliveryService.delete("user_1", "delivery_1");
 
-        ArgumentCaptor<DeliveryRecord> captor = ArgumentCaptor.forClass(DeliveryRecord.class);
-        verify(deliveryRecordMapper).updateById(captor.capture());
-        assertEquals(1, captor.getValue().getDeleted());
+        // @TableLogic 下必须走 deleteById（自动转 UPDATE deleted=1），
+        // setDeleted+updateById 会把逻辑删除字段排除在 SET 外导致静默失效
+        verify(deliveryRecordMapper).deleteById("delivery_1");
+        verify(deliveryRecordMapper, never()).updateById(any(DeliveryRecord.class));
+    }
+
+    @Test
+    void update_shouldRejectInvalidStatus() {
+        DeliveryRecord record = new DeliveryRecord();
+        record.setId("delivery_1");
+        record.setUserId("user_1");
+        record.setStatus("delivered");
+        when(deliveryRecordMapper.selectById("delivery_1")).thenReturn(record);
+
+        DeliveryRecordRequest request = buildRequest();
+        request.setStatus("hacked_status");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> deliveryService.update("user_1", "delivery_1", request));
+        assertEquals(ResultCode.PARAM_INVALID, ex.getErrorCode());
+        verify(deliveryRecordMapper, never()).updateById(any(DeliveryRecord.class));
+    }
+
+    @Test
+    void buildCsv_shouldEscapeDateAndTimeColumns() {
+        DeliveryRecord record = new DeliveryRecord();
+        record.setId("delivery_1");
+        record.setUserId("user_1");
+        record.setResumeId("resume_1");
+        record.setCompany("a,b");
+        record.setPosition("后端开发工程师");
+        record.setStatus("delivered");
+        record.setApplyDate(LocalDate.of(2026, 8, 1));
+        when(deliveryRecordMapper.selectList(any())).thenReturn(List.of(record));
+
+        String csv = deliveryService.buildCsv();
+
+        // 逗号列被引号包裹，日期列统一走 csv() 转义后正常输出
+        assertTrue(csv.contains("\"a,b\""));
+        assertTrue(csv.contains("2026-08-01"));
+    }
+
+    @Test
+    void buildCsv_shouldHandleNullDates() {
+        DeliveryRecord record = new DeliveryRecord();
+        record.setId("delivery_1");
+        record.setUserId("user_1");
+        record.setResumeId("resume_1");
+        record.setCompany("华为");
+        record.setPosition("后端开发工程师");
+        record.setStatus("delivered");
+        when(deliveryRecordMapper.selectList(any())).thenReturn(List.of(record));
+
+        assertDoesNotThrow(() -> deliveryService.buildCsv());
     }
 
     @Test

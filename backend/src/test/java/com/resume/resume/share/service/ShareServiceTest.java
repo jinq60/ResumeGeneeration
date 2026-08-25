@@ -125,7 +125,7 @@ class ShareServiceTest {
         when(resumeMapper.selectById("resume_1")).thenReturn(buildResume("user_1", "resume_1"));
         Template template = new Template();
         template.setId("template_classic_single");
-        when(templateService.getTemplateEntity("template_classic_single")).thenReturn(template);
+        when(templateService.getTemplateEntityForRender("template_classic_single")).thenReturn(template);
         when(resumeRenderService.render(any(), any())).thenReturn("<div>简历内容</div>");
 
         String html = shareService.renderSharePage("some-token");
@@ -146,7 +146,7 @@ class ShareServiceTest {
         when(resumeMapper.selectById("resume_1")).thenReturn(buildResume("user_1", "resume_1"));
         Template template = new Template();
         template.setId("template_classic_single");
-        when(templateService.getTemplateEntity("template_classic_single")).thenReturn(template);
+        when(templateService.getTemplateEntityForRender("template_classic_single")).thenReturn(template);
         when(resumeRenderService.render(any(), any(),
                 eq(ResumeRenderService.RenderOptions.withHiddenContact()))).thenReturn("<div>无联系方式</div>");
 
@@ -166,7 +166,7 @@ class ShareServiceTest {
         when(resumeMapper.selectById("resume_1")).thenReturn(buildResume("user_1", "resume_1"));
         Template template = new Template();
         template.setId("template_classic_single");
-        when(templateService.getTemplateEntity("template_classic_single")).thenReturn(template);
+        when(templateService.getTemplateEntityForRender("template_classic_single")).thenReturn(template);
         when(resumeRenderService.render(any(), any())).thenReturn("<div>含联系方式</div>");
 
         String html = shareService.renderSharePage("token");

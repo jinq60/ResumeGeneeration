@@ -156,6 +156,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getJwtRole } from '@/utils/jwt'
 import {
   Document,
   Fold,
@@ -230,6 +231,15 @@ function handleSearchShortcut(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  // 兜底校验：路由守卫之外再解析一次 JWT role，防止非管理员令牌渲染后台壳
+  const adminToken = localStorage.getItem('admin_token')
+  if (!adminToken || getJwtRole(adminToken) !== 'ADMIN') {
+    localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_refresh_token')
+    ElMessage.error('登录已过期，请重新登录')
+    router.replace('/admin/login')
+    return
+  }
   loadPendingAudits()
   window.addEventListener('keydown', handleSearchShortcut)
 })

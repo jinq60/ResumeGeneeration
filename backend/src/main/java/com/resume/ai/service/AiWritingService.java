@@ -12,6 +12,7 @@ import com.resume.ai.entity.AiCallLog;
 import com.resume.ai.mapper.AiCallLogMapper;
 import com.resume.ai.provider.LlmProvider;
 import com.resume.ai.provider.ProviderRouter;
+import com.resume.ai.util.AiCallLogDefaults;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.common.service.AuditLogService;
@@ -78,34 +79,18 @@ public class AiWritingService {
 
     /**
      * 执行行内 AI 写作。
+     * <p>
+     * 顺序：参数校验（归属 / 白名单 / 动作 / 原文）→ 并发槽位 → provider 解析 →
+     * 扣减按日配额 → 调用 LLM；调用失败时退还配额，避免"先扣不退"。
+     * </p>
      */
     public ResumeAiWriteResponse write(String userId, boolean guest, String resumeId,
                                        ResumeAiWriteRequest request) {
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
-        checkQuota(userId, guest);
-
-        // 白名单校验
-        if (!FIELD_WHITELIST.containsKey(request.getSectionType())
-                || !FIELD_WHITELIST.get(request.getSectionType()).contains(request.getField())) {
-            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID,
-                    "该字段暂不支持 AI 写作。");
-        }
-        if (!ACTIONS.contains(request.getAction())) {
-            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "不支持的 AI 写作动作。");
-        }
-        if ("translate".equals(request.getAction()) && StringUtils.isBlank(request.getTargetLang())) {
-            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "翻译需要指定目标语言。");
-        }
+        validateRequest(request);
 
         String originalText = StringUtils.defaultString(request.getOriginalText());
-        if (originalText.length() > MAX_TEXT_LENGTH) {
-            throw new BusinessException(ResultCode.AI_WRITING_CONTENT_TOO_LONG,
-                    "原文过长，AI 写作单次最多支持 " + MAX_TEXT_LENGTH + " 字符。");
-        }
-        if (!"generate".equals(request.getAction()) && StringUtils.isBlank(originalText)) {
-            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID,
-                    "请先填写内容，再进行 AI 改写。");
-        }
+        validateOriginalText(request, originalText);
 
         AtomicInteger counter = inFlight.computeIfAbsent(userId, k -> new AtomicInteger());
         if (counter.incrementAndGet() > aiProperties.getRateLimit().getMaxConcurrentPerUser()) {
@@ -114,7 +99,25 @@ public class AiWritingService {
                     "同时进行的 AI 请求过多，请稍后再试。");
         }
         try {
-            return doWrite(resume, request, originalText);
+            // provider 解析放在配额扣减之前，解析失败不消耗配额
+            LlmProvider provider = providerRouter.resolve(FEATURE_KEY);
+            String model = providerRouter.resolveModel(FEATURE_KEY);
+            log.info("AI writing chat -> provider={}, model={}, resumeId={}, section={}, field={}, action={}",
+                    provider.getProviderName(), model, resume.getId(),
+                    request.getSectionType(), request.getField(), request.getAction());
+            String prompt = buildPrompt(resume, request, originalText);
+            AiProperties.FeatureConfig featureConfig = providerRouter.getFeatureConfig(FEATURE_KEY);
+            AiChatRequest aiRequest = buildChatRequest(model, prompt, featureConfig);
+
+            // 所有校验与解析完成后、发起 LLM 调用前才扣减配额
+            consumeQuota(userId, guest);
+            try {
+                return doWrite(resume, request, originalText, provider, model, prompt, aiRequest);
+            } catch (Exception e) {
+                // LLM 调用失败退还本次配额（used_count 下限保护为 0）
+                aiDailyQuotaService.refund(userId, FEATURE_KEY);
+                throw e;
+            }
         } finally {
             releaseInFlight(userId, counter);
         }
@@ -122,12 +125,13 @@ public class AiWritingService {
 
     /**
      * Stream generated content as text deltas. The same validation and quota
-     * rules as the synchronous endpoint apply.
+     * rules as the synchronous endpoint apply: quota is consumed only after all
+     * validation / provider resolution, right before the LLM call, and refunded
+     * when the stream fails.
      */
     public Flux<String> stream(String userId, boolean guest, String resumeId,
                                ResumeAiWriteRequest request) {
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
-        checkQuota(userId, guest);
         validateRequest(request);
 
         String originalText = StringUtils.defaultString(request.getOriginalText());
@@ -145,14 +149,7 @@ public class AiWritingService {
             String model = providerRouter.resolveModel(FEATURE_KEY);
             String prompt = buildPrompt(resume, request, originalText);
             AiProperties.FeatureConfig featureConfig = providerRouter.getFeatureConfig(FEATURE_KEY);
-            AiChatRequest aiRequest = AiChatRequest.builder()
-                    .model(model)
-                    .userPrompt(prompt)
-                    .temperature(0.4)
-                    .maxTokens(MAX_PROMPT_TOKENS)
-                    .timeout(featureConfig.getTimeout())
-                    .retry(featureConfig.getRetry())
-                    .build();
+            AiChatRequest aiRequest = buildChatRequest(model, prompt, featureConfig);
             AiCallLog callLog = new AiCallLog();
             callLog.setUserId(resume.getUserId());
             callLog.setFeatureKey(FEATURE_KEY);
@@ -162,6 +159,9 @@ public class AiWritingService {
             callLog.setCreatedAt(LocalDateTime.now());
             long start = System.currentTimeMillis();
             AtomicBoolean finalized = new AtomicBoolean(false);
+
+            // 所有校验与解析完成后、发起 LLM 调用前才扣减配额
+            consumeQuota(userId, guest);
 
             return provider.stream(aiRequest)
                     .filter(StringUtils::isNotBlank)
@@ -174,7 +174,9 @@ public class AiWritingService {
         }
     }
 
-    private ResumeAiWriteResponse doWrite(Resume resume, ResumeAiWriteRequest request, String originalText) {
+    private ResumeAiWriteResponse doWrite(Resume resume, ResumeAiWriteRequest request, String originalText,
+                                          LlmProvider provider, String model,
+                                          String prompt, AiChatRequest aiRequest) {
         long start = System.currentTimeMillis();
         AiCallLog callLog = new AiCallLog();
         callLog.setUserId(resume.getUserId());
@@ -182,33 +184,6 @@ public class AiWritingService {
         callLog.setCreatedAt(LocalDateTime.now());
 
         try {
-            LlmProvider provider = providerRouter.resolve(FEATURE_KEY);
-            String model = providerRouter.resolveModel(FEATURE_KEY);
-            log.info("AI writing chat -> provider={}, model={}, resumeId={}, section={}, field={}, action={}",
-                    provider.getProviderName(), model, resume.getId(),
-                    request.getSectionType(), request.getField(), request.getAction());
-
-            String resumeContent = toJson(resume.getSections());
-            String prompt = promptTemplates.render(FEATURE_KEY, Map.of(
-                    "resumeContent", resumeContent,
-                    "jobDescription", StringUtils.defaultString(resume.getTargetPosition()),
-                    "sectionType", request.getSectionType(),
-                    "field", request.getField(),
-                    "action", request.getAction(),
-                    "originalText", originalText,
-                    "targetLang", StringUtils.defaultString(request.getTargetLang())
-            ));
-
-            AiProperties.FeatureConfig featureConfig = providerRouter.getFeatureConfig(FEATURE_KEY);
-            AiChatRequest aiRequest = AiChatRequest.builder()
-                    .model(model)
-                    .userPrompt(prompt)
-                    .temperature(0.4)
-                    .maxTokens(MAX_PROMPT_TOKENS)
-                    .timeout(featureConfig.getTimeout())
-                    .retry(featureConfig.getRetry())
-                    .build();
-
             AiChatResponse response = provider.chat(aiRequest);
 
             callLog.setProviderName(provider.getProviderName());
@@ -246,12 +221,28 @@ public class AiWritingService {
             log.error("AI writing failed: resumeId={}", resume.getId(), e);
             throw new BusinessException(ResultCode.AI_MODEL_CALL_FAILED, "AI 写作失败，请稍后重试。");
         } finally {
+            AiCallLogDefaults.fillRequiredColumns(callLog, provider.getProviderName());
             try {
                 aiCallLogMapper.insert(callLog);
             } catch (Exception logEx) {
                 log.warn("Insert AiCallLog failed: {}", logEx.getMessage());
             }
         }
+    }
+
+    /**
+     * 构建 LLM 请求（在配额扣减前完成解析与构建）。
+     */
+    private AiChatRequest buildChatRequest(String model, String prompt,
+                                           AiProperties.FeatureConfig featureConfig) {
+        return AiChatRequest.builder()
+                .model(model)
+                .userPrompt(prompt)
+                .temperature(0.4)
+                .maxTokens(MAX_PROMPT_TOKENS)
+                .timeout(featureConfig.getTimeout())
+                .retry(featureConfig.getRetry())
+                .build();
     }
 
     /**
@@ -264,9 +255,10 @@ public class AiWritingService {
     }
 
     /**
-     * 按日配额校验：游客与登录用户使用不同上限，超限直接拒绝。
+     * 按日配额扣减：游客与登录用户使用不同上限，超限直接拒绝。
+     * 仅在所有校验与 provider 解析完成、即将发起 LLM 调用前调用。
      */
-    private void checkQuota(String userId, boolean guest) {
+    private void consumeQuota(String userId, boolean guest) {
         int dailyLimit = guest
                 ? aiProperties.getDailyQuota().getGuest()
                 : aiProperties.getDailyQuota().getUser();
@@ -316,12 +308,15 @@ public class AiWritingService {
         callLog.setLatencyMs(System.currentTimeMillis() - start);
         if (!success) {
             callLog.setErrorMsg("AI stream failed");
+            // 流式调用失败退还本次配额（finalized 保证只退一次）
+            aiDailyQuotaService.refund(resume.getUserId(), FEATURE_KEY);
         } else {
             auditLogService.record(resume.getUserId(), "ai_write", resume.getId(),
                     "stream=true, section=" + request.getSectionType()
                             + ", field=" + request.getField() + ", action=" + request.getAction());
         }
         try {
+            AiCallLogDefaults.fillRequiredColumns(callLog, null);
             aiCallLogMapper.insert(callLog);
         } catch (Exception logEx) {
             log.warn("Insert streaming AiCallLog failed: {}", logEx.getMessage());

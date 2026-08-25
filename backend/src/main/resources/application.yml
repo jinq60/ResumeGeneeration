@@ -87,9 +87,6 @@ app:
       password: ${ADMIN_BOOTSTRAP_PASSWORD:}
       nickname: ${ADMIN_BOOTSTRAP_NICKNAME:管理员}
   auth:
-    verify-code:
-      # 验证码模式：placeholder=任意 6 位数字（仅限开发测试）；strict=未配置真实验证码服务时拒绝注册
-      mode: ${VERIFY_CODE_MODE:placeholder}
     email-code:
       # 邮箱验证码有效期与重发间隔
       ttl-minutes: 5
@@ -119,9 +116,17 @@ app:
       # 每 IP 每天可创建的游客会话上限（防刷号）
       max-per-ip-per-day: ${GUEST_MAX_PER_IP_PER_DAY:50}
     login:
-      # 连续登录失败锁定
+      # 连续登录失败锁定（账号维度）
       max-failures: ${LOGIN_MAX_FAILURES:5}
       lockout-minutes: ${LOGIN_LOCKOUT_MINUTES:15}
+      # 单 IP 窗口内登录失败上限（密码喷洒/撞库防御，阈值高于账号维度）
+      ip-max-failures: ${LOGIN_IP_MAX_FAILURES:20}
+    sms:
+      # 短信通道 API Key：留空表示未接入真实短信通道；
+      # 生产环境（非 dev/test profile）未配置时发送验证码将直接拒绝
+      api-key: ${SMS_API_KEY:}
+      # 每手机号每日验证码发送上限
+      daily-limit-per-phone: ${SMS_DAILY_LIMIT_PER_PHONE:10}
   rate-limit:
     max-requests: 60
     window-seconds: 60

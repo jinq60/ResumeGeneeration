@@ -114,7 +114,7 @@
             <el-button
               type="primary"
               class="flex-1"
-              @click="loadTemplates"
+              @click="handleSearch"
             >
               <el-icon size="16">
                 <Search />
@@ -255,6 +255,19 @@
       </div>
     </div>
 
+    <!-- Pagination -->
+    <div class="flex items-center justify-end gap-4 mb-8">
+      <span class="text-label-md text-on-surface-variant">共 {{ total }} 条</span>
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[12, 24, 48]"
+        layout="sizes, prev, pager, next"
+        background
+      />
+    </div>
+
     <!-- Add/Edit Dialog -->
     <el-dialog
       v-model="dialogVisible"
@@ -363,7 +376,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document, Search, Plus, Download, Refresh, More } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules, UploadProps, UploadRequestOptions } from 'element-plus'
@@ -377,6 +390,9 @@ interface TemplateForm extends TemplateRequest {
 const loading = ref(false)
 const filters = reactive({ keyword: '', category: '', status: '' })
 const templateList = ref<Template[]>([])
+const page = ref(1)
+const pageSize = ref(12)
+const total = ref(0)
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增模板')
 const submitLoading = ref(false)
@@ -407,6 +423,8 @@ const stats = reactive([
   { label: '系统内置', value: '-', icon: Document, iconBg: 'bg-on-tertiary-fixed-variant/10', iconColor: 'text-on-tertiary-fixed-variant' }
 ])
 
+watch([page, pageSize], loadTemplates)
+
 onMounted(() => {
   loadStats()
   loadTemplates()
@@ -428,13 +446,14 @@ async function loadTemplates() {
   loading.value = true
   try {
     const res = await templateApi.getTemplates({
-      page: 1,
-      size: 100,
+      page: page.value,
+      size: pageSize.value,
       keyword: filters.keyword || undefined,
       status: filters.status || undefined,
       category: filters.category || undefined
     })
     templateList.value = res.records
+    total.value = res.total
   } catch (e: any) {
     ElMessage.error(e.message || '加载模板列表失败')
   } finally {
@@ -442,10 +461,20 @@ async function loadTemplates() {
   }
 }
 
+/** 查询：先回到第一页再加载（page 变化由 watch 触发，避免重复请求） */
+function handleSearch() {
+  if (page.value === 1) {
+    loadTemplates()
+  } else {
+    page.value = 1
+  }
+}
+
 function resetFilters() {
   filters.keyword = ''
   filters.category = ''
   filters.status = ''
+  page.value = 1
   loadTemplates()
 }
 

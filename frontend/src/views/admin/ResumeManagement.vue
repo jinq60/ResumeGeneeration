@@ -60,7 +60,7 @@
             <el-button
               type="primary"
               class="flex-1"
-              @click="loadResumes"
+              @click="handleSearch"
             >
               <el-icon size="16">
                 <Search />
@@ -249,12 +249,23 @@ function resetFilters() {
   loadResumes()
 }
 
+/** 查询：先回到第一页再加载（watch 会因 page 变化触发一次，避免重复请求） */
+function handleSearch() {
+  if (page.value === 1) {
+    loadResumes()
+  } else {
+    page.value = 1
+  }
+}
+
 function sceneLabel(scene: string) {
   const map: Record<string, string> = {
-    campus: '校园招聘',
-    social: '社会招聘',
-    intern: '实习',
-    postgraduate: '考研复试'
+    campus_recruitment: '校园招聘',
+    social_recruitment: '社会招聘',
+    internship: '实习',
+    postgraduate_reexam: '考研复试',
+    project_application: '项目申请',
+    custom: '自定义'
   }
   return map[scene] || scene
 }

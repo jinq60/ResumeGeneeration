@@ -1,11 +1,15 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { useAuthModalStore } from '@/stores/authModal'
+import { useUserStore } from '@/stores/user'
 import {
   getAccessToken,
   readStoredAuth,
   updateStoredTokens,
   clearStoredAuth
 } from '@/utils/authStorage'
+import { ApiError } from '@/utils/apiError'
+
+export { ApiError }
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -56,9 +60,17 @@ function refreshAccessToken(): Promise<string> {
 }
 
 function handleAuthExpired() {
-  clearStoredAuth()
+  // 同步清理 Pinia 用户态与本地存储，避免侧边栏仍显示已登录、
+  // 后续请求重复触发"刷新失败→弹窗"循环。
+  try {
+    useUserStore().clearUser()
+  } catch {
+    // Pinia 尚未初始化时兜底只清 localStorage
+    clearStoredAuth()
+  }
   const path = window.location.pathname
-  if (!path.startsWith('/admin/login')) {
+  // 管理端有自己的登录态处理（adminRequest + /admin/login），整个 /admin 前缀都不弹用户端登录框
+  if (!path.startsWith('/admin')) {
     const authModalStore = useAuthModalStore()
     authModalStore.open()
   }
@@ -71,7 +83,13 @@ request.interceptors.response.use(
       return response
     }
     if (response.data.code !== 200) {
-      return Promise.reject(new Error(response.data.message || '请求失败'))
+      // 业务错误必须携带 R.code，供下游按业务码分支（如 6004 AI 并发限流）
+      return Promise.reject(
+        new ApiError(response.data.message || '请求失败', {
+          code: response.data.code,
+          httpStatus: response.status
+        })
+      )
     }
     return response.data.data
   },
@@ -88,12 +106,17 @@ request.interceptors.response.use(
         return request(config)
       } catch {
         handleAuthExpired()
-        return Promise.reject(new Error('登录已过期，请重新登录'))
+        return Promise.reject(new ApiError('登录已过期，请重新登录', { httpStatus: 401 }))
       }
     }
 
     const message = error.response?.data?.message || '网络异常，请稍后重试'
-    return Promise.reject(new Error(message))
+    return Promise.reject(
+      new ApiError(message, {
+        code: error.response?.data?.code,
+        httpStatus: status
+      })
+    )
   }
 )
 

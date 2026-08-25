@@ -89,6 +89,8 @@ describe('LoginView', () => {
 
     const modalStore = useAuthModalStore()
     expect(modalStore.isOpen).toBe(true)
+    // 错误文本在清除 URL query 前转存到 authModalStore，供 LoginModal 打开时消费
+    expect(modalStore.oauthError).toBe('第三方登录失败')
     expect(replaceMock).toHaveBeenCalledWith('/')
   })
 

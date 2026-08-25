@@ -115,6 +115,10 @@ public class ContentAuditService {
         if (audit == null || BizConstant.DELETED.equals(audit.getDeleted())) {
             throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "审核记录不存在。");
         }
+        // 终态保护：approved / rejected 为终态，不允许再次审核改判
+        if (STATUS_APPROVED.equals(audit.getStatus()) || STATUS_REJECTED.equals(audit.getStatus())) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "该记录已完成审核，不允许再次审核。");
+        }
         String nextStatus = switch (action) {
             case "approve" -> STATUS_APPROVED;
             case "reject" -> STATUS_REJECTED;

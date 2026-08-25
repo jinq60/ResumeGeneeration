@@ -370,6 +370,8 @@ function close() {
 }
 
 function applyAuth(res: { userId: string; accessToken: string; refreshToken: string; expiresIn: number; isGuest?: boolean }) {
+  // 游客升级为正式账号前，吊销游客会话的刷新令牌（fire-and-forget，失败静默）
+  revokeGuestSession()
   userStore.setUser({
     userId: res.userId,
     accessToken: res.accessToken,
@@ -378,6 +380,16 @@ function applyAuth(res: { userId: string; accessToken: string; refreshToken: str
   })
   close()
   router.push('/workbench/dashboard')
+}
+
+/** 当前为游客登录态时，异步调用登出接口吊销其刷新令牌；不等待结果、失败不阻塞正式登录。 */
+function revokeGuestSession() {
+  if (!userStore.isGuest) return
+  const guestRefreshToken = userStore.refreshToken
+  if (!userStore.accessToken || !guestRefreshToken) return
+  authApi.logout(guestRefreshToken).catch(() => {
+    // 服务端吊销失败不阻塞正式登录流程
+  })
 }
 
 async function loadLoginMethods() {
@@ -479,9 +491,18 @@ function handleOAuth(provider: string) {
 
 /** 处理 OAuth 回调：用一次性授权码换取令牌（JWT 不经 URL 传递），或 ?error=... */
 async function handleOAuthCallback() {
+  // 错误文本优先来自 authModalStore：/login 回调页会在 router.replace 清除
+  // URL query 前转存，避免直接读 route.query.error 的时序竞争
+  if (authModalStore.oauthError) {
+    errorMsg.value = authModalStore.oauthError
+    authModalStore.oauthError = ''
+    return
+  }
+
   const query = route.query
   if (query.error) {
     errorMsg.value = String(query.error)
+    authModalStore.oauthError = ''
     return
   }
 

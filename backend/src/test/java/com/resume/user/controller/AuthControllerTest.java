@@ -93,7 +93,8 @@ class AuthControllerTest {
         request.setPassword("Password123");
         request.setLoginType("phone");
 
-        when(userService.login(any(LoginRequest.class))).thenReturn(buildAuthResponse());
+        // 控制器现以两参形式调用 login（附带客户端 IP 用于 IP 维度防爆破）
+        when(userService.login(any(LoginRequest.class), any())).thenReturn(buildAuthResponse());
 
         mockMvc.perform(post("/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)

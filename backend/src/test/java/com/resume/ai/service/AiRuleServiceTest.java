@@ -122,6 +122,36 @@ class AiRuleServiceTest {
     }
 
     @Test
+    void publish_shouldInheritMissingFieldsFromLatestVersion() {
+        AiRule active = buildRule("rule_1", 1, "active", "family_1");
+        active.setDescription("原描述");
+        active.setSystemPrompt("原系统提示词");
+        active.setUserPrompt("原用户提示词");
+        active.setParams(Map.of("temperature", 0.2));
+        when(aiRuleMapper.selectById("rule_1")).thenReturn(active);
+        when(aiRuleMapper.selectList(any())).thenReturn(List.of(active));
+        when(aiRuleMapper.insert(any(AiRule.class))).thenAnswer(inv -> {
+            AiRule rule = inv.getArgument(0);
+            rule.setId("rule_2");
+            return 1;
+        });
+
+        AiRuleRequest request = new AiRuleRequest();
+        request.setName("新名称");
+        // description / systemPrompt / userPrompt / params 缺省，不应把生效中的值置 null
+        AiRuleResponse response = aiRuleService.publish("admin_1", "rule_1", request);
+
+        ArgumentCaptor<AiRule> captor = ArgumentCaptor.forClass(AiRule.class);
+        verify(aiRuleMapper).insert(captor.capture());
+        AiRule published = captor.getValue();
+        assertEquals("新名称", response.getName());
+        assertEquals("原描述", published.getDescription());
+        assertEquals("原系统提示词", published.getSystemPrompt());
+        assertEquals("原用户提示词", published.getUserPrompt());
+        assertEquals(Map.of("temperature", 0.2), published.getParams());
+    }
+
+    @Test
     void toggle_shouldSwitchStatus() {
         AiRule rule = buildRule("rule_1", 1, "draft", "family_1");
         when(aiRuleMapper.selectById("rule_1")).thenReturn(rule);
@@ -176,15 +206,15 @@ class AiRuleServiceTest {
     }
 
     @Test
-    void delete_shouldLogicalDeleteDraft() {
+    void delete_shouldLogicalDeleteDraftViaDeleteById() {
         AiRule rule = buildRule("rule_1", 1, "draft", "family_1");
         when(aiRuleMapper.selectById("rule_1")).thenReturn(rule);
 
         aiRuleService.delete("rule_1");
 
-        ArgumentCaptor<AiRule> captor = ArgumentCaptor.forClass(AiRule.class);
-        verify(aiRuleMapper).updateById(captor.capture());
-        assertEquals(1, captor.getValue().getDeleted());
+        // @TableLogic 下必须走 deleteById（自动转 UPDATE deleted=1）
+        verify(aiRuleMapper).deleteById("rule_1");
+        verify(aiRuleMapper, never()).updateById(any(AiRule.class));
     }
 
     @Test

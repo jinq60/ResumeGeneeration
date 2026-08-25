@@ -149,6 +149,7 @@ public class ResumeImportService {
         response.setSections(resume.getSections());
         response.setRenderSettings(RenderSettings.copyOf(resume.getRenderSettings()));
         response.setExportCount(resume.getExportCount());
+        response.setVersion(resume.getVersion());
         response.setLastEditedAt(resume.getLastEditedAt());
         response.setCreatedAt(resume.getCreatedAt());
         response.setUpdatedAt(resume.getUpdatedAt());

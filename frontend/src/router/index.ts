@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useAuthModalStore } from '@/stores/authModal'
 import { getAccessToken } from '@/utils/authStorage'
+import { getJwtRole } from '@/utils/jwt'
 import adminRoutes from './admin'
 import websiteRoutes from './website'
 import workbenchRoutes from './workbench'
@@ -30,9 +31,17 @@ router.beforeEach((to, _from, next) => {
   // Admin routes use separate token
   if (to.path.startsWith('/admin')) {
     const adminToken = localStorage.getItem('admin_token')
-    if (to.meta.requiresAuth && !adminToken) {
+    // 除检查 token 存在外，还需解析 JWT role claim：防止把普通用户 JWT
+    // 手工放入 admin_token 后渲染后台页面壳（真正鉴权仍以后端为准）
+    const isAdmin = !!adminToken && getJwtRole(adminToken) === 'ADMIN'
+    if (adminToken && !isAdmin) {
+      // 非管理员令牌立即清除，同时清掉可能残留的刷新令牌
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_refresh_token')
+    }
+    if (to.meta.requiresAuth && !isAdmin) {
       next('/admin/login')
-    } else if (to.path === '/admin/login' && adminToken) {
+    } else if (to.path === '/admin/login' && isAdmin) {
       next('/admin/dashboard')
     } else {
       next()

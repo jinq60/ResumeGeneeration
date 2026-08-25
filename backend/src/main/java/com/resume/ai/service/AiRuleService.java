@@ -163,6 +163,19 @@ public class AiRuleService {
             rule.setName(request.getName() != null ? request.getName() : latest.getName());
             rule.setRuleType(request.getRuleType() != null ? request.getRuleType() : latest.getRuleType());
             applyRequest(rule, request);
+            // 发布新版本时 request 缺省的字段继承 latest 版本的值，避免把生效中的配置置 null
+            if (rule.getDescription() == null) {
+                rule.setDescription(latest.getDescription());
+            }
+            if (rule.getSystemPrompt() == null) {
+                rule.setSystemPrompt(latest.getSystemPrompt());
+            }
+            if (rule.getUserPrompt() == null) {
+                rule.setUserPrompt(latest.getUserPrompt());
+            }
+            if (rule.getParams() == null) {
+                rule.setParams(latest.getParams());
+            }
         } else {
             rule.setName(latest.getName());
             rule.setRuleType(latest.getRuleType());
@@ -248,9 +261,10 @@ public class AiRuleService {
         if (STATUS_ACTIVE.equals(rule.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "生效中的规则不可删除，请先停用。");
         }
-        rule.setDeleted(BizConstant.DELETED);
-        rule.setUpdatedAt(LocalDateTime.now());
-        aiRuleMapper.updateById(rule);
+        // @TableLogic 下 deleteById 自动转为 UPDATE deleted=1；
+        // setDeleted+updateById 会把逻辑删除字段排除在 SET 外导致静默失效，禁止使用。
+        // 规则当前无内存/Redis 缓存，无需额外失效处理
+        aiRuleMapper.deleteById(id);
     }
 
     /**

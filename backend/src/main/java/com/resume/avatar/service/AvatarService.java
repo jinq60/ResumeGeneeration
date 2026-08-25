@@ -1,6 +1,7 @@
 package com.resume.avatar.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.ai.service.AiAvatarService;
@@ -95,7 +96,18 @@ public class AvatarService {
         task.setDeleted(BizConstant.NOT_DELETED);
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(LocalDateTime.now());
-        avatarTaskMapper.insert(task);
+        try {
+            avatarTaskMapper.insert(task);
+        } catch (Exception e) {
+            // 插入失败（事务将回滚）时 best-effort 删除已上传对象，避免 MinIO 孤儿文件；
+            // 清理失败仅 warn，不掩盖原始异常
+            try {
+                minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
+            } catch (Exception cleanupEx) {
+                log.warn("Failed to cleanup uploaded avatar object after insert failure: {}", objectName, cleanupEx);
+            }
+            throw e;
+        }
 
         AvatarUploadResponse response = new AvatarUploadResponse();
         response.setId(task.getId());
@@ -219,12 +231,12 @@ public class AvatarService {
             pendingRemoval.add(resultObjectName);
         }
 
-        AvatarTask deleted = new AvatarTask();
-        deleted.setDeleted(BizConstant.DELETED);
-        LambdaQueryWrapper<AvatarTask> wrapper = new LambdaQueryWrapper<>();
+        // 逻辑删除字段必须用 UpdateWrapper.set 显式写入：实体方式会被 MP 从 SET 子句排除导致静默失效
+        LambdaUpdateWrapper<AvatarTask> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(AvatarTask::getUserId, userId)
-               .eq(AvatarTask::getSourceImageUrl, task.getSourceImageUrl());
-        avatarTaskMapper.update(deleted, wrapper);
+               .eq(AvatarTask::getSourceImageUrl, task.getSourceImageUrl())
+               .set(AvatarTask::getDeleted, BizConstant.DELETED);
+        avatarTaskMapper.update(null, wrapper);
 
         minioStorageService.removeAfterCommit(minioStorageService.getBucketAvatars(), pendingRemoval);
     }
@@ -233,6 +245,8 @@ public class AvatarService {
      * 清理指定简历关联的所有头像任务及 MinIO 文件。
      * <p>
      * 任务记录在当前事务内逻辑删除；MinIO 文件延迟到事务提交后移除。
+     * 删除前检查共享引用：若同一源图仍被该用户其他未删除任务引用（如多份简历
+     * 复用同一张自拍照），则跳过物理删除，避免跨简历误删。
      * </p>
      */
     @Transactional(rollbackFor = Exception.class)
@@ -241,16 +255,39 @@ public class AvatarService {
         wrapper.eq(AvatarTask::getUserId, userId)
                 .eq(AvatarTask::getResumeId, resumeId);
         List<AvatarTask> tasks = avatarTaskMapper.selectList(wrapper);
-        List<String> pendingRemoval = tasks.stream()
-                .map(AvatarTask::getSourceImageUrl)
-                .map(this::extractObjectName)
-                .filter(StringUtils::isNotBlank)
-                .filter(objectName -> isOwnedObject(userId, objectName))
-                .toList();
         if (!tasks.isEmpty()) {
             avatarTaskMapper.delete(wrapper);
         }
+        // 逻辑删除后再统计剩余引用：selectCount 自动追加 deleted=0，
+        // 只统计本次清理之外仍存活的引用
+        List<String> pendingRemoval = new ArrayList<>();
+        tasks.stream()
+                .map(AvatarTask::getSourceImageUrl)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .forEach(sourceImageUrl -> {
+                    String objectName = extractObjectName(sourceImageUrl);
+                    if (objectName == null || !isOwnedObject(userId, objectName)) {
+                        return;
+                    }
+                    if (hasOtherActiveReference(userId, sourceImageUrl)) {
+                        log.info("Skip removing shared avatar source, still referenced: userId={}, object={}",
+                                userId, objectName);
+                        return;
+                    }
+                    pendingRemoval.add(objectName);
+                });
         minioStorageService.removeAfterCommit(minioStorageService.getBucketAvatars(), pendingRemoval);
+    }
+
+    /**
+     * 判断该用户名下是否仍有未删除的任务引用同一源图 URL。
+     */
+    private boolean hasOtherActiveReference(String userId, String sourceImageUrl) {
+        LambdaQueryWrapper<AvatarTask> refWrapper = new LambdaQueryWrapper<>();
+        refWrapper.eq(AvatarTask::getUserId, userId)
+                .eq(AvatarTask::getSourceImageUrl, sourceImageUrl);
+        return avatarTaskMapper.selectCount(refWrapper) > 0;
     }
 
     private String extractObjectName(String sourceImageUrl) {

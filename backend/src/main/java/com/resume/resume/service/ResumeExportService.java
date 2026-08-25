@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 
 /**
  * 简历多格式导出（Markdown / Word）。
@@ -41,23 +42,7 @@ public class ResumeExportService {
     public String buildMarkdown(String userId, String resumeId) {
         Resume resume = resumeService.getResumeEntity(userId, resumeId);
         resumeSectionValidator.validateForExport(resume.getSections());
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("# ").append(profileValue(resume, "name")).append("\n\n");
-        sb.append("> 目标岗位：").append(profileValue(resume, "targetPosition")).append("\n\n");
-        String contact = buildContactLine(resume);
-        if (StringUtils.isNotBlank(contact)) {
-            sb.append("> ").append(contact).append("\n\n");
-        }
-
-        for (SectionDTO section : resume.getSections()) {
-            if (!Boolean.TRUE.equals(section.getVisible())) {
-                continue;
-            }
-            sb.append("## ").append(section.getTitle()).append("\n\n");
-            appendSectionMarkdown(sb, section);
-        }
-        return sb.toString();
+        return renderMarkdown(resume);
     }
 
     /**
@@ -66,11 +51,14 @@ public class ResumeExportService {
     public String buildMarkdownForAdmin(String resumeId) {
         Resume resume = resumeService.getResumeForPreview(resumeId);
         resumeSectionValidator.validateForExport(resume.getSections());
+        return renderMarkdown(resume);
+    }
 
+    private String renderMarkdown(Resume resume) {
         StringBuilder sb = new StringBuilder();
-        sb.append("# ").append(profileValue(resume, "name")).append("\n\n");
-        sb.append("> 目标岗位：").append(profileValue(resume, "targetPosition")).append("\n\n");
-        String contact = buildContactLine(resume);
+        sb.append("# ").append(escapeMarkdown(profileValue(resume, "name"))).append("\n\n");
+        sb.append("> 目标岗位：").append(escapeMarkdown(profileValue(resume, "targetPosition"))).append("\n\n");
+        String contact = buildContactLine(findProfile(resume.getSections()), this::escapeMarkdown);
         if (StringUtils.isNotBlank(contact)) {
             sb.append("> ").append(contact).append("\n\n");
         }
@@ -79,7 +67,7 @@ public class ResumeExportService {
             if (!Boolean.TRUE.equals(section.getVisible())) {
                 continue;
             }
-            sb.append("## ").append(section.getTitle()).append("\n\n");
+            sb.append("## ").append(escapeMarkdown(section.getTitle())).append("\n\n");
             appendSectionMarkdown(sb, section);
         }
         return sb.toString();
@@ -217,13 +205,13 @@ public class ResumeExportService {
             }
             case "education", "work", "project", "skill" -> {
                 for (Map<String, Object> map : section.dataAsItems()) {
-                    sb.append("- **").append(firstNonBlank(getString(map, "school"),
-                            getString(map, "company"), getString(map, "name"), getString(map, "category")))
+                    sb.append("- **").append(escapeMarkdown(firstNonBlank(getString(map, "school"),
+                            getString(map, "company"), getString(map, "name"), getString(map, "category"))))
                       .append("**");
                     String sub = firstNonBlank(getString(map, "degree"), getString(map, "position"),
                             getString(map, "role"));
                     if (StringUtils.isNotBlank(sub)) {
-                        sb.append(" · ").append(sub);
+                        sb.append(" · ").append(escapeMarkdown(sub));
                     }
                     sb.append("\n");
                      appendRichTextMarkdown(sb, map, "descriptionHtml", "description");
@@ -269,7 +257,7 @@ public class ResumeExportService {
     }
 
     private void appendProfileMarkdown(StringBuilder sb, Map<String, Object> profile) {
-        String contact = buildContactLine(profile);
+        String contact = buildContactLine(profile, this::escapeMarkdown);
         if (StringUtils.isNotBlank(contact)) {
             sb.append(contact).append("\n\n");
         }
@@ -330,14 +318,21 @@ public class ResumeExportService {
     }
 
     private String buildContactLine(Resume resume) {
-        return buildContactLine(findProfile(resume.getSections()));
+        return buildContactLine(findProfile(resume.getSections()), UnaryOperator.identity());
     }
 
     private String buildContactLine(Map<String, Object> profile) {
+        return buildContactLine(profile, UnaryOperator.identity());
+    }
+
+    /**
+     * 拼接联系方式行；escaper 用于 Markdown 导出时对字段值做字符转义（分隔符 | 不转义）。
+     */
+    private String buildContactLine(Map<String, Object> profile, UnaryOperator<String> escaper) {
         StringBuilder sb = new StringBuilder();
-        String phone = getString(profile, "phone");
-        String email = getString(profile, "email");
-        String city = getString(profile, "city");
+        String phone = escaper.apply(getString(profile, "phone"));
+        String email = escaper.apply(getString(profile, "email"));
+        String city = escaper.apply(getString(profile, "city"));
         if (StringUtils.isNotBlank(phone)) sb.append(phone);
         if (StringUtils.isNotBlank(email)) {
             if (sb.length() > 0) sb.append(" | ");
@@ -390,5 +385,24 @@ public class ResumeExportService {
         }
         return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 .replace("\"", "&quot;").replace("'", "&#39;");
+    }
+
+    /**
+     * Markdown 基本转义：对标题/加粗/链接/表格/行内代码等有语法含义的字符前加反斜杠，
+     * 防止姓名、职位、联系方式、章节标题等文本字段破坏导出文档结构（内容注入）。
+     */
+    private String escapeMarkdown(String text) {
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(text.length() + 16);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '#' || c == '*' || c == '_' || c == '[' || c == ']' || c == '|' || c == '`') {
+                sb.append('\\');
+            }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 }

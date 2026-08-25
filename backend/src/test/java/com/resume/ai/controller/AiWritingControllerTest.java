@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import reactor.core.publisher.Flux;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -61,7 +62,7 @@ class AiWritingControllerTest {
     @Test
     @WithMockJwt(userId = "user123")
     void write_shouldReturnContent() throws Exception {
-        when(aiWritingService.write(eq("user123"), eq(false), eq("resume123"), any(ResumeAiWriteRequest.class)))
+        when(aiWritingService.write(eq("user123"), anyBoolean(), eq("resume123"), any(ResumeAiWriteRequest.class)))
                 .thenReturn(new ResumeAiWriteResponse("优化后的内容"));
 
         mockMvc.perform(post("/resumes/resume123/ai/write")
@@ -75,7 +76,7 @@ class AiWritingControllerTest {
     @Test
     @WithMockJwt(userId = "user123")
     void write_shouldReturn400OnBusinessError() throws Exception {
-        when(aiWritingService.write(eq("user123"), eq(false), eq("resume123"), any(ResumeAiWriteRequest.class)))
+        when(aiWritingService.write(eq("user123"), anyBoolean(), eq("resume123"), any(ResumeAiWriteRequest.class)))
                 .thenThrow(new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "该字段暂不支持 AI 写作。"));
 
         mockMvc.perform(post("/resumes/resume123/ai/write")
@@ -96,7 +97,7 @@ class AiWritingControllerTest {
     @Test
     @WithMockJwt(userId = "user123")
     void write_shouldReturnQuotaExceeded() throws Exception {
-        when(aiWritingService.write(eq("user123"), eq(false), eq("resume123"), any(ResumeAiWriteRequest.class)))
+        when(aiWritingService.write(eq("user123"), anyBoolean(), eq("resume123"), any(ResumeAiWriteRequest.class)))
                 .thenThrow(new BusinessException(ResultCode.AI_DAILY_QUOTA_EXCEEDED, "今日 AI 写作次数已用完，请明天再来。"));
 
         mockMvc.perform(post("/resumes/resume123/ai/write")
@@ -109,7 +110,7 @@ class AiWritingControllerTest {
     @Test
     @WithMockJwt(userId = "user123")
     void stream_shouldReturnServerSentEvents() throws Exception {
-        when(aiWritingService.stream(eq("user123"), eq(false), eq("resume123"), any(ResumeAiWriteRequest.class)))
+        when(aiWritingService.stream(eq("user123"), anyBoolean(), eq("resume123"), any(ResumeAiWriteRequest.class)))
                 .thenReturn(Flux.just("first", "second"));
 
         mockMvc.perform(post("/resumes/resume123/ai/write/stream")

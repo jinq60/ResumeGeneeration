@@ -40,4 +40,55 @@ describe('resumeApi.aiWriteStream', () => {
       expect.objectContaining({ method: 'POST' })
     )
   })
+
+  it('passes the abort signal to fetch', async () => {
+    localStorage.setItem('access_token', 'token')
+    const controller = new AbortController()
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: {
+        getReader: () => ({
+          read: vi.fn(async () => ({ done: true, value: undefined }))
+        })
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await resumeApi.aiWriteStream(
+      'resume_1',
+      { sectionType: 'introduction', field: 'content', action: 'polish' },
+      () => {},
+      controller.signal
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: controller.signal })
+    )
+  })
+
+  it('cancels the reader and rethrows when the stream is aborted mid-read', async () => {
+    localStorage.setItem('access_token', 'token')
+    const cancelMock = vi.fn()
+    const abortError = Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: {
+        getReader: () => ({
+          read: vi.fn(async () => { throw abortError }),
+          cancel: cancelMock
+        })
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(resumeApi.aiWriteStream(
+      'resume_1',
+      { sectionType: 'work', field: 'description', action: 'expand' },
+      () => {}
+    )).rejects.toThrow(abortError)
+
+    // 中断时必须释放底层连接
+    expect(cancelMock).toHaveBeenCalledTimes(1)
+  })
 })

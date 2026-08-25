@@ -66,6 +66,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import type { UploadFile } from 'element-plus'
 import { Briefcase, Calendar, Delete, Link, Location, Message, Phone, Plus, User, View } from '@element-plus/icons-vue'
 import type { Profile } from '@/types/resume'
@@ -95,22 +97,41 @@ function toggleField(key: string) {
   hiddenFields.value = isFieldVisible(key) ? [...hiddenFields.value, key] : hiddenFields.value.filter(item => item !== key)
 }
 
+const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const AVATAR_MAX_SIZE_MB = 10
+
+function validateAvatar(file: File): boolean {
+  if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+    ElMessage.error('仅支持 JPG、PNG 或 WEBP 格式图片')
+    return false
+  }
+  if (file.size / 1024 / 1024 > AVATAR_MAX_SIZE_MB) {
+    ElMessage.error('图片大小不能超过 10MB')
+    return false
+  }
+  return true
+}
+
 async function handleAvatarChange(file: UploadFile) {
   if (!file.raw || !props.resume?.id) return
+  if (!validateAvatar(file.raw)) return
   avatarUploading.value = true
   try {
     const result = await avatarApi.upload(file.raw, props.resume.id)
     formData.value.avatarUrl = result.sourceImageUrl
+  } catch {
+    ElMessage.error('头像上传失败')
   } finally {
     avatarUploading.value = false
   }
 }
 
+const router = useRouter()
+
 function goAvatarUpload() {
   const resumeId = props.resume?.id
   if (!resumeId) return
-  const url = `/workbench/avatar/upload?resumeId=${encodeURIComponent(resumeId)}`
-  window.location.href = url
+  router.push(`/workbench/avatar/upload?resumeId=${encodeURIComponent(resumeId)}`)
 }
 
 const formData = ref<Profile>({
@@ -133,28 +154,6 @@ const formData = ref<Profile>({
   showAvatar: true,
   customFields: []
 })
-
-const rules = {
-  name: [
-    { required: true, message: '请输入姓名', trigger: 'blur' },
-    { min: 1, max: 50, message: '姓名长度在1-50个字符', trigger: 'blur' }
-  ],
-  phone: [
-    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
-  ],
-  email: [
-    { type: 'email', message: '请输入正确的邮箱', trigger: 'blur' }
-  ],
-  personalWebsite: [
-    { type: 'url', message: '请输入正确的URL', trigger: 'blur' }
-  ],
-  github: [
-    { type: 'url', message: '请输入正确的URL', trigger: 'blur' }
-  ],
-  portfolio: [
-    { type: 'url', message: '请输入正确的URL', trigger: 'blur' }
-  ]
-}
 
 function startAddCustomField() {
   newFieldLabel.value = ''

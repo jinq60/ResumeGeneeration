@@ -82,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { resumeApi, type AiWritePayload } from '@/api/resume'
@@ -121,12 +121,25 @@ function handleCommand(command: string) {
   runAction(command as AiWritePayload['action'])
 }
 
+let abortController: AbortController | null = null
+
+function cancelGeneration() {
+  if (abortController) {
+    abortController.abort()
+    abortController = null
+  }
+}
+
 async function runAction(action: AiWritePayload['action']) {
   loading.value = true
   errorMsg.value = ''
   currentAction.value = action
   editedContent.value = ''
   dialogVisible.value = true
+  // 支持取消：对话框关闭或组件卸载时中断流式请求
+  cancelGeneration()
+  const controller = new AbortController()
+  abortController = controller
   try {
     const payload: AiWritePayload = {
       sectionType: props.sectionType,
@@ -140,19 +153,41 @@ async function runAction(action: AiWritePayload['action']) {
     if (typeof resumeApi.aiWriteStream === 'function') {
       await resumeApi.aiWriteStream(props.resumeId, payload, (content) => {
         editedContent.value += content
-      })
+      }, controller.signal)
     } else {
       // Keep component tests and older API mocks compatible with sync fallback.
       const result = await resumeApi.aiWrite(props.resumeId, payload)
       editedContent.value = result.content
     }
   } catch (e: any) {
+    if (controller.signal.aborted || e?.name === 'AbortError') {
+      // 用户主动取消：静默退出，保留已生成的半段内容
+      return
+    }
+    // 非 abort 错误：保留已生成的半段内容并提示
     errorMsg.value = e.message || 'AI 写作失败，请稍后重试'
-    ElMessage.error(errorMsg.value)
+    if (editedContent.value) {
+      ElMessage.warning('生成中断，已保留已生成的内容')
+    } else {
+      ElMessage.error(errorMsg.value)
+    }
   } finally {
+    if (abortController === controller) {
+      abortController = null
+    }
     loading.value = false
   }
 }
+
+watch(dialogVisible, (visible) => {
+  if (!visible) {
+    cancelGeneration()
+  }
+})
+
+onUnmounted(() => {
+  cancelGeneration()
+})
 
 function applyContent() {
   if (!editedContent.value) return

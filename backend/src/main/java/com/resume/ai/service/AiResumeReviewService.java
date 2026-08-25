@@ -11,6 +11,7 @@ import com.resume.ai.entity.AiCallLog;
 import com.resume.ai.mapper.AiCallLogMapper;
 import com.resume.ai.provider.LlmProvider;
 import com.resume.ai.provider.ProviderRouter;
+import com.resume.ai.util.AiCallLogDefaults;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
@@ -20,6 +21,7 @@ import com.resume.resume.entity.ResumeReviewSuggestion;
 import com.resume.resume.mapper.ResumeReviewMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
@@ -64,8 +66,14 @@ public class AiResumeReviewService {
             String model = providerRouter.resolveModel(FEATURE_KEY);
             doRealReview(review, resume, jobDescription, provider, model);
         } catch (BusinessException e) {
-            log.warn("AI provider not configured, using placeholder: {}", e.getMessage());
-            doPlaceholderReview(review);
+            if (e.getErrorCode() == ResultCode.AI_PROVIDER_NOT_CONFIGURED) {
+                log.warn("AI provider not configured, using placeholder: {}", e.getMessage());
+                doPlaceholderReview(review);
+            } else {
+                log.warn("AI review failed for reviewId={}", reviewId, e);
+                review.setStatus(BizConstant.REVIEW_STATUS_FAILED);
+                review.setErrorMsg(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            }
         } catch (Throwable e) {
             log.error("AI review failed for reviewId={}", reviewId, e);
             review.setStatus(BizConstant.REVIEW_STATUS_FAILED);
@@ -84,6 +92,12 @@ public class AiResumeReviewService {
                     && resume.getUserId() != null) {
                 notificationService.notify(resume.getUserId(), "ai", "AI 点评完成",
                         "你的简历《" + resume.getTitle() + "》点评已生成，综合评分 " + review.getOverallScore() + " 分，快去查看吧。");
+            } else if (BizConstant.REVIEW_STATUS_FAILED.equals(review.getStatus())
+                    && resume.getUserId() != null) {
+                String reason = StringUtils.abbreviate(
+                        StringUtils.defaultString(review.getErrorMsg(), "未知原因"), 100);
+                notificationService.notify(resume.getUserId(), "ai", "AI 点评失败",
+                        "你的简历《" + resume.getTitle() + "》点评失败：" + reason + "，请稍后重试。");
             }
         }
     }
@@ -92,7 +106,7 @@ public class AiResumeReviewService {
                                 LlmProvider provider, String model) {
         long start = System.currentTimeMillis();
         log.info("AI review chat -> provider={}, model={}, reviewId={}",
-                provider.getProviderName(), review.getId());
+                provider.getProviderName(), model, review.getId());
         AiCallLog callLog = new AiCallLog();
         callLog.setUserId(resume.getUserId());
         callLog.setFeatureKey(FEATURE_KEY);
@@ -139,14 +153,32 @@ public class AiResumeReviewService {
                 review.setErrorMsg(response.getErrorMsg());
                 callLog.setErrorMsg(response.getErrorMsg());
             }
-        } catch (Exception e) {
-            log.error("AI call failed, falling back to placeholder", e);
-            doPlaceholderReview(review);
+        } catch (BusinessException e) {
             callLog.setSuccess(false);
-            callLog.setErrorMsg("Fallback to placeholder: " + e.getMessage());
+            callLog.setErrorMsg(e.getMessage());
+            callLog.setLatencyMs(System.currentTimeMillis() - start);
+            if (e.getErrorCode() == ResultCode.AI_PROVIDER_NOT_CONFIGURED) {
+                // 仅供应商未配置时回退占位结果，避免假成功冒充真实点评
+                log.warn("AI provider not configured, falling back to placeholder", e);
+                doPlaceholderReview(review);
+            } else {
+                // 解析失败等业务异常视为点评失败，落库 failed 状态
+                log.error("AI review business failure for reviewId={}", review.getId(), e);
+                review.setStatus(BizConstant.REVIEW_STATUS_FAILED);
+                review.setErrorMsg(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            }
+        } catch (Exception e) {
+            // 供应商调用失败不再伪装成 SUCCESS 占位结果
+            log.error("AI call failed, marking review as failed: reviewId={}", review.getId(), e);
+            review.setStatus(BizConstant.REVIEW_STATUS_FAILED);
+            review.setErrorMsg(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            callLog.setSuccess(false);
+            callLog.setErrorMsg(e.getMessage());
             callLog.setLatencyMs(System.currentTimeMillis() - start);
         }
 
+        // 失败调用也要落审计表：NOT NULL 列兜底，避免 resolve 阶段异常时插入失败被吞
+        AiCallLogDefaults.fillRequiredColumns(callLog, provider.getProviderName());
         aiCallLogMapper.insert(callLog);
     }
 

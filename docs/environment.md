@@ -23,7 +23,7 @@
 
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |---|---|---|---|
-| `app.jwt.secret` | `JWT_SECRET`（dev）/ `APP_JWT_SECRET`（prod） | — | Base64 编码密钥，≥ 256 bit |
+| `app.jwt.secret` | `JWT_SECRET`（dev 与 prod 统一使用） | — | Base64 编码密钥，≥ 256 bit；prod 启动时由 JwtSecretValidator 校验，缺失即启动失败 |
 | `app.jwt.access-token-expiration` | — | `3600000` | Access Token 有效期（毫秒） |
 | `app.jwt.refresh-token-expiration` | — | `604800000` | Refresh Token 有效期（毫秒） |
 
@@ -37,6 +37,11 @@
 | `app.minio.buckets.avatars` | `APP_MINIO_BUCKET_AVATARS`（prod） | `resume-avatars` | 头像 Bucket |
 | `app.minio.buckets.pdfs` | `APP_MINIO_BUCKET_PDFS`（prod） | `resume-pdfs` | PDF Bucket |
 | `app.minio.buckets.templates` | `APP_MINIO_BUCKET_TEMPLATES`（prod） | `resume-templates` | 模板 Bucket |
+
+> 本地启动脚本 `backend/start-backend.ps1` / `start-backend.bat` 不再硬编码 MinIO 凭据：
+> 脚本从环境变量 `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` 读取并映射为后端的
+> `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY`；未设置时给出提示并跳过导出，
+> 后端回退到 `application-dev.yml` 的本地默认值。禁止在脚本或配置中提交真实凭据。
 
 ### 1.4 服务端口号
 
@@ -56,7 +61,6 @@
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |---|---|---|---|
 | `app.cors.allowed-origins` | `CORS_ALLOWED_ORIGINS`（dev）/ `APP_CORS_ALLOWED_ORIGINS`（prod） | `http://localhost:5173` | 允许的前端来源，逗号分隔 |
-| `app.auth.verify-code.mode` | `VERIFY_CODE_MODE` | `placeholder` | 已随注册功能移除，保留配置项向后兼容 |
 | `app.admin.bootstrap.phone` | `ADMIN_BOOTSTRAP_PHONE` | 空 | 首个管理员引导手机号 |
 | `app.admin.bootstrap.password` | `ADMIN_BOOTSTRAP_PASSWORD` | 空 | 首个管理员引导密码 |
 | `app.render.public-base-url` | `APP_PUBLIC_BASE_URL` | 空 | PDF/分享渲染时的外部访问前缀 |
@@ -68,6 +72,11 @@
 |---|---|---|---|
 | `app.auth.email-code.ttl-minutes` | — | `5` | 邮箱验证码有效期（分钟） |
 | `app.auth.email-code.resend-interval-seconds` | — | `60` | 重发间隔（秒） |
+| `app.auth.sms.api-key` | `SMS_API_KEY` | 空 | 短信通道 API Key；留空表示未接入真实通道，生产环境（非 dev/test profile）发送验证码将直接拒绝 |
+| `app.auth.sms.daily-limit-per-phone` | `SMS_DAILY_LIMIT_PER_PHONE` | `10` | 每手机号每日验证码发送上限 |
+| `app.auth.login.max-failures` | `LOGIN_MAX_FAILURES` | `5` | 账号维度连续登录失败锁定阈值 |
+| `app.auth.login.lockout-minutes` | `LOGIN_LOCKOUT_MINUTES` | `15` | 登录失败锁定时长（分钟） |
+| `app.auth.login.ip-max-failures` | `LOGIN_IP_MAX_FAILURES` | `20` | 单 IP 窗口内登录失败上限（密码喷洒/撞库防御） |
 | `app.auth.oauth.base-url` | `AUTH_OAUTH_BASE_URL` | `http://localhost:8080/api` | 后端对外地址，回调 = base-url + `/auth/oauth/{provider}/callback` |
 | `app.auth.oauth.frontend-redirect` | `AUTH_OAUTH_FRONTEND_REDIRECT` | `http://localhost:5173/login` | OAuth 登录成功后的前端跳转地址 |
 | `app.auth.oauth.google.client-id` | `GOOGLE_CLIENT_ID` | 空 | Google OAuth 客户端 ID |

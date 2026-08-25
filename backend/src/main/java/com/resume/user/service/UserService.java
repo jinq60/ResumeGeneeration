@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -49,6 +50,13 @@ public class UserService {
             Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).+$");
 
     /**
+     * refresh token 轮换宽限窗口：并发刷新（多标签页）时第二个请求携带的旧令牌
+     * 刚被消费，落入该窗口视为良性竞态而非重放攻击，直接返回最近一次轮换结果；
+     * 攻击者重放超过窗口仍触发整族吊销。
+     */
+    private static final long ROTATION_GRACE_MILLIS = 5_000;
+
+    /**
      * 登录。当 loginType 未传时自动识别账号类型。
      * <p>
      * 邮箱账号不存在时自动创建（登录即注册）；手机号不存在时保持报错。
@@ -56,10 +64,30 @@ public class UserService {
      * </p>
      */
     public AuthResponse login(LoginRequest request) {
+        return login(request, null);
+    }
+
+    /**
+     * 登录（带客户端 IP 维度防暴力破解）。
+     * <p>
+     * 统一凭证错误：账号不存在 / 密码错误 / 游客账号共用同一错误码与文案
+     * （{@code AUTH_CREDENTIALS_INVALID}），且账号不存在时对随机哈希执行一次
+     * bcrypt 比对抹平时序，防止注册手机号/邮箱枚举与游客身份泄露。
+     * </p>
+     *
+     * @param clientIp 客户端 IP（来自 request.getRemoteAddr()），可为 null（跳过 IP 维度校验）
+     */
+    public AuthResponse login(LoginRequest request, String clientIp) {
         log.info("login start: account={}", maskAccount(request.getAccount()));
         if (loginAttemptGuard.isLocked(request.getAccount())) {
             throw new BusinessException(ResultCode.AUTH_ACCOUNT_LOCKED,
                     "登录失败次数过多，账号已临时锁定，请稍后再试。");
+        }
+        // 按 IP 维度的密码喷洒防御：单 IP 短时间内大量失败直接拒绝（阈值高于账号维度）
+        if (StringUtils.isNotBlank(clientIp) && loginAttemptGuard.isIpBlocked(clientIp)) {
+            log.warn("login blocked by ip failure limit: clientIp={}", maskAccount(clientIp));
+            throw new BusinessException(ResultCode.RATE_LIMITED,
+                    "登录失败次数过多，请稍后再试。");
         }
         String loginType = request.getLoginType();
         if (StringUtils.isBlank(loginType)) {
@@ -74,20 +102,24 @@ public class UserService {
         }
 
         if (user == null) {
-            if (!"email".equals(loginType)) {
-                throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND, "账号不存在。");
-            }
-            // 邮箱不存在时不再"登录即注册"（存在账号抢占风险），
-            // 引导用户走邮箱验证码登录，由验证码校验邮箱所有权后再自动创建账号
-            throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND,
-                    "该邮箱尚未注册，请使用邮箱验证码登录。");
-        } else if (BizConstant.IS_GUEST.equals(user.getIsGuest())) {
-            throw new BusinessException(ResultCode.AUTH_ACCOUNT_NOT_FOUND, "账号不存在。");
+            // 邮箱不存在时不再"登录即注册"（存在账号抢占风险）。
+            // 对随机哈希执行一次真实 bcrypt 比对，使"账号不存在"与"密码错误"耗时一致，
+            // 错误码与文案也完全相同，无法据此枚举注册账号。
+            simulatePasswordTiming();
+            throw new BusinessException(ResultCode.AUTH_CREDENTIALS_INVALID, "账号或密码不正确。");
+        }
+        if (BizConstant.IS_GUEST.equals(user.getIsGuest())) {
+            // 游客账号无密码：与凭证错误同码同文案，不暴露游客身份
+            simulatePasswordTiming();
+            throw new BusinessException(ResultCode.AUTH_CREDENTIALS_INVALID, "账号或密码不正确。");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             loginAttemptGuard.recordFailure(request.getAccount());
-            throw new BusinessException(ResultCode.AUTH_PASSWORD_INCORRECT, "密码不正确。");
+            if (StringUtils.isNotBlank(clientIp)) {
+                loginAttemptGuard.recordIpFailure(clientIp);
+            }
+            throw new BusinessException(ResultCode.AUTH_CREDENTIALS_INVALID, "账号或密码不正确。");
         }
         if (BizConstant.USER_STATUS_DISABLED.equals(user.getStatus())) {
             throw new BusinessException(ResultCode.AUTH_ACCOUNT_LOCKED, "账号已被锁定，请稍后再试。");
@@ -97,6 +129,28 @@ public class UserService {
         auditLogService.record(user.getId(), "login", user.getId(), "loginType=" + loginType);
         log.info("login success: userId={}", user.getId());
         return buildAuthResponse(user);
+    }
+
+    /** 抹平时序用的惰性随机哈希（首次生成后复用，保证每次只做一次 matches 比对）。 */
+    private volatile String timingDummyHash;
+
+    /** refresh 轮换宽限缓存：token hash → 已消费令牌的最近轮换结果（短 TTL）。 */
+    private final Map<String, RotationGrace> rotationGraceCache = new ConcurrentHashMap<>();
+
+    /** 同一 token 哈希的串行化锁（仅覆盖轮换临界区，用后即清理）。 */
+    private final Map<String, Object> rotationLocks = new ConcurrentHashMap<>();
+
+    /**
+     * 执行一次针对随机哈希的 bcrypt 比对，抹平"账号不存在"分支与正常密码校验的耗时差异。
+     */
+    private void simulatePasswordTiming() {
+        String hash = this.timingDummyHash;
+        if (hash == null) {
+            hash = passwordEncoder.encode(
+                    "timing-equalizer-" + java.util.UUID.randomUUID());
+            this.timingDummyHash = hash;
+        }
+        passwordEncoder.matches("timing-equalizer-invalid", hash);
     }
 
     /**
@@ -125,11 +179,12 @@ public class UserService {
      * <ol>
      *   <li>JWT 签名 + 类型 {@code refresh} 有效；</li>
      *   <li>计算 SHA-256 哈希后查库，确认该 refresh token 已落库且未过期、未删除；</li>
-     *   <li>签名合法但哈希查无记录 → 该令牌已被消费（轮换或重放）：从 claim 取家族 ID
-     *       撤销整个令牌家族后拒绝，覆盖"失窃令牌在合法客户端刷新后被重放"的主攻击场景；</li>
-     *   <li>原子删除当前 refresh 记录（先删后验，一次性使用，防并发复用）；</li>
+     *   <li>签名合法但哈希查无记录 → 若仍在轮换宽限窗口内（多标签页并发刷新的良性竞态）
+     *       则返回最近一次轮换结果；否则从 claim 取家族 ID 撤销整个令牌家族后拒绝，
+     *       覆盖"失窃令牌在合法客户端刷新后被重放"的主攻击场景；</li>
+     *   <li>原子删除当前 refresh 记录（先删后验，一次性使用，防并发复用），同哈希串行化；</li>
      *   <li>用户存在、未逻辑删除、未被禁用；</li>
-     *   <li>颁发新的 access + refresh 对。</li>
+     *   <li>颁发新的 access + refresh 对并记入宽限缓存。</li>
      * </ol>
      * </p>
      */
@@ -142,12 +197,33 @@ public class UserService {
         String claimedFamilyId = jwtTokenProvider.getFamilyId(request.getRefreshToken());
         String tokenHash = TokenHashUtil.hash(request.getRefreshToken());
 
+        // 同一令牌哈希串行化：并发刷新（多标签页）时第二个请求等待首个请求完成轮换，
+        // 随后在宽限缓存中命中良性竞态路径，避免被误判为重放而整族吊销
+        Object lock = rotationLocks.computeIfAbsent(tokenHash, k -> new Object());
+        try {
+            synchronized (lock) {
+                return doRefresh(userId, claimedFamilyId, tokenHash);
+            }
+        } finally {
+            rotationLocks.remove(tokenHash);
+        }
+    }
+
+    private AuthResponse doRefresh(String userId, String claimedFamilyId, String tokenHash) {
         LambdaQueryWrapper<RefreshToken> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(RefreshToken::getUserId, userId)
                 .eq(RefreshToken::getTokenHash, tokenHash);
         RefreshToken stored = refreshTokenMapper.selectOne(wrapper);
         if (stored == null) {
-            // 签名合法但记录不存在：该令牌此前已被消费。若携带家族 ID 则判定为失窃重放，
+            // 记录不存在：可能是宽限窗口内的良性并发竞态（刚被另一标签页消费），
+            // 也可能是失窃重放。窗口内返回最近一次轮换结果；超窗则撤销整个家族。
+            RotationGrace grace = rotationGraceCache.get(tokenHash);
+            if (grace != null && System.currentTimeMillis() < grace.expiresAt) {
+                log.info("Refresh token replay within rotation grace window "
+                        + "(benign multi-tab race): userId={}", userId);
+                return grace.response;
+            }
+            // 签名合法但记录不存在且超出宽限期：判定为失窃重放，
             // 撤销整个家族（含被盗会话当前持有的新令牌）；无家族 ID 的历史令牌仅拒绝。
             if (StringUtils.isNotBlank(claimedFamilyId)) {
                 log.warn("Refresh token replay detected (record already consumed): userId={}", userId);
@@ -161,11 +237,16 @@ public class UserService {
             throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌无效或已过期。");
         }
 
-        // refresh token rotation：先删后验。并发复用同一令牌时只有第一个请求能删除成功，
-        // 后续请求影响 0 行即判定为复用攻击，撤销整个令牌家族后直接拒绝。
+        // refresh token rotation：先删后验。并发复用同一令牌时只有第一个请求能删除成功；
+        // 后续请求若在宽限窗口内视为良性竞态返回既有结果，超窗即判定为复用攻击并撤销全族。
         String consumedFamilyId = stored.getFamilyId();
         int removed = refreshTokenMapper.delete(wrapper);
         if (removed == 0) {
+            RotationGrace grace = rotationGraceCache.get(tokenHash);
+            if (grace != null && System.currentTimeMillis() < grace.expiresAt) {
+                log.info("Concurrent refresh resolved by rotation grace window: userId={}", userId);
+                return grace.response;
+            }
             revokeTokenFamily(userId, consumedFamilyId);
             throw new BusinessException(ResultCode.AUTH_REFRESH_TOKEN_INVALID, "刷新令牌已失效，请重新登录。");
         }
@@ -181,7 +262,27 @@ public class UserService {
         String familyId = StringUtils.isNotBlank(consumedFamilyId)
                 ? consumedFamilyId
                 : java.util.UUID.randomUUID().toString();
-        return buildAuthResponse(user, familyId);
+        AuthResponse response = buildAuthResponse(user, familyId);
+        recordRotationGrace(tokenHash, response);
+        return response;
+    }
+
+    private void recordRotationGrace(String tokenHash, AuthResponse response) {
+        long expiresAt = System.currentTimeMillis() + ROTATION_GRACE_MILLIS;
+        // 顺带清理过期条目，避免长期驻留
+        rotationGraceCache.entrySet().removeIf(e -> e.getValue().expiresAt <= System.currentTimeMillis());
+        rotationGraceCache.put(tokenHash, new RotationGrace(expiresAt, response));
+    }
+
+    /** 已消费 refresh token 的宽限缓存条目（包级可见以便单元测试构造）。 */
+    static final class RotationGrace {
+        final long expiresAt;
+        final AuthResponse response;
+
+        RotationGrace(long expiresAt, AuthResponse response) {
+            this.expiresAt = expiresAt;
+            this.response = response;
+        }
     }
 
     /**

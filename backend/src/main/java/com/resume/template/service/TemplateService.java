@@ -1,7 +1,6 @@
 package com.resume.template.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,6 +64,22 @@ public class TemplateService {
         Template template = templateMapper.selectById(templateId);
         if (template == null || BizConstant.DELETED.equals(template.getDeleted())
                 || !BizConstant.TEMPLATE_STATUS_ACTIVE.equals(template.getStatus())) {
+            throw new BusinessException(ResultCode.TEMPLATE_NOT_FOUND, "模板不存在。");
+        }
+        return template;
+    }
+
+    /**
+     * 获取模板实体（供渲染场景使用：分享页 / 预览 / PDF 导出）。
+     * <p>
+     * 容忍 inactive/deleted 模板：模板被删除或下架后，引用它的历史简历
+     * （分享页、预览、PDF 导出）仍需正常渲染。编辑/选择模板场景请用
+     * {@link #getTemplateEntity(String)} 保持严格校验。
+     * </p>
+     */
+    public Template getTemplateEntityForRender(String templateId) {
+        Template template = templateMapper.selectByIdIncludingDeleted(templateId);
+        if (template == null) {
             throw new BusinessException(ResultCode.TEMPLATE_NOT_FOUND, "模板不存在。");
         }
         return template;
@@ -154,25 +169,43 @@ public class TemplateService {
 
     /**
      * 创建模板。
+     * <p>
+     * uk_template_code 唯一索引不区分 deleted：若 code 命中已逻辑删除的行，
+     * 直接插入新行必然触发 DuplicateKeyException（HTTP 500）。
+     * 因此查重使用绕过逻辑删除的自定义 SQL，命中已删行时复活该行而不是插入新行。
+     * </p>
      */
     @Transactional(rollbackFor = Exception.class)
     public TemplateDTO createTemplate(AdminTemplateRequest request, String operatorId) {
-        // 唯一索引不区分 deleted，查重需包含已删记录
+        // 查重需包含已删记录（自定义 SQL 绕过 @TableLogic）
         Template exist = findByCodeIncludingDeleted(request.getCode());
+        validateConfig(request.getConfig());
         if (exist != null) {
             if (BizConstant.NOT_DELETED.equals(exist.getDeleted())) {
                 throw new BusinessException(ResultCode.TEMPLATE_CODE_EXISTS, "模板编码已存在。");
             }
-            // 回收被逻辑删除模板占用的唯一索引
-            LambdaUpdateWrapper<Template> release = new LambdaUpdateWrapper<>();
-            release.eq(Template::getId, exist.getId())
-                    .set(Template::getCode, null)
-                    .set(Template::getUpdatedAt, LocalDateTime.now());
-            templateMapper.update(null, release);
+            // 复活被逻辑删除的模板行，回收其占用的唯一索引
+            applyRequestFields(exist, request, operatorId);
+            exist.setStatus(BizConstant.TEMPLATE_STATUS_ACTIVE);
+            exist.setVersion(exist.getVersion() == null ? 1 : exist.getVersion() + 1);
+            exist.setDeleted(BizConstant.NOT_DELETED);
+            exist.setUpdatedAt(LocalDateTime.now());
+            templateMapper.updateById(exist);
+            return toAdminTemplateDTO(exist);
         }
-        validateConfig(request.getConfig());
 
         Template template = new Template();
+        applyRequestFields(template, request, operatorId);
+        template.setStatus(BizConstant.TEMPLATE_STATUS_ACTIVE);
+        template.setVersion(1);
+        template.setDeleted(BizConstant.NOT_DELETED);
+        template.setCreatedAt(LocalDateTime.now());
+        template.setUpdatedAt(LocalDateTime.now());
+        templateMapper.insert(template);
+        return toAdminTemplateDTO(template);
+    }
+
+    private void applyRequestFields(Template template, AdminTemplateRequest request, String operatorId) {
         template.setCode(request.getCode());
         template.setName(request.getName());
         template.setCategory(request.getCategory());
@@ -186,14 +219,7 @@ public class TemplateService {
         template.setIsRecommended(request.getIsRecommended() != null && request.getIsRecommended()
                 ? BizConstant.BUILTIN_YES : BizConstant.BUILTIN_NO);
         template.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
-        template.setStatus(BizConstant.TEMPLATE_STATUS_ACTIVE);
         template.setCreatedBy(operatorId);
-        template.setVersion(1);
-        template.setDeleted(BizConstant.NOT_DELETED);
-        template.setCreatedAt(LocalDateTime.now());
-        template.setUpdatedAt(LocalDateTime.now());
-        templateMapper.insert(template);
-        return toAdminTemplateDTO(template);
     }
 
     /**
@@ -245,6 +271,10 @@ public class TemplateService {
 
     /**
      * 删除模板。
+     * <p>
+     * 删除前检查简历引用：仍有未删除简历引用该模板时拒绝删除，
+     * 否则这些简历的分享页/预览/PDF 导出会全部因模板缺失而报错。
+     * </p>
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteTemplate(String templateId) {
@@ -255,9 +285,19 @@ public class TemplateService {
         if (BizConstant.BUILTIN_YES.equals(template.getIsBuiltin())) {
             throw new BusinessException(ResultCode.TEMPLATE_BUILTIN_PROTECTED, "系统内置模板不可删除。");
         }
-        template.setDeleted(BizConstant.DELETED);
+        long references = templateMapper.countResumeReferences(templateId);
+        if (references > 0) {
+            // 注：ResultCode 属于 common 模块且无"模板被引用"专用错误码，
+            // 此处复用 TEMPLATE_CODE_EXISTS(3001) 以获得统一的 409 资源冲突 HTTP 语义，
+            // 具体原因通过 message 传达给前端。
+            throw new BusinessException(ResultCode.TEMPLATE_CODE_EXISTS,
+                    "该模板已被 " + references + " 份简历引用，无法删除。请先让相关简历更换模板。");
+        }
+        // deleteById 配合 @TableLogic 生成 UPDATE deleted=1；setDeleted+updateById 会因逻辑删除字段被
+        // MP 排除在 SET 子句外而静默失效，禁止使用。
         template.setUpdatedAt(LocalDateTime.now());
         templateMapper.updateById(template);
+        templateMapper.deleteById(templateId);
     }
 
     private void validateConfig(Object config) {
@@ -272,9 +312,9 @@ public class TemplateService {
     }
 
     private Template findByCodeIncludingDeleted(String code) {
-        LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Template::getCode, code);
-        return templateMapper.selectOne(wrapper);
+        // selectOne 会被 @TableLogic 追加 deleted=0，永远查不到已删行；
+        // 必须用自定义 SQL 绕过逻辑删除
+        return templateMapper.selectByCodeIncludingDeleted(code);
     }
 
     private boolean isValidTemplateStatus(String status) {

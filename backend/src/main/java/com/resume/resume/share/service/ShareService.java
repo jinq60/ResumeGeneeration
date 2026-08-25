@@ -1,6 +1,7 @@
 package com.resume.resume.share.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
@@ -112,7 +113,8 @@ public class ShareService {
         if (resume == null || BizConstant.DELETED.equals(resume.getDeleted())) {
             throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "简历不存在或已被删除。");
         }
-        Template template = templateService.getTemplateEntity(resume.getTemplateId());
+        // 渲染场景容忍 inactive/deleted 模板：模板被删后历史分享页仍需可渲染
+        Template template = templateService.getTemplateEntityForRender(resume.getTemplateId());
         String body = Boolean.TRUE.equals(share.getHideContact())
                 ? resumeRenderService.render(resume, template, ResumeRenderService.RenderOptions.withHiddenContact())
                 : resumeRenderService.render(resume, template);
@@ -127,14 +129,14 @@ public class ShareService {
         if (StringUtils.isBlank(resumeId)) {
             return;
         }
-        ResumeShare update = new ResumeShare();
-        update.setStatus(SHARE_STATUS_REVOKED);
-        update.setRevokedAt(LocalDateTime.now());
-        update.setDeleted(BizConstant.DELETED);
-        update.setUpdatedAt(LocalDateTime.now());
-        LambdaQueryWrapper<ResumeShare> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ResumeShare::getResumeId, resumeId);
-        resumeShareMapper.update(update, wrapper);
+        // 逻辑删除字段必须用 UpdateWrapper.set 显式写入：实体方式会被 MP 从 SET 子句排除导致静默失效
+        LambdaUpdateWrapper<ResumeShare> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(ResumeShare::getResumeId, resumeId)
+                .set(ResumeShare::getStatus, SHARE_STATUS_REVOKED)
+                .set(ResumeShare::getRevokedAt, LocalDateTime.now())
+                .set(ResumeShare::getDeleted, BizConstant.DELETED)
+                .set(ResumeShare::getUpdatedAt, LocalDateTime.now());
+        resumeShareMapper.update(null, wrapper);
     }
 
     /**
@@ -190,16 +192,16 @@ public class ShareService {
     }
 
     private void revokeShareRecords(String userId, String resumeId) {
-        ResumeShare update = new ResumeShare();
-        update.setStatus(SHARE_STATUS_REVOKED);
-        update.setRevokedAt(LocalDateTime.now());
-        update.setDeleted(BizConstant.DELETED);
-        update.setUpdatedAt(LocalDateTime.now());
-        LambdaQueryWrapper<ResumeShare> wrapper = new LambdaQueryWrapper<>();
+        // 逻辑删除字段必须用 UpdateWrapper.set 显式写入：实体方式会被 MP 从 SET 子句排除导致静默失效
+        LambdaUpdateWrapper<ResumeShare> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(ResumeShare::getUserId, userId)
                 .eq(ResumeShare::getResumeId, resumeId)
-                .eq(ResumeShare::getDeleted, BizConstant.NOT_DELETED);
-        resumeShareMapper.update(update, wrapper);
+                .eq(ResumeShare::getDeleted, BizConstant.NOT_DELETED)
+                .set(ResumeShare::getStatus, SHARE_STATUS_REVOKED)
+                .set(ResumeShare::getRevokedAt, LocalDateTime.now())
+                .set(ResumeShare::getDeleted, BizConstant.DELETED)
+                .set(ResumeShare::getUpdatedAt, LocalDateTime.now());
+        resumeShareMapper.update(null, wrapper);
     }
 
     /**

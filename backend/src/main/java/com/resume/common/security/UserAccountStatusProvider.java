@@ -13,4 +13,16 @@ public interface UserAccountStatusProvider {
      * 账号是否可用（存在、未逻辑删除、未被禁用）。
      */
     boolean isEnabled(String userId);
+
+    /**
+     * 查询用户当前实际角色（如 ADMIN / USER），带短 TTL 缓存。
+     * <p>
+     * 供 {@link JwtAuthenticationFilter} 在 token claim 声明为 ADMIN 时回库核对，
+     * 使管理员被降权后旧 access token 尽快失去管理员权限。
+     * 用户不存在时返回 {@code null}；实现不可用时过滤器应保守降级为普通用户。
+     * </p>
+     */
+    default String findRole(String userId) {
+        return null;
+    }
 }

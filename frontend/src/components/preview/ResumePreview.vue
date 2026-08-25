@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { Loading, Warning } from '@element-plus/icons-vue'
 import { fetchResumePreview, fetchLivePreview } from '@/api/preview'
 import type { Resume } from '@/types/resume'
@@ -160,6 +160,13 @@ watch(
     loadPreview()
   }
 )
+
+onUnmounted(() => {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+})
 </script>
 
 <style scoped lang="scss">

@@ -4,9 +4,14 @@ set "Path=%JAVA_HOME%\bin;%Path%"
 
 set "MYSQL_USERNAME=resume"
 set "MYSQL_PASSWORD=ResumeDev123"
-set "JWT_SECRET=5fzzGoz+qpaerr2vZtQ3JTokEkMk7hXAiXAbZC2wa7LzONMYAoEYY4FvKTEe46ZB"
-set "MINIO_ACCESS_KEY=minioadmin"
-set "MINIO_SECRET_KEY=minioadmin123"
+REM MinIO 凭据禁止硬编码（AGENTS.md §9）：从环境变量 MINIO_ROOT_USER / MINIO_ROOT_PASSWORD 读取，
+REM 缺失时跳过导出（后端将回退到 application-dev.yml 配置的本地默认值）
+if defined MINIO_ROOT_USER if defined MINIO_ROOT_PASSWORD (
+    set "MINIO_ACCESS_KEY=%MINIO_ROOT_USER%"
+    set "MINIO_SECRET_KEY=%MINIO_ROOT_PASSWORD%"
+) else (
+    echo [WARN] 未设置 MINIO_ROOT_USER / MINIO_ROOT_PASSWORD 环境变量，跳过 MinIO 凭据导出（使用配置文件默认值）。
+)
 
 set "SMTP_HOST="
 set "SMTP_PORT="

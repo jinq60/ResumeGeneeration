@@ -10,6 +10,7 @@ import com.resume.ai.entity.AiCallLog;
 import com.resume.ai.mapper.AiCallLogMapper;
 import com.resume.ai.provider.LlmProvider;
 import com.resume.ai.provider.ProviderRouter;
+import com.resume.ai.util.AiCallLogDefaults;
 import com.resume.avatar.entity.AvatarTask;
 import com.resume.avatar.mapper.AvatarTaskMapper;
 import com.resume.common.constant.BizConstant;
@@ -164,6 +165,8 @@ public class AiAvatarService {
             }
 
             try {
+                // 失败调用也要落审计表：NOT NULL 列兜底
+                AiCallLogDefaults.fillRequiredColumns(callLog, null);
                 aiCallLogMapper.insert(callLog);
             } catch (Exception logEx) {
                 log.warn("Insert AiCallLog failed for taskId={}: {}", taskId, logEx.getMessage());

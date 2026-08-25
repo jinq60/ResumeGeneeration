@@ -32,4 +32,11 @@ public class UpdateResumeRequest {
 
     @Valid
     private RenderSettings renderSettings;
+
+    /**
+     * 乐观锁版本号（可选，向后兼容）：
+     * 传入时按 CAS 更新（与库中 version 不匹配返回 2012 冲突）；
+     * 不传时保持"读最新实体→写回"的旧行为。
+     */
+    private Integer version;
 }

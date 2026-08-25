@@ -82,4 +82,21 @@ class AiDailyQuotaServiceTest {
         assertDoesNotThrow(() -> service.consume("user_1", "resume-writing", 3));
         verify(aiDailyQuotaMapper).update(any(), any());
     }
+
+    @Test
+    void refund_shouldDecrementUsedCount() {
+        when(aiDailyQuotaMapper.update(any(), any())).thenReturn(1);
+
+        assertDoesNotThrow(() -> service.refund("user_1", "resume-writing"));
+        verify(aiDailyQuotaMapper).update(any(), any());
+    }
+
+    @Test
+    void refund_shouldSkipSilentlyWhenNoRowOrZeroUsed() {
+        // 无当日记录或 used_count=0 时 update 影响 0 行，refund 静默跳过
+        when(aiDailyQuotaMapper.update(any(), any())).thenReturn(0);
+
+        assertDoesNotThrow(() -> service.refund("user_1", "resume-writing"));
+        verify(aiDailyQuotaMapper).update(any(), any());
+    }
 }

@@ -53,15 +53,25 @@ public class SectionListTypeHandler extends BaseTypeHandler<List<SectionDTO>> {
         return parse(cs.getString(columnIndex));
     }
 
-    private List<SectionDTO> parse(String json) {
+    private List<SectionDTO> parse(String json) throws SQLException {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
         try {
+            // 兼容被二次编码的数据（如 H2 JSON 列 getString 返回带引号的字符串字面量、
+            // 或历史上被双重序列化写入的行）：顶层是 JSON 字符串时先解一层再解析数组。
+            if (json.charAt(0) == '"') {
+                json = MAPPER.readValue(json, String.class);
+                if (json == null || json.isBlank()) {
+                    return Collections.emptyList();
+                }
+            }
             return MAPPER.readValue(json, TYPE_REF);
         } catch (Exception e) {
+            // 解析失败必须显式抛出而非返回空列表：静默返回空 sections 后，
+            // 下次保存会把空数组写回 DB，造成不可逆的数据丢失。
             log.error("Failed to deserialize sections: {}", json, e);
-            return Collections.emptyList();
+            throw new SQLException("Failed to deserialize resume sections (possible data corruption)", e);
         }
     }
 }

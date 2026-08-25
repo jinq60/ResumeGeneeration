@@ -197,23 +197,6 @@
           </ul>
         </div>
 
-        <!-- 缺失技能 -->
-        <div
-          v-if="reviewResult.missingSkills?.length"
-          class="mb-5"
-        >
-          <h3 class="text-sm font-semibold text-on-surface tracking-wide pl-2 border-l-[3px] border-primary mb-3">
-            建议补充的技能
-          </h3>
-          <div class="flex flex-wrap gap-2">
-            <span
-              v-for="(skill, i) in reviewResult.missingSkills"
-              :key="i"
-              class="bg-surface-container-low border border-outline-variant text-on-surface-variant px-2.5 py-1 text-xs rounded-full"
-            >{{ skill }}</span>
-          </div>
-        </div>
-
         <footer class="mt-6 pt-4 border-t border-outline-variant flex justify-end gap-2">
           <button
             class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2"
@@ -222,7 +205,9 @@
             重新分析
           </button>
           <button
-            class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform"
+            class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md flex items-center gap-2 shadow-sm hover:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="applicableMissingSkills.length === 0"
+            :title="applicableMissingSkills.length === 0 ? '缺失技能来自 JD 匹配深度优化，请先运行 JD 优化' : '将 JD 优化识别的缺失技能补充到简历技能清单'"
             @click="handleApplySuggestions"
           >
             <el-icon size="14">
@@ -413,11 +398,11 @@ interface ReviewSuggestion {
 }
 
 interface ReviewResult {
+  reviewId?: string
   overallScore?: number
   dimensionScores?: Record<string, number>
   highlights?: string[]
   suggestions?: ReviewSuggestion[]
-  missingSkills?: string[]
 }
 
 function safeDecode(value: string): string {
@@ -514,12 +499,16 @@ async function handleAnalyze() {
   reviewResult.value = null
   const token = ++reviewPollToken
   try {
-    await resumeApi.review(resumeId, { jobDescription: reviewForm.value.jobDescription })
-    // 点评为异步任务：轮询最新结果（最长 60 秒，页面离开/重新发起即取消）
+    // 点评为异步任务，响应中携带本次任务的 reviewId（历史最近一次成功点评不会混淆）
+    const created = await resumeApi.review(resumeId, { jobDescription: reviewForm.value.jobDescription })
+    const myReviewId: string | undefined = created?.reviewId
+    // 轮询最新结果（最长 60 秒，页面离开/重新发起即取消）。
+    // latest 接口只返回 status=success 的点评，因此 reviewId 与本次一致即代表本次任务完成，
+    // 同时规避了 overallScore 为 0 时真值判断导致的永久轮询问题。
     for (let i = 0; i < 60; i++) {
       if (token !== reviewPollToken) return
       const latest = await resumeApi.getLatestReview(resumeId)
-      if (latest?.overallScore) {
+      if (latest?.reviewId && myReviewId && latest.reviewId === myReviewId) {
         reviewResult.value = latest as ReviewResult
         break
       }
@@ -529,7 +518,7 @@ async function handleAnalyze() {
     if (reviewResult.value) {
       ElMessage.success('分析完成')
     } else {
-      ElMessage.warning('点评生成较慢，请稍后重新查看')
+      ElMessage.warning('分析仍在进行中，请稍后在点评中心查看')
     }
   } catch (e: any) {
     ElMessage.error(e.message || '暂时无法生成点评；你的简历内容不会丢失。')
@@ -602,21 +591,21 @@ onBeforeUnmount(() => {
   ++optimizePollToken
 })
 
+// 点评响应 DTO 没有 missingSkills 字段；可应用的缺失技能只来自 JD 匹配深度优化结果。
+const applicableMissingSkills = computed(() =>
+  (optimizeResult.value?.missingSkills || []).filter((s) => s && s.trim())
+)
+
 function handleApplySuggestions() {
-  const skills = reviewResult.value?.missingSkills?.filter((s) => s && s.trim()) || []
+  const skills = applicableMissingSkills.value
   if (skills.length === 0) {
-    ElMessage.info('当前点评没有可自动应用的技能建议，请根据文字建议手动修改')
+    ElMessage.info('请先运行「JD 匹配深度优化」，再应用缺失技能建议')
     return
   }
-  applyMissingSkillsToResume()
+  applyMissingSkillsToResume(skills)
 }
 
-async function applyMissingSkillsToResume() {
-  const skills = reviewResult.value?.missingSkills?.filter((s) => s && s.trim()) || []
-  if (skills.length === 0) {
-    ElMessage.info('当前点评没有可自动应用的技能建议，请根据文字建议手动修改')
-    return
-  }
+async function applyMissingSkillsToResume(skills: string[]) {
   const { resumeApi } = await import('@/api/resume')
   try {
     const resume = await resumeApi.get(resumeId)

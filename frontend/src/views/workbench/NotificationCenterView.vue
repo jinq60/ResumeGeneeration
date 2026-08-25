@@ -18,11 +18,11 @@
           全部已读
         </button>
         <button
-          class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2"
-          :disabled="notifications.length === 0"
+          class="border border-outline-variant rounded-lg hover:bg-surface-container-low text-on-surface-variant px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="notifications.length === 0 || clearing"
           @click="clearAll"
         >
-          清空
+          {{ clearing ? '清空中…' : '清空' }}
         </button>
       </div>
     </header>
@@ -148,7 +148,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Bell, Document, Picture, MagicStick, InfoFilled, Close } from '@element-plus/icons-vue'
 import { notificationApi, type NotificationItem, type NotificationType } from '@/api/notification'
 
@@ -247,16 +247,37 @@ async function removeNotification(id: string) {
   }
 }
 
+const clearing = ref(false)
+
 async function clearAll() {
+  if (clearing.value) return
+  try {
+    await ElMessageBox.confirm(
+      '确定清空所有通知吗？清空后不可恢复。',
+      '清空通知',
+      { confirmButtonText: '清空', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  clearing.value = true
+  let failed = 0
   try {
     for (const item of notifications.value) {
-      await notificationApi.remove(item.id)
+      try {
+        await notificationApi.remove(item.id)
+      } catch {
+        failed++
+      }
     }
-    notifications.value = []
-    total.value = 0
-    ElMessage.success('已清空通知')
-  } catch (e: any) {
-    ElMessage.error(e.message || '清空失败')
+    await loadList()
+    if (failed === 0) {
+      ElMessage.success('已清空通知')
+    } else {
+      ElMessage.warning(`部分通知删除失败（${failed} 条），列表已刷新`)
+    }
+  } finally {
+    clearing.value = false
   }
 }
 

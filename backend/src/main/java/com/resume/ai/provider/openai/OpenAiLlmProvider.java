@@ -84,7 +84,8 @@ public class OpenAiLlmProvider implements LlmProvider {
         Map<String, Object> body = buildRequestBody(request, false);
         body.put("stream", true);
         Duration timeout = request.getTimeout() != null ? request.getTimeout() : Duration.ofSeconds(120);
-        int retry = request.getRetry() != null ? request.getRetry() : 2;
+        // 流式链路不重试：retryWhen 位于产出 delta 之后，重订阅会从头重放已生成内容导致重复输出；
+        // 首字节前失败直接报错，由上层提示用户重试
         // 跨 chunk 行缓冲：网络 chunk 边界不等于 SSE 行边界，需拼接残行再按行解析
         AtomicReference<String> pending = new AtomicReference<>("");
         return getClient().post()
@@ -93,10 +94,7 @@ public class OpenAiLlmProvider implements LlmProvider {
                 .retrieve()
                 .bodyToFlux(String.class)
                 .concatMapIterable(chunk -> parseStreamChunk(chunk, pending))
-                .timeout(timeout)
-                .retryWhen(Retry.backoff(retry, Duration.ofSeconds(1))
-                        .filter(e -> e instanceof org.springframework.web.reactive.function.client.WebClientResponseException w
-                                && w.getStatusCode().is5xxServerError()));
+                .timeout(timeout);
     }
 
     @Override

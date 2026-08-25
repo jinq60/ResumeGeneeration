@@ -41,7 +41,7 @@ class TemplateServiceTest {
     @Test
     void createTemplate_shouldSucceed() {
         AdminTemplateRequest request = buildRequest("classic-new");
-        when(templateMapper.selectOne(any())).thenReturn(null);
+        when(templateMapper.selectByCodeIncludingDeleted("classic-new")).thenReturn(null);
         when(templateMapper.insert(any(Template.class))).thenAnswer(inv -> {
             Template t = inv.getArgument(0);
             t.setId("tpl_new");
@@ -62,7 +62,7 @@ class TemplateServiceTest {
         Template existing = new Template();
         existing.setCode("classic-existing");
         existing.setDeleted(BizConstant.NOT_DELETED);
-        when(templateMapper.selectOne(any())).thenReturn(existing);
+        when(templateMapper.selectByCodeIncludingDeleted("classic-existing")).thenReturn(existing);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> templateService.createTemplate(request, "admin_1"));
@@ -73,11 +73,52 @@ class TemplateServiceTest {
     void createTemplate_shouldRejectInvalidConfig() {
         AdminTemplateRequest request = buildRequest("classic-invalid-config");
         request.setConfig(new NonSerializableConfig());
-        when(templateMapper.selectOne(any())).thenReturn(null);
+        when(templateMapper.selectByCodeIncludingDeleted("classic-invalid-config")).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> templateService.createTemplate(request, "admin_1"));
         assertEquals(ResultCode.TEMPLATE_CONFIG_INVALID, ex.getErrorCode());
+    }
+
+    @Test
+    void createTemplate_shouldReviveDeletedRowWithSameCode() {
+        AdminTemplateRequest request = buildRequest("classic-deleted");
+
+        // 唯一索引不区分 deleted：命中已逻辑删除的同 code 行时应复活而非插入新行
+        Template deleted = buildTemplate("tpl_old", "classic-deleted");
+        deleted.setStatus(BizConstant.TEMPLATE_STATUS_INACTIVE);
+        deleted.setVersion(3);
+        deleted.setDeleted(BizConstant.DELETED);
+        when(templateMapper.selectByCodeIncludingDeleted("classic-deleted")).thenReturn(deleted);
+        when(templateMapper.updateById(any(Template.class))).thenReturn(1);
+
+        TemplateDTO dto = templateService.createTemplate(request, "admin_1");
+
+        assertEquals("tpl_old", dto.getId());
+        assertEquals(BizConstant.NOT_DELETED, deleted.getDeleted());
+        assertEquals(BizConstant.TEMPLATE_STATUS_ACTIVE, deleted.getStatus());
+        assertEquals(4, deleted.getVersion());
+        verify(templateMapper).updateById(deleted);
+        verify(templateMapper, never()).insert(any(Template.class));
+    }
+
+    @Test
+    void getTemplateEntityForRender_shouldReturnInactiveOrDeletedTemplate() {
+        Template deleted = buildTemplate("tpl_1", "classic-1");
+        deleted.setDeleted(BizConstant.DELETED);
+        when(templateMapper.selectByIdIncludingDeleted("tpl_1")).thenReturn(deleted);
+
+        // 渲染场景容忍已删除模板，历史简历仍需可渲染
+        assertSame(deleted, templateService.getTemplateEntityForRender("tpl_1"));
+    }
+
+    @Test
+    void getTemplateEntityForRender_shouldRejectMissing() {
+        when(templateMapper.selectByIdIncludingDeleted("tpl_missing")).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> templateService.getTemplateEntityForRender("tpl_missing"));
+        assertEquals(ResultCode.TEMPLATE_NOT_FOUND, ex.getErrorCode());
     }
 
     @Test
@@ -152,15 +193,31 @@ class TemplateServiceTest {
     }
 
     @Test
-    void deleteTemplate_shouldSucceed() {
+    void deleteTemplate_shouldRejectWhenReferencedByResumes() {
         Template template = buildTemplate("tpl_1", "custom-1");
         template.setIsBuiltin(BizConstant.BUILTIN_NO);
         when(templateMapper.selectById("tpl_1")).thenReturn(template);
+        when(templateMapper.countResumeReferences("tpl_1")).thenReturn(5L);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> templateService.deleteTemplate("tpl_1"));
+        assertEquals(ResultCode.TEMPLATE_CODE_EXISTS, ex.getErrorCode());
+        assertTrue(ex.getMessage().contains("5"));
+        verify(templateMapper, never()).updateById(any(Template.class));
+    }
+
+    @Test
+    void deleteTemplate_shouldSucceedWhenNoReference() {
+        Template template = buildTemplate("tpl_1", "custom-1");
+        template.setIsBuiltin(BizConstant.BUILTIN_NO);
+        when(templateMapper.selectById("tpl_1")).thenReturn(template);
+        when(templateMapper.countResumeReferences("tpl_1")).thenReturn(0L);
 
         templateService.deleteTemplate("tpl_1");
 
-        assertEquals(BizConstant.DELETED, template.getDeleted());
+        // 逻辑删除必须走 deleteById（MP 转 UPDATE deleted=1），setDeleted+updateById 静默失效
         verify(templateMapper).updateById(template);
+        verify(templateMapper).deleteById("tpl_1");
     }
 
     @Test

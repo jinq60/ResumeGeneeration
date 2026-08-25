@@ -15,9 +15,12 @@ import com.resume.ai.mapper.AiCallLogMapper;
 import com.resume.ai.mapper.ResumeOptimizeTaskMapper;
 import com.resume.ai.provider.LlmProvider;
 import com.resume.ai.provider.ProviderRouter;
+import com.resume.ai.task.AiZombieTaskSweeper;
+import com.resume.ai.util.AiCallLogDefaults;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
+import com.resume.notification.service.NotificationService;
 import com.resume.resume.dto.SectionDTO;
 import com.resume.resume.entity.Resume;
 import lombok.RequiredArgsConstructor;
@@ -47,16 +50,21 @@ public class AiResumeOptimizeService {
     private final ProviderRouter providerRouter;
     private final AiPromptTemplates promptTemplates;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     /**
      * 创建优化任务（含每用户并发配额校验）。
      */
     public ResumeOptimizeTask createTask(String userId, String resumeId, Resume resume, String jobDescription) {
+        // 计数时排除 updated_at 超过阈值仍 pending/processing 的僵尸行，
+        // 避免服务重启后的滞留任务把用户并发额度永久占满
         long runningCount = optimizeTaskMapper.selectCount(
                 new LambdaQueryWrapper<ResumeOptimizeTask>()
                         .eq(ResumeOptimizeTask::getUserId, userId)
                         .in(ResumeOptimizeTask::getStatus, List.of(
-                                BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING)));
+                                BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING))
+                        .ge(ResumeOptimizeTask::getUpdatedAt,
+                                LocalDateTime.now().minus(AiZombieTaskSweeper.ZOMBIE_THRESHOLD)));
         if (runningCount >= MAX_CONCURRENT_PER_USER) {
             throw new BusinessException(ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED,
                     "同时进行的 AI 任务过多，请等待当前任务完成后再试。");
@@ -195,11 +203,37 @@ public class AiResumeOptimizeService {
                 task.setCompletedAt(LocalDateTime.now());
             }
             optimizeTaskMapper.updateById(task);
+            notifyTaskResult(task, resume);
             try {
+                // 失败调用也要落审计表：NOT NULL 列兜底
+                AiCallLogDefaults.fillRequiredColumns(callLog, null);
                 aiCallLogMapper.insert(callLog);
             } catch (Exception logEx) {
                 log.warn("Insert AiCallLog failed for taskId={}: {}", taskId, logEx.getMessage());
             }
+        }
+    }
+
+    /**
+     * 任务终态后推送站内通知（完成 / 失败）。
+     */
+    private void notifyTaskResult(ResumeOptimizeTask task, Resume resume) {
+        try {
+            if (resume.getUserId() == null) {
+                return;
+            }
+            if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
+                notificationService.notify(resume.getUserId(), "ai", "JD 优化完成",
+                        "你的简历《" + resume.getTitle() + "》JD 匹配优化已完成，综合匹配分 "
+                                + task.getMatchScore() + "，快去查看优化建议吧。");
+            } else if (BizConstant.TASK_STATUS_FAILED.equals(task.getStatus())) {
+                String reason = org.apache.commons.lang3.StringUtils.abbreviate(
+                        org.apache.commons.lang3.StringUtils.defaultString(task.getErrorMsg(), "未知原因"), 100);
+                notificationService.notify(resume.getUserId(), "ai", "JD 优化失败",
+                        "你的简历《" + resume.getTitle() + "》JD 匹配优化失败：" + reason + "，请稍后重试。");
+            }
+        } catch (Exception ex) {
+            log.warn("Notify optimize task result failed: taskId={}", task.getId(), ex);
         }
     }
 

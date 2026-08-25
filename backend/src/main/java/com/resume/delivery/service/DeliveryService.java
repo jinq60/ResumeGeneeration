@@ -120,6 +120,8 @@ public class DeliveryService {
     @Transactional(rollbackFor = Exception.class)
     public DeliveryRecordResponse update(String userId, String recordId, DeliveryRecordRequest request) {
         DeliveryRecord record = getOwnedRecord(userId, recordId);
+        // 更新同样校验状态合法性，避免任意 status 字符串直接落库
+        validateStatus(request.getStatus());
         applyRequest(record, request);
         record.setUpdatedAt(LocalDateTime.now());
         deliveryRecordMapper.updateById(record);
@@ -131,10 +133,11 @@ public class DeliveryService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void delete(String userId, String recordId) {
-        DeliveryRecord record = getOwnedRecord(userId, recordId);
-        record.setDeleted(BizConstant.DELETED);
-        record.setUpdatedAt(LocalDateTime.now());
-        deliveryRecordMapper.updateById(record);
+        // 校验归属
+        getOwnedRecord(userId, recordId);
+        // @TableLogic 下 deleteById 自动转为 UPDATE deleted=1；
+        // setDeleted+updateById 会把逻辑删除字段排除在 SET 外导致静默失效，禁止使用
+        deliveryRecordMapper.deleteById(recordId);
         log.info("delivery deleted: userId={}, recordId={}", userId, recordId);
     }
 
@@ -252,9 +255,9 @@ public class DeliveryService {
                     .append(csv(r.getPosition())).append(',')
                     .append(csv(r.getChannel())).append(',')
                     .append(csv(r.getStatus())).append(',')
-                    .append(r.getApplyDate() != null ? r.getApplyDate() : "").append(',')
-                    .append(r.getInterviewTime() != null ? r.getInterviewTime() : "").append(',')
-                    .append(r.getCreatedAt() != null ? r.getCreatedAt() : "")
+                    .append(csv(r.getApplyDate() != null ? r.getApplyDate().toString() : null)).append(',')
+                    .append(csv(r.getInterviewTime() != null ? r.getInterviewTime().toString() : null)).append(',')
+                    .append(csv(r.getCreatedAt() != null ? r.getCreatedAt().toString() : null))
                     .append('\n');
         }
         return sb.toString();

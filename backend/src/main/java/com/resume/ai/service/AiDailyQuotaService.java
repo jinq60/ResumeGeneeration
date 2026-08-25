@@ -51,6 +51,26 @@ public class AiDailyQuotaService {
         incrementOrFail(userId, featureKey, quotaDate, dailyLimit);
     }
 
+    /**
+     * 退还一次配额（调用失败时使用）：used_count 减 1，下限保护为 0。
+     * <p>仅当当日已有记录且 used_count &gt; 0 时生效；无记录时不做任何操作。</p>
+     */
+    public void refund(String userId, String featureKey) {
+        String quotaDate = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        LambdaUpdateWrapper<AiDailyQuota> update = new LambdaUpdateWrapper<>();
+        update.eq(AiDailyQuota::getUserId, userId)
+                .eq(AiDailyQuota::getFeatureKey, featureKey)
+                .eq(AiDailyQuota::getQuotaDate, quotaDate)
+                .eq(AiDailyQuota::getDeleted, BizConstant.NOT_DELETED)
+                .gt(AiDailyQuota::getUsedCount, 0)
+                .setSql("used_count = GREATEST(used_count - 1, 0)");
+        int updated = aiDailyQuotaMapper.update(null, update);
+        if (updated == 0) {
+            log.debug("AiDailyQuota refund skipped (no row or used_count=0): user={}, feature={}",
+                    userId, featureKey);
+        }
+    }
+
     private AiDailyQuota find(String userId, String featureKey, String quotaDate) {
         LambdaQueryWrapper<AiDailyQuota> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AiDailyQuota::getUserId, userId)

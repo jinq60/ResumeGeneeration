@@ -95,8 +95,20 @@ public class PdfService {
 
         validateResumeForExport(resume);
 
+        // 去重：同 (userId, resumeId) 已有进行中的任务时直接复用，避免重复提交产生冗余导出
+        PdfTask existing = findActiveTask(userId, resumeId);
+        if (existing != null) {
+            log.info("exportPdf deduplicated: reuse running task={}, userId={}, resumeId={}",
+                    existing.getId(), userId, resumeId);
+            Map<String, Object> reused = new java.util.HashMap<>();
+            reused.put("taskId", existing.getId());
+            reused.put("status", existing.getStatus());
+            return reused;
+        }
+
         String exportTemplateId = StringUtils.isNotBlank(templateId) ? templateId : resume.getTemplateId();
-        Template template = templateService.getTemplateEntity(exportTemplateId);
+        // 渲染场景容忍 inactive/deleted 模板，历史简历仍可导出
+        Template template = templateService.getTemplateEntityForRender(exportTemplateId);
 
         PdfTask task = new PdfTask();
         task.setUserId(userId);
@@ -119,6 +131,21 @@ public class PdfService {
     }
 
     /**
+     * 查找同 (userId, resumeId) 仍处于 pending/processing 的导出任务（用于重复提交去重）。
+     * 可能存在多条历史遗留的进行中任务，取最新一条即可。
+     */
+    private PdfTask findActiveTask(String userId, String resumeId) {
+        LambdaQueryWrapper<PdfTask> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PdfTask::getUserId, userId)
+                .eq(PdfTask::getResumeId, resumeId)
+                .in(PdfTask::getStatus,
+                        List.of(BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING))
+                .orderByDesc(PdfTask::getCreatedAt);
+        List<PdfTask> tasks = pdfTaskMapper.selectList(wrapper);
+        return tasks.isEmpty() ? null : tasks.get(0);
+    }
+
+    /**
      * 管理端创建 PDF 导出任务：不做所有权校验，任务归属简历所有者，
      * 所有者可在自己的下载中心查看，完成时收到通知。
      */
@@ -130,7 +157,8 @@ public class PdfService {
         validateResumeForExport(resume);
 
         String exportTemplateId = StringUtils.isNotBlank(templateId) ? templateId : resume.getTemplateId();
-        templateService.getTemplateEntity(exportTemplateId);
+        // 渲染场景容忍 inactive/deleted 模板
+        templateService.getTemplateEntityForRender(exportTemplateId);
 
         PdfTask task = new PdfTask();
         task.setUserId(resume.getUserId());
@@ -200,7 +228,8 @@ public class PdfService {
         }
         try {
             Resume resume = resumeService.getResumeEntity(userId, resumeId);
-            Template template = templateService.getTemplateEntity(exportTemplateId);
+            // 渲染场景容忍 inactive/deleted 模板，历史简历仍可导出
+            Template template = templateService.getTemplateEntityForRender(exportTemplateId);
             generatePdf(taskId, resume, template);
             resumeService.incrementExportCount(resumeId);
         } catch (BusinessException e) {

@@ -141,4 +141,31 @@ class ContentAuditServiceTest {
                 () -> contentAuditService.review("admin_1", "audit_missing", "approve", null, null));
         assertEquals(ResultCode.RESOURCE_NOT_FOUND, ex.getErrorCode());
     }
+
+    @Test
+    void review_shouldRejectAlreadyApprovedRecord() {
+        ContentAudit audit = new ContentAudit();
+        audit.setId("audit_1");
+        audit.setStatus("approved");
+        when(contentAuditMapper.selectById("audit_1")).thenReturn(audit);
+
+        // 终态保护：已通过的记录不允许再次审核（如再驳回）
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> contentAuditService.review("admin_1", "audit_1", "reject", "改判", null));
+        assertEquals(ResultCode.PARAM_INVALID, ex.getErrorCode());
+        verify(contentAuditMapper, never()).updateById(any(ContentAudit.class));
+    }
+
+    @Test
+    void review_shouldRejectAlreadyRejectedRecord() {
+        ContentAudit audit = new ContentAudit();
+        audit.setId("audit_1");
+        audit.setStatus("rejected");
+        when(contentAuditMapper.selectById("audit_1")).thenReturn(audit);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> contentAuditService.review("admin_1", "audit_1", "approve", "翻案", null));
+        assertEquals(ResultCode.PARAM_INVALID, ex.getErrorCode());
+        verify(contentAuditMapper, never()).updateById(any(ContentAudit.class));
+    }
 }

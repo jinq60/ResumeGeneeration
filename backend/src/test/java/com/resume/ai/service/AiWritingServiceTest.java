@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -223,6 +224,65 @@ class AiWritingServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.write("user_1", false, "resume_1", buildRequest("polish")));
         assertEquals(ResultCode.AI_DAILY_QUOTA_EXCEEDED, ex.getErrorCode());
+        // 配额扣减失败时不应退还（未实际扣减成功）
+        verify(aiDailyQuotaService, never()).refund(anyString(), anyString());
+    }
+
+    @Test
+    void write_shouldRefundQuotaWhenLlmCallFails() {
+        when(resumeService.getResumeEntity("user_1", "resume_1"))
+                .thenReturn(buildResume("user_1", "resume_1"));
+        AiChatResponse response = new AiChatResponse();
+        response.setSuccess(false);
+        response.setErrorMsg("provider error");
+        when(llmProvider.chat(any(AiChatRequest.class))).thenReturn(response);
+
+        assertThrows(BusinessException.class,
+                () -> service.write("user_1", false, "resume_1", buildRequest("polish")));
+
+        // LLM 调用失败必须退还配额，避免先扣不退
+        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiWritingService.FEATURE_KEY));
+    }
+
+    @Test
+    void write_shouldRefundQuotaWhenProviderThrows() {
+        when(resumeService.getResumeEntity("user_1", "resume_1"))
+                .thenReturn(buildResume("user_1", "resume_1"));
+        when(llmProvider.chat(any(AiChatRequest.class)))
+                .thenThrow(new BusinessException(ResultCode.AI_MODEL_CALL_FAILED, "模型调用失败"));
+
+        assertThrows(BusinessException.class,
+                () -> service.write("user_1", false, "resume_1", buildRequest("polish")));
+
+        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiWritingService.FEATURE_KEY));
+    }
+
+    @Test
+    void write_shouldNotConsumeQuotaWhenValidationFails() {
+        when(resumeService.getResumeEntity("user_1", "resume_1"))
+                .thenReturn(buildResume("user_1", "resume_1"));
+        ResumeAiWriteRequest request = buildRequest("polish");
+        request.setField("hackerField");
+
+        assertThrows(BusinessException.class,
+                () -> service.write("user_1", false, "resume_1", request));
+
+        // 参数校验失败发生在扣减之前，不应消耗也不应退还配额
+        verify(aiDailyQuotaService, never()).consume(anyString(), anyString(), any(Integer.class));
+        verify(aiDailyQuotaService, never()).refund(anyString(), anyString());
+    }
+
+    @Test
+    void stream_shouldRefundQuotaWhenStreamErrors() {
+        when(resumeService.getResumeEntity("user_1", "resume_1"))
+                .thenReturn(buildResume("user_1", "resume_1"));
+        when(llmProvider.stream(any(AiChatRequest.class)))
+                .thenReturn(Flux.error(new RuntimeException("boom")));
+
+        assertThrows(RuntimeException.class,
+                () -> service.stream("user_1", false, "resume_1", buildRequest("polish")).blockLast());
+
+        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiWritingService.FEATURE_KEY));
     }
 
     @Test

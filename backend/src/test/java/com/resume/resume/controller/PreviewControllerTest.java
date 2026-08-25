@@ -78,7 +78,7 @@ class PreviewControllerTest {
         request.setResume(resume);
         request.setTemplateId("template_classic_single");
 
-        when(templateService.getTemplateEntity(eq("template_classic_single"))).thenReturn(template);
+        when(templateService.getTemplateEntityForRender(eq("template_classic_single"))).thenReturn(template);
         when(resumeRenderService.render(eq(resume), eq(template))).thenReturn("<html>preview</html>");
 
         mockMvc.perform(post("/resumes/preview")

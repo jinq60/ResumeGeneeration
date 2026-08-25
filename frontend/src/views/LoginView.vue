@@ -42,8 +42,9 @@ onMounted(async () => {
 
   // 有错误信息时打开弹窗并展示错误
   if (query.error) {
-    // 弹窗会在打开后读取 route.query 处理错误
-    authModalStore.open()
+    // 先把错误文本转存到 authModalStore，再清理地址栏；
+    // LoginModal 打开后从 store 读取，避免与 router.replace 清 query 的时序竞争
+    authModalStore.open({ oauthError: String(query.error) })
     router.replace('/')
     return
   }

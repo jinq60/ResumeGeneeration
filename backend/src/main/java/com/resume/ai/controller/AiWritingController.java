@@ -56,13 +56,21 @@ public class AiWritingController {
 
     /**
      * 从 Authentication 的 credentials（原始 JWT）解析游客标志；
-     * 拿不到 token（如测试场景）时按非游客处理。
+     * fail-closed：无法确定身份（无凭证 / 非字符串凭证 / 解析异常）时按游客配额处理，
+     * 避免解析失败被当作高配额的登录用户绕过限制。
      */
     private boolean resolveGuest(Authentication authentication) {
         if (authentication == null) {
-            return false;
+            return true;
         }
         Object credentials = authentication.getCredentials();
-        return credentials instanceof String token && jwtTokenProvider.getGuest(token);
+        if (!(credentials instanceof String token)) {
+            return true;
+        }
+        try {
+            return jwtTokenProvider.getGuest(token);
+        } catch (Exception e) {
+            return true;
+        }
     }
 }

@@ -1,14 +1,20 @@
 import adminRequest from '@/utils/adminRequest'
 
+// 与后端 AdminUserListItemResponse / AdminUserDetailResponse 对齐：
+// avatarUrl 仅详情接口（AdminUserDetailResponse）返回，列表接口
+// （AdminUserListItemResponse）不含该字段，故标注为可选。
+// 因后台用户管理视图以单一 User 类型同时承接列表与详情数据，
+// 不做接口级类型拆分，使用时注意列表项的 avatarUrl 可能为 undefined。
 export interface User {
   userId: string
   nickname: string | null
   email: string | null
   phone: string | null
-  avatarUrl: string | null
+  /** 仅详情接口 GET /admin/users/{id} 返回；列表接口无此字段 */
+  avatarUrl?: string | null
   role: string
-  isGuest: boolean
   status: string
+  isGuest: boolean
   createdAt: string
   updatedAt: string
 }

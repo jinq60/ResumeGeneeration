@@ -16,6 +16,8 @@ export interface UpdateResumeRequest {
   templateId?: string
   sections?: Section[]
   renderSettings?: RenderSettings
+  /** 期望版本号（乐观锁）；与服务器不一致时后端返回业务码 2012 / HTTP 409 */
+  version?: number
 }
 
 export interface Page<T> {
@@ -173,31 +175,45 @@ export const resumeApi = {
       dataLines = []
     }
 
-    while (!streamDone) {
-      const { done, value } = await reader.read()
-      streamDone = done
-      buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
-      const lines = buffer.split(/\r?\n/)
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        if (!line) {
-          dispatch()
-        } else if (line.startsWith('event:')) {
-          eventName = line.slice(6).trim()
-        } else if (line.startsWith('data:')) {
-          dataLines.push(line.slice(5).replace(/^ /, ''))
-        }
+    // 中断（abort）或读取出错时释放底层连接，避免连接泄漏
+    try {
+      await consumeStream()
+    } catch (e) {
+      try {
+        await reader.cancel()
+      } catch {
+        // 连接可能已被对端关闭，忽略取消失败
       }
-
-      if (done) break
+      throw e
     }
 
-    if (buffer || dataLines.length > 0) {
-      if (buffer.startsWith('data:')) {
-        dataLines.push(buffer.slice(5).replace(/^ /, ''))
+    async function consumeStream(): Promise<void> {
+      while (!streamDone) {
+        const { done, value } = await reader.read()
+        streamDone = done
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+        const lines = buffer.split(/\r?\n/)
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line) {
+            dispatch()
+          } else if (line.startsWith('event:')) {
+            eventName = line.slice(6).trim()
+          } else if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5).replace(/^ /, ''))
+          }
+        }
+
+        if (done) break
       }
-      dispatch()
+
+      if (buffer || dataLines.length > 0) {
+        if (buffer.startsWith('data:')) {
+          dataLines.push(buffer.slice(5).replace(/^ /, ''))
+        }
+        dispatch()
+      }
     }
   }
 }

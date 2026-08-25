@@ -43,14 +43,26 @@ export function useAutoSave() {
       const fn = queue.shift()!
       try {
         await fn()
+        // 队列中后续保存成功时恢复状态，避免一次失败后永久卡在 error
+        if (saveStatus.value === 'error' || saveStatus.value === 'saving') {
+          saveStatus.value = 'saved'
+        }
       } catch {
         saveStatus.value = 'error'
       }
     }
     saving = false
-    if (saveStatus.value !== 'error') {
+    if (saveStatus.value === 'saving') {
       saveStatus.value = 'saved'
     }
+  }
+
+  /**
+   * 手动重试：上次保存失败后调用，立即重新执行最近一次保存。
+   */
+  function retry() {
+    if (!lastSaveFn) return
+    enqueue(lastSaveFn)
   }
 
   /**
@@ -78,6 +90,7 @@ export function useAutoSave() {
   return {
     saveStatus,
     triggerSave,
-    flush
+    flush,
+    retry
   }
 }
