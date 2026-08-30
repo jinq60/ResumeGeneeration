@@ -192,9 +192,17 @@ public class AiAvatarService {
         if (StringUtils.isBlank(sourceImageUrl)) {
             return null;
         }
-        String prefix = "/uploads/avatars/";
-        if (sourceImageUrl.startsWith(prefix)) {
-            return sourceImageUrl.substring(prefix.length());
+        String trimmed = sourceImageUrl.trim();
+        // 兼容多种形式：/uploads/avatars/...、http(s)://host/.../uploads/avatars/...、带查询参数的预签名 URL
+        String withoutQuery = trimmed.split("\\?")[0];
+        // 去掉可能的 http(s)://host 前缀
+        int uploadsIdx = withoutQuery.indexOf("/uploads/avatars/");
+        if (uploadsIdx >= 0) {
+            return withoutQuery.substring(uploadsIdx + "/uploads/avatars/".length());
+        }
+        // 兼容直接存储为 bucket 前缀（如 resume-avatars/userId/...）
+        if (withoutQuery.startsWith(minioStorageService.getBucketAvatars() + "/")) {
+            return withoutQuery.substring(minioStorageService.getBucketAvatars().length() + 1);
         }
         return null;
     }

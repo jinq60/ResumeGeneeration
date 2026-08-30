@@ -156,6 +156,7 @@ public class AiWritingService {
                     "同时进行的 AI 请求过多，请稍后再试。");
         }
 
+        boolean quotaConsumed = false;
         try {
             LlmProvider provider = providerRouter.resolve(FEATURE_KEY);
             String model = providerRouter.resolveModel(FEATURE_KEY);
@@ -174,13 +175,24 @@ public class AiWritingService {
 
             // 所有校验与解析完成后、发起 LLM 调用前才扣减配额
             consumeQuota(userId, guest);
+            quotaConsumed = true;
 
             return provider.stream(aiRequest)
                     .filter(StringUtils::isNotBlank)
                     .doOnComplete(() -> finishStream(callLog, resume, request, start, true, finalized))
                     .doOnError(error -> finishStream(callLog, resume, request, start, false, finalized))
-                    .doFinally(signal -> releaseInFlight(userId, counter));
+                    .doFinally(signal -> {
+                        if (signal == reactor.core.publisher.SignalType.CANCEL) {
+                            finishStream(callLog, resume, request, start, false, finalized);
+                        }
+                        releaseInFlight(userId, counter);
+                    });
         } catch (RuntimeException e) {
+            if (quotaConsumed) {
+                try {
+                    aiDailyQuotaService.refund(resume.getUserId(), FEATURE_KEY);
+                } catch (Exception ignore) {}
+            }
             releaseInFlight(userId, counter);
             throw e;
         }
@@ -344,7 +356,8 @@ public class AiWritingService {
                             + ", field=" + request.getField() + ", action=" + request.getAction());
         }
         try {
-            AiCallLogDefaults.fillRequiredColumns(callLog, null);
+            String providerName = callLog.getProviderName();
+            AiCallLogDefaults.fillRequiredColumns(callLog, providerName);
             aiCallLogMapper.insert(callLog);
         } catch (Exception logEx) {
             log.warn("Insert streaming AiCallLog failed: {}", logEx.getMessage());

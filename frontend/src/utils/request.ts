@@ -25,6 +25,16 @@ request.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    // FormData 需由浏览器自动设置 multipart boundary，删除默认的 application/json 头
+    const data = (config as unknown as { data?: unknown }).data
+    if (data instanceof FormData) {
+      if ((config.headers as Record<string, unknown>)?.['Content-Type']) {
+        delete (config.headers as Record<string, unknown>)['Content-Type']
+      }
+      if ((config.headers as unknown as { common?: Record<string, unknown> })?.common?.['Content-Type']) {
+        delete (config.headers as unknown as { common: Record<string, unknown> }).common['Content-Type']
+      }
+    }
     // api-spec §13 + api-changelog v2.4：创建/幂等类请求必须携带 Idempotency-Key
     // 后端 IdempotencyFilter 据此去重；并发冲突返回 425。
     // 允许调用方通过 config.headers['Idempotency-Key'] 显式覆盖。

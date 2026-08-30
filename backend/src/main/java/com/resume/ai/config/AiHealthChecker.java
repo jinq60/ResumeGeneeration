@@ -37,9 +37,9 @@ public class AiHealthChecker {
 
     private boolean hasApiKey(String provider) {
         return switch (provider) {
-            case "openai" -> isNotEmpty(aiProperties.getOpenai().getApiKey());
-            case "qwen" -> isNotEmpty(aiProperties.getQwen().getApiKey());
-            case "ernie" -> isNotEmpty(aiProperties.getErnie().getApiKey());
+            case "openai" -> aiProperties.getOpenai() != null && isNotEmpty(aiProperties.getOpenai().getApiKey());
+            case "qwen" -> aiProperties.getQwen() != null && isNotEmpty(aiProperties.getQwen().getApiKey());
+            case "ernie" -> aiProperties.getErnie() != null && isNotEmpty(aiProperties.getErnie().getApiKey());
             default -> false;
         };
     }

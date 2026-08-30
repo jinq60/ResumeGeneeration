@@ -67,6 +67,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(R.error(ResultCode.PARAM_INVALID, "上传文件过大，请检查大小限制。"));
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    public ResponseEntity<R<Void>> handleMultipartException(org.springframework.web.multipart.MultipartException e) {
+        log.warn("Multipart error: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(R.error(ResultCode.PARAM_INVALID, "文件上传失败，请检查格式与大小。"));
+    }
+
     @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
     public ResponseEntity<R<Void>> handleAuthenticationException(org.springframework.security.core.AuthenticationException e) {
         log.warn("Authentication failed: {}", e.getMessage());
@@ -126,8 +132,8 @@ public class GlobalExceptionHandler {
         } else if (msg.contains("uk_template_code")) {
             code = ResultCode.TEMPLATE_CODE_EXISTS;
             errMsg = "模板编码已存在。";
-        } else if (msg.contains("uk_share_token")) {
-            code = ResultCode.RESOURCE_NOT_FOUND;
+        } else if (msg.contains("uk_share_token") || msg.contains("uk_resume_share_token")) {
+            code = ResultCode.TEMPLATE_CODE_EXISTS;
             errMsg = "分享已存在，请重试。";
         } else if (msg.contains("uk_ai_daily_quota")) {
             code = ResultCode.AI_DAILY_QUOTA_EXCEEDED;

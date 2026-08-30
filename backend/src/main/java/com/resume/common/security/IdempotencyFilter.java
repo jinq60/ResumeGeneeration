@@ -122,18 +122,23 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             return;
         }
 
+        // 非 JSON 响应（如文件下载）不进行幂等缓存，直接放行
         ContentCachingResponseWrapper wrapped = new ContentCachingResponseWrapper(response);
         IdempotencyRecord completedRecord = null;
         try {
             chain.doFilter(request, wrapped);
 
             int status = wrapped.getStatus();
-            if (HttpStatus.valueOf(status).is2xxSuccessful()) {
+            String responseContentType = wrapped.getContentType();
+            boolean jsonResponse = responseContentType == null
+                    || responseContentType.contains("application/json")
+                    || responseContentType.contains("text/");
+            if (HttpStatus.valueOf(status).is2xxSuccessful() && jsonResponse) {
                 if (owner) {
                     completedRecord = complete(scopedKey, status, wrapped);
                 }
             } else if (owner) {
-                // 失败请求不缓存，释放占位以允许重试
+                // 失败或非 JSON 响应不缓存，释放占位以允许重试
                 idempotencyRecordMapper.deleteById(scopedKey);
             }
         } finally {
@@ -156,12 +161,26 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             response.getWriter().write(objectMapper.writeValueAsString(R.error(ResultCode.INTERNAL_ERROR, "幂等记录异常，请重试。")));
             return;
         }
+        // 非 JSON 响应（如 PDF 二进制）不缓存重放，避免二进制破坏
+        String contentType = record.getResponseContentType();
+        if (contentType != null && !contentType.contains("application/json") && !contentType.contains("text/")) {
+            log.debug("Skipping replay for non-JSON contentType: {}", contentType);
+            response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            response.getWriter().write(objectMapper.writeValueAsString(R.error(ResultCode.INTERNAL_ERROR, "幂等记录类型不支持重放，请重试。")));
+            return;
+        }
         response.setStatus(status);
-        response.setContentType(record.getResponseContentType());
+        response.setContentType(contentType);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         String body = record.getResponseBody() != null ? record.getResponseBody() : "";
-        if (body.length() > MAX_RESPONSE_BODY_BYTES) {
-            body = body.substring(0, MAX_RESPONSE_BODY_BYTES);
+        byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+        if (bodyBytes.length > MAX_RESPONSE_BODY_BYTES) {
+            // 按字节截断并保证 UTF-8 不割裂：截后重新按字符边界解码
+            int cut = MAX_RESPONSE_BODY_BYTES;
+            while (cut > 0 && (bodyBytes[cut] & 0xC0) == 0x80) cut--;
+            body = new String(bodyBytes, 0, cut, StandardCharsets.UTF_8);
         }
         response.getWriter().write(body);
     }

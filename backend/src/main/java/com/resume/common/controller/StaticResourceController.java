@@ -24,23 +24,41 @@ public class StaticResourceController {
     private final MinioStorageService minioStorageService;
 
     @GetMapping("/uploads/avatars/**")
-    public ResponseEntity<byte[]> serveAvatar(HttpServletRequest request) {
+    public ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> serveAvatar(HttpServletRequest request) {
         String objectName = extractObjectName(request, "/uploads/avatars/");
         validateObjectName(objectName);
-
-        byte[] data = minioStorageService.download(minioStorageService.getBucketAvatars(), objectName);
-
-        return buildResponse(objectName, data, false);
+        java.io.InputStream is = minioStorageService.downloadStream(minioStorageService.getBucketAvatars(), objectName);
+        String contentType = guessContentType(objectName);
+        org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody body = out -> {
+            try (java.io.InputStream in = is) {
+                in.transferTo(out);
+            }
+        };
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'")
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(body);
     }
 
     @GetMapping("/uploads/templates/**")
-    public ResponseEntity<byte[]> serveTemplate(HttpServletRequest request) {
+    public ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> serveTemplate(HttpServletRequest request) {
         String objectName = extractObjectName(request, "/uploads/templates/");
         validateObjectName(objectName);
-
-        byte[] data = minioStorageService.download(minioStorageService.getBucketTemplates(), objectName);
-
-        return buildResponse(objectName, data, true);
+        java.io.InputStream is = minioStorageService.downloadStream(minioStorageService.getBucketTemplates(), objectName);
+        String contentType = guessContentType(objectName);
+        org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody body = out -> {
+            try (java.io.InputStream in = is) {
+                in.transferTo(out);
+            }
+        };
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'")
+                .cacheControl(org.springframework.http.CacheControl.maxAge(1, java.util.concurrent.TimeUnit.HOURS).cachePublic())
+                .body(body);
     }
 
     /**

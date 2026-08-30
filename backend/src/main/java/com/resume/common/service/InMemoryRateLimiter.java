@@ -28,15 +28,15 @@ public class InMemoryRateLimiter implements RateLimiter {
     @Override
     public boolean tryAcquire(String key, int maxRequests, long windowMs) {
         long now = System.currentTimeMillis();
-        WindowCounter counter = cache.get(key, k -> new WindowCounter(now));
+        // 原子化窗口重置：避免 A/B 同时过期时后者覆盖前者计数丢失
+        WindowCounter counter = cache.asMap().compute(key, (k, existing) -> {
+            if (existing == null || now - existing.windowStart > windowMs) {
+                return new WindowCounter(now);
+            }
+            return existing;
+        });
         if (counter == null) {
             return false;
-        }
-        // 窗口过期则重置
-        if (now - counter.windowStart > windowMs) {
-            WindowCounter fresh = new WindowCounter(now);
-            cache.put(key, fresh);
-            counter = fresh;
         }
         return counter.tryAcquire(maxRequests);
     }

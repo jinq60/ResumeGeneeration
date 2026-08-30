@@ -76,6 +76,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * </ul>
      */
     private String resolveEffectiveRole(UserAccountStatusProvider provider, String userId, String claimedRole) {
+        // 严格白名单：仅 USER/ADMIN 视为合法，其他（含 null/Guest）视为未认证
+        if (!BizConstant.USER_ROLE_ADMIN.equals(claimedRole)
+                && !BizConstant.USER_ROLE_USER.equals(claimedRole)) {
+            return null;
+        }
         if (!BizConstant.USER_ROLE_ADMIN.equals(claimedRole)) {
             return claimedRole;
         }
@@ -84,6 +89,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         String actualRole = provider.findRole(userId);
         // 用户不存在（已被删除）时，旧 ADMIN token 不再以 USER 身份放行
+        if (actualRole == null) {
+            return null;
+        }
+        // 非 ADMIN 降级后返回 DB 实际角色（需同样为白名单）
+        if (!BizConstant.USER_ROLE_ADMIN.equals(actualRole)
+                && !BizConstant.USER_ROLE_USER.equals(actualRole)) {
+            return BizConstant.USER_ROLE_USER;
+        }
         return actualRole;
     }
 
@@ -94,6 +107,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         authorities.add(new SimpleGrantedAuthority("ROLE_" + BizConstant.USER_ROLE_USER));
         return authorities;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String ctx = request.getContextPath() == null ? "" : request.getContextPath();
+        String path = uri.startsWith(ctx) ? uri.substring(ctx.length()) : uri;
+        return path.startsWith("/actuator/health")
+                || path.startsWith("/actuator/prometheus")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/swagger-resources");
     }
 
     private String resolveToken(HttpServletRequest request) {

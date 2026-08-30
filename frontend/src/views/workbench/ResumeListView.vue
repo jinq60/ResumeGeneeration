@@ -520,15 +520,12 @@ const filteredAll = computed(() => {
   return list
 })
 
-const filteredResumes = computed(() => {
-  const all = filteredAll.value
-  const start = (page.value - 1) * pageSize.value
-  return all.slice(start, start + pageSize.value)
-})
+// 服务端已分页（page/size），客户端不再二次 slice，避免翻页空白；
+// 关键字/场景过滤仅对当页 12 条生效（全量搜索需后端支持 keyword/scene 参数，后续可扩展 resumeApi.list 透传）
+const filteredResumes = computed(() => filteredAll.value)
 
 const displayTotal = computed(() => {
-  // 当存在客户端过滤时，总数应为过滤后总数而非服务端总数
-  if (sceneFilter.value || keyword.value.trim() || currentTab.value === 'recent') {
+  if (sceneFilter.value || keyword.value.trim()) {
     return filteredAll.value.length
   }
   return total.value

@@ -32,8 +32,8 @@ class StaticResourceControllerTest {
     @Test
     void shouldServeUploadsUnderContextPath() throws Exception {
         when(minioStorageService.getBucketAvatars()).thenReturn("resume-avatars");
-        when(minioStorageService.download("resume-avatars", "user_1/avatars/a.png"))
-                .thenReturn(new byte[]{1, 2, 3});
+        when(minioStorageService.downloadStream("resume-avatars", "user_1/avatars/a.png"))
+                .thenReturn(new java.io.ByteArrayInputStream(new byte[]{1, 2, 3}));
 
         // 未携带 token 也应放行（/uploads/** permitAll），且能到达控制器
         mockMvc.perform(get("/api/uploads/avatars/user_1/avatars/a.png").contextPath("/api"))
