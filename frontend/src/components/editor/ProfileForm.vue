@@ -416,10 +416,10 @@ useSectionSync(
   gap: 10px;
 }
 
-/* 单行：左侧 6px drag 占位(实际 16px 含 padding) + 14px 图标 + 80px label + flex1 input + 22px eye + 22px delete */
+/* 紧凑：icon 与 label 无多余留白 — 16 drag + 20 icon + 36 label + 1fr input + 28 eye + 28 delete，gap 6 */
 .magic-field-row {
   display: grid;
-  grid-template-columns: 16px 22px 40px minmax(0, 1fr) 28px 28px;
+  grid-template-columns: 16px 20px 36px minmax(0, 1fr) 28px 28px;
   align-items: center;
   gap: 6px;
   min-height: 44px;
@@ -462,15 +462,15 @@ useSectionSync(
 .magic-drag-icon { font-size: 14px; }
 
 .magic-icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: hsl(var(--st-muted-foreground));
-  background: hsl(var(--st-secondary) / 0.7);
+  background: hsl(var(--st-secondary) / 0.6);
   border: 1px solid hsl(var(--st-border));
-  border-radius: 6px;
+  border-radius: 5px;
 }
 
 .magic-label {
@@ -479,8 +479,8 @@ useSectionSync(
   color: hsl(var(--st-foreground));
   white-space: nowrap;
   letter-spacing: -0.01em;
-  text-align: right;
-  padding-right: 4px;
+  text-align: left;
+  padding-left: 0;
 }
 
 .field-control.magic-input { width: 100%; min-width: 0; }
