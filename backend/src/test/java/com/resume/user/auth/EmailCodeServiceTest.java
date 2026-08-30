@@ -88,7 +88,9 @@ class EmailCodeServiceTest {
     private String extractCode(String email) throws Exception {
         java.lang.reflect.Field field = EmailCodeService.class.getDeclaredField("codes");
         field.setAccessible(true);
-        Object entry = ((java.util.Map<String, Object>) field.get(service)).get(email.toLowerCase());
+        com.github.benmanes.caffeine.cache.Cache<String, Object> cache =
+                (com.github.benmanes.caffeine.cache.Cache<String, Object>) field.get(service);
+        Object entry = cache.getIfPresent(email.toLowerCase());
         assertNotNull(entry);
         return (String) entry.getClass().getDeclaredMethod("code").invoke(entry);
     }
@@ -120,7 +122,10 @@ class EmailCodeServiceTest {
 
         java.lang.reflect.Field field = EmailCodeService.class.getDeclaredField("codes");
         field.setAccessible(true);
-        assertTrue(((java.util.Map<?, ?>) field.get(prodService)).isEmpty(),
+        Object cache = field.get(prodService);
+        @SuppressWarnings("unchecked")
+        com.github.benmanes.caffeine.cache.Cache<?, ?> c = (com.github.benmanes.caffeine.cache.Cache<?, ?>) cache;
+        assertTrue(c.asMap().isEmpty(),
                 "生产环境发送失败时不应落库任何验证码");
     }
 }

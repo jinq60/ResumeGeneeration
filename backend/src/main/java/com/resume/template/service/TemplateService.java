@@ -19,10 +19,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -36,18 +40,33 @@ public class TemplateService {
     private final TemplateMapper templateMapper;
     private final ObjectMapper objectMapper;
 
+    private final Cache<String, List<TemplateDTO>> activeListCache = Caffeine.newBuilder()
+            .expireAfterWrite(60, TimeUnit.SECONDS)
+            .maximumSize(1)
+            .build();
+
     /**
-     * 前台模板列表。
+     * 前台模板列表（60s Caffeine 缓存）。
      */
     public List<TemplateDTO> listActiveTemplates() {
+        List<TemplateDTO> cached = activeListCache.getIfPresent("active");
+        if (cached != null) {
+            return cached;
+        }
         LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Template::getStatus, BizConstant.TEMPLATE_STATUS_ACTIVE)
                 .eq(Template::getDeleted, BizConstant.NOT_DELETED)
                 .orderByAsc(Template::getSortOrder)
                 .orderByDesc(Template::getCreatedAt);
-        return templateMapper.selectList(wrapper).stream()
+        List<TemplateDTO> result = templateMapper.selectList(wrapper).stream()
                 .map(this::toTemplateDTO)
                 .toList();
+        activeListCache.put("active", result);
+        return result;
+    }
+
+    private void invalidateActiveCache() {
+        activeListCache.invalidateAll();
     }
 
     /**
@@ -194,6 +213,7 @@ public class TemplateService {
             exist.setDeleted(BizConstant.NOT_DELETED);
             exist.setUpdatedAt(LocalDateTime.now());
             templateMapper.updateById(exist);
+            invalidateActiveCache();
             return toAdminTemplateDTO(exist);
         }
 
@@ -205,6 +225,7 @@ public class TemplateService {
         template.setCreatedAt(LocalDateTime.now());
         template.setUpdatedAt(LocalDateTime.now());
         templateMapper.insert(template);
+        invalidateActiveCache();
         return toAdminTemplateDTO(template);
     }
 
@@ -263,6 +284,7 @@ public class TemplateService {
         template.setVersion(template.getVersion() + 1);
         template.setUpdatedAt(LocalDateTime.now());
         templateMapper.updateById(template);
+        invalidateActiveCache();
         return toAdminTemplateDTO(template);
     }
 
@@ -281,6 +303,7 @@ public class TemplateService {
         template.setStatus(status);
         template.setUpdatedAt(LocalDateTime.now());
         templateMapper.updateById(template);
+        invalidateActiveCache();
     }
 
     /**
@@ -312,6 +335,7 @@ public class TemplateService {
         template.setUpdatedAt(LocalDateTime.now());
         templateMapper.updateById(template);
         templateMapper.deleteById(templateId);
+        invalidateActiveCache();
     }
 
     private void validateConfig(Map<String, Object> config) {

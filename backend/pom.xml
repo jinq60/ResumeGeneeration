@@ -147,6 +147,12 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Caffeine 本地缓存（限流器 / 验证码 / 登录防护等内存降级） -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- Prometheus 指标（/actuator/prometheus，供监控采集） -->
         <dependency>
             <groupId>io.micrometer</groupId>

@@ -13,12 +13,14 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 邮箱验证码服务：生成、校验（一次性、5 分钟过期、5 次错误作废）与发送。
@@ -45,8 +47,14 @@ public class EmailCodeService {
     private final ObjectProvider<RedisTemplate<String, String>> redisTemplateProvider;
     private final ObjectProvider<Environment> environmentProvider;
 
-    private final Map<String, Entry> codes = new ConcurrentHashMap<>();
-    private final Map<String, Integer> dailyCounts = new ConcurrentHashMap<>();
+    private final Cache<String, Entry> codes = Caffeine.newBuilder()
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .maximumSize(10_000)
+            .build();
+    private final Cache<String, Integer> dailyCounts = Caffeine.newBuilder()
+            .expireAfterWrite(25, TimeUnit.HOURS)
+            .maximumSize(10_000)
+            .build();
 
     /**
      * 发送验证码到邮箱（带重发间隔限制）。
@@ -84,18 +92,13 @@ public class EmailCodeService {
             } catch (BusinessException e) {
                 throw e;
             } catch (Exception e) {
-                log.warn("Redis check email daily limit failed, fallback to memory: {}", e.getMessage());
+                log.warn("Redis check email daily limit failed, fallback to Caffeine: {}", e.getMessage());
             }
         }
         String memKey = key + "|" + day;
-        if (dailyCounts.size() > 10000 && !dailyCounts.containsKey(memKey)) {
-            dailyCounts.entrySet().removeIf(e -> !e.getKey().endsWith("|" + day));
-            if (dailyCounts.size() > 10000) {
-                throw new BusinessException(ResultCode.RATE_LIMITED, "今日验证码发送次数已达上限，请明日再试。");
-            }
-        }
-        int count = dailyCounts.compute(memKey, (k, v) -> v == null ? 1 : v + 1);
-        dailyCounts.keySet().removeIf(k -> !k.endsWith("|" + day));
+        Integer current = dailyCounts.getIfPresent(memKey);
+        int count = (current == null ? 1 : current + 1);
+        dailyCounts.put(memKey, count);
         if (count > DAILY_LIMIT_PER_EMAIL) {
             throw new BusinessException(ResultCode.RATE_LIMITED, "今日验证码发送次数已达上限，请明日再试。");
         }
@@ -142,8 +145,6 @@ public class EmailCodeService {
                 log.warn("Redis store email code failed, fallback to memory: {}", e.getMessage());
             }
         }
-        // 惰性清理过期条目，避免内存无限增长
-        codes.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(LocalDateTime.now()));
         codes.put(key, new Entry(code, LocalDateTime.now().plusMinutes(
                 authProperties.getEmailCode().getTtlMinutes()), LocalDateTime.now(), 0));
     }
@@ -157,9 +158,9 @@ public class EmailCodeService {
                 log.warn("Redis read email code failed, fallback to memory: {}", e.getMessage());
             }
         }
-        Entry entry = codes.get(key);
+        Entry entry = codes.getIfPresent(key);
         if (entry == null || entry.expiresAt().isBefore(LocalDateTime.now())) {
-            codes.remove(key);
+            if (entry != null) codes.invalidate(key);
             return null;
         }
         return entry.code();
@@ -175,7 +176,7 @@ public class EmailCodeService {
                 log.warn("Redis read email code sentAt failed: {}", e.getMessage());
             }
         }
-        Entry entry = codes.get(key);
+        Entry entry = codes.getIfPresent(key);
         return entry == null ? null : entry.lastSentAt();
     }
 
@@ -195,13 +196,13 @@ public class EmailCodeService {
                 log.warn("Redis increment attempts failed: {}", e.getMessage());
             }
         }
-        Entry updated = codes.compute(key, (k, entry) -> {
-            if (entry == null) {
-                return null;
-            }
-            return new Entry(entry.code(), entry.expiresAt(), entry.lastSentAt(), entry.attempts() + 1);
-        });
-        return updated == null ? 0 : updated.attempts();
+        Entry entry = codes.getIfPresent(key);
+        if (entry == null) {
+            return 0;
+        }
+        Entry updated = new Entry(entry.code(), entry.expiresAt(), entry.lastSentAt(), entry.attempts() + 1);
+        codes.put(key, updated);
+        return updated.attempts();
     }
 
     private void remove(String key) {
@@ -216,7 +217,7 @@ public class EmailCodeService {
                 log.warn("Redis delete email code failed: {}", e.getMessage());
             }
         }
-        codes.remove(key);
+        codes.invalidate(key);
     }
 
     private RedisTemplate<String, String> redis() {

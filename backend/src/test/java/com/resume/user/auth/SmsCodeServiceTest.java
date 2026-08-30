@@ -67,9 +67,9 @@ class SmsCodeServiceTest {
         assertEquals(ResultCode.AUTH_SMS_CODE_NOT_AVAILABLE, ex.getErrorCode());
 
         // 不落 Redis / 内存
-        @SuppressWarnings("unchecked")
-        Map<String, ?> codes = (Map<String, ?>) ReflectionTestUtils.getField(service, "codes");
-        assertTrue(codes.isEmpty());
+        com.github.benmanes.caffeine.cache.Cache<?, ?> codes =
+                (com.github.benmanes.caffeine.cache.Cache<?, ?>) ReflectionTestUtils.getField(service, "codes");
+        assertTrue(codes.asMap().isEmpty());
     }
 
     @Test
@@ -81,8 +81,9 @@ class SmsCodeServiceTest {
         assertDoesNotThrow(() -> service.send("13800138000"));
 
         @SuppressWarnings("unchecked")
-        Map<String, ?> codes = (Map<String, ?>) ReflectionTestUtils.getField(service, "codes");
-        assertTrue(codes.containsKey("13800138000"));
+        com.github.benmanes.caffeine.cache.Cache<String, ?> codes =
+                (com.github.benmanes.caffeine.cache.Cache<String, ?>) ReflectionTestUtils.getField(service, "codes");
+        assertNotNull(codes.getIfPresent("13800138000"));
     }
 
     @Test

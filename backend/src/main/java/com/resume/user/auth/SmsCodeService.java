@@ -12,12 +12,14 @@ import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /**
@@ -43,9 +45,15 @@ public class SmsCodeService {
     private final AuthProperties authProperties;
     private final ObjectProvider<RedisTemplate<String, String>> redisTemplateProvider;
 
-    private final Map<String, Entry> codes = new ConcurrentHashMap<>();
+    private final Cache<String, Entry> codes = Caffeine.newBuilder()
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .maximumSize(10_000)
+            .build();
     /** 内存降级模式的每日发送计数：key = phone|yyyy-MM-dd。 */
-    private final Map<String, Integer> dailyCounts = new ConcurrentHashMap<>();
+    private final Cache<String, Integer> dailyCounts = Caffeine.newBuilder()
+            .expireAfterWrite(25, TimeUnit.HOURS)
+            .maximumSize(10_000)
+            .build();
 
     @Autowired(required = false)
     private Environment environment;
@@ -142,9 +150,9 @@ public class SmsCodeService {
             }
         }
         String memKey = phone + "|" + day;
-        int count = dailyCounts.compute(memKey, (k, v) -> v == null ? 1 : v + 1);
-        // 清理过期计数，避免长期驻留
-        dailyCounts.keySet().removeIf(k -> !k.endsWith("|" + day));
+        Integer current = dailyCounts.getIfPresent(memKey);
+        int count = (current == null ? 1 : current + 1);
+        dailyCounts.put(memKey, count);
         if (count > dailyLimitPerPhone) {
             throw new BusinessException(ResultCode.RATE_LIMITED,
                     "今日验证码发送次数已达上限，请明日再试。");
@@ -180,7 +188,6 @@ public class SmsCodeService {
                 log.warn("Redis store sms code failed, fallback to memory: {}", e.getMessage());
             }
         }
-        codes.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(LocalDateTime.now()));
         codes.put(phone, new Entry(code, LocalDateTime.now().plusMinutes(
                 authProperties.getEmailCode().getTtlMinutes()), LocalDateTime.now(), 0));
     }
@@ -194,9 +201,9 @@ public class SmsCodeService {
                 log.warn("Redis read sms code failed, fallback to memory: {}", e.getMessage());
             }
         }
-        Entry entry = codes.get(phone);
+        Entry entry = codes.getIfPresent(phone);
         if (entry == null || entry.expiresAt().isBefore(LocalDateTime.now())) {
-            codes.remove(phone);
+            if (entry != null) codes.invalidate(phone);
             return null;
         }
         return entry.code();
@@ -212,7 +219,7 @@ public class SmsCodeService {
                 log.warn("Redis read sms code sentAt failed: {}", e.getMessage());
             }
         }
-        Entry entry = codes.get(phone);
+        Entry entry = codes.getIfPresent(phone);
         return entry == null ? null : entry.lastSentAt();
     }
 
@@ -231,13 +238,13 @@ public class SmsCodeService {
                 log.warn("Redis increment sms attempts failed: {}", e.getMessage());
             }
         }
-        Entry updated = codes.compute(phone, (k, entry) -> {
-            if (entry == null) {
-                return null;
-            }
-            return new Entry(entry.code(), entry.expiresAt(), entry.lastSentAt(), entry.attempts() + 1);
-        });
-        return updated == null ? 0 : updated.attempts();
+        Entry entry = codes.getIfPresent(phone);
+        if (entry == null) {
+            return 0;
+        }
+        Entry updated = new Entry(entry.code(), entry.expiresAt(), entry.lastSentAt(), entry.attempts() + 1);
+        codes.put(phone, updated);
+        return updated.attempts();
     }
 
     private void remove(String phone) {
@@ -252,7 +259,7 @@ public class SmsCodeService {
                 log.warn("Redis delete sms code failed: {}", e.getMessage());
             }
         }
-        codes.remove(phone);
+        codes.invalidate(phone);
     }
 
     private RedisTemplate<String, String> redis() {

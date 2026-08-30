@@ -29,9 +29,11 @@ class LoginAttemptGuardTest {
         assertTrue(guard.isLocked("13800000000"));
 
         // 模拟锁定到期
-        Object state = ReflectionTestUtils.getField(guard, "states");
-        java.util.Map<?, ?> map = (java.util.Map<?, ?>) state;
-        Object entry = map.get("13800000000");
+        @SuppressWarnings("unchecked")
+        com.github.benmanes.caffeine.cache.Cache<String, Object> cache =
+                (com.github.benmanes.caffeine.cache.Cache<String, Object>) ReflectionTestUtils.getField(guard, "cache");
+        Object entry = cache.getIfPresent("13800000000");
+        assertNotNull(entry);
         ReflectionTestUtils.setField(entry, "lockUntil", System.currentTimeMillis() - 1000);
         assertFalse(guard.isLocked("13800000000"));
     }

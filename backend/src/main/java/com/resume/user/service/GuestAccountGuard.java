@@ -1,5 +1,7 @@
 package com.resume.user.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,15 +13,14 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 游客会话创建限额。
  * <p>
  * 按 IP 每日窗口计数，防止通过 /auth/guest 无限刷号。
- * 优先使用 Redis（多实例安全）；未配置 Redis 时降级为进程内存（单实例适用）。
+ * 优先使用 Redis（多实例安全）；未配置 Redis 时降级为 Caffeine 本地缓存。
  * </p>
  */
 @Slf4j
@@ -28,7 +29,10 @@ public class GuestAccountGuard {
 
     private static final String REDIS_KEY_PREFIX = "guest-count:";
 
-    private final Map<String, DailyCounter> counters = new ConcurrentHashMap<>();
+    private final Cache<String, DailyCounter> cache = Caffeine.newBuilder()
+            .expireAfterWrite(25, TimeUnit.HOURS)
+            .maximumSize(10_000)
+            .build();
 
     @Value("${app.auth.guest.max-per-ip-per-day:50}")
     private int maxPerIpPerDay;
@@ -63,25 +67,21 @@ public class GuestAccountGuard {
                 }
                 return allowed;
             } catch (Exception e) {
-                log.warn("Redis guest count failed, fallback to memory: {}", e.getMessage());
+                log.warn("Redis guest count failed, fallback to Caffeine: {}", e.getMessage());
             }
         }
 
         LocalDate today = LocalDate.now();
-        // 内存降级时防无限增长：超 10000 个 IP 时清理旧日数据
-        if (counters.size() > 10000 && !counters.containsKey(ip)) {
-            counters.entrySet().removeIf(e -> !today.equals(e.getValue().day));
-            if (counters.size() > 10000) {
-                log.warn("GuestAccountGuard memory map too large ({}), rejecting new IP", counters.size());
-                return false;
-            }
+        DailyCounter counter = cache.get(ip, k -> new DailyCounter(today));
+        if (counter == null) {
+            return false;
         }
-        DailyCounter counter = counters.compute(ip, (k, existing) -> {
-            if (existing == null || !today.equals(existing.day)) {
-                return new DailyCounter(today);
-            }
-            return existing;
-        });
+        // 跨天重置
+        if (!today.equals(counter.day)) {
+            DailyCounter fresh = new DailyCounter(today);
+            cache.put(ip, fresh);
+            counter = fresh;
+        }
         boolean allowed = counter.count.incrementAndGet() <= maxPerIpPerDay;
         if (!allowed) {
             log.warn("Guest account limit exceeded: ip={}, maxPerDay={}", ip, maxPerIpPerDay);
