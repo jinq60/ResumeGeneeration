@@ -419,17 +419,19 @@ useSectionSync(
 /* 单行：左侧 6px drag 占位(实际 16px 含 padding) + 14px 图标 + 80px label + flex1 input + 22px eye + 22px delete */
 .magic-field-row {
   display: grid;
-  grid-template-columns: 16px 22px 80px minmax(0, 1fr) 28px 28px;
+  grid-template-columns: 16px 22px 64px minmax(0, 1fr) 28px 28px;
   align-items: center;
   gap: 8px;
   min-height: 44px;
   padding: 8px 10px 8px 8px;
   background: hsl(var(--st-card));
   border: 1px solid hsl(var(--st-border));
-  border-radius: var(--st-radius-lg); /* 0.75rem 对齐 magic --radius */
+  border-radius: var(--st-radius-lg);
   box-shadow: var(--st-shadow-sm);
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
+.magic-field-row .el-date-editor,
+.magic-field-row .el-date-editor.el-input__wrapper { width: 100%; min-width: 0; }
 .magic-field-row:hover {
   border-color: hsl(var(--st-foreground) / 0.14);
   box-shadow: var(--st-shadow-md);
@@ -476,6 +478,8 @@ useSectionSync(
   color: hsl(var(--st-foreground));
   white-space: nowrap;
   letter-spacing: -0.01em;
+  text-align: right;
+  padding-right: 4px;
 }
 
 .field-control.magic-input { width: 100%; min-width: 0; }
