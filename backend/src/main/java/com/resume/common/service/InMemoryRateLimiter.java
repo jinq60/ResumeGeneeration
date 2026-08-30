@@ -1,5 +1,6 @@
 package com.resume.common.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 激活条件：未显式启用 {@code app.rate-limit.driver=redis}，即不配置或配置为 {@code memory}。
  * </p>
  */
+@Slf4j
 @Component
 @ConditionalOnProperty(name = "app.rate-limit.driver", havingValue = "memory", matchIfMissing = true)
 public class InMemoryRateLimiter implements RateLimiter {
@@ -27,6 +29,11 @@ public class InMemoryRateLimiter implements RateLimiter {
     @Override
     public boolean tryAcquire(String key, int maxRequests, long windowMs) {
         long now = System.currentTimeMillis();
+        // 防御：恶意随机 key 撑大内存，超限时拒绝新 key
+        if (counters.size() > 50000 && !counters.containsKey(key)) {
+            log.warn("InMemoryRateLimiter map too large ({}), rejecting new key to prevent OOM", counters.size());
+            return false;
+        }
 
         WindowCounter counter = counters.compute(key, (k, existing) -> {
             if (existing == null || now - existing.windowStart > windowMs) {

@@ -30,7 +30,7 @@ request.interceptors.request.use(
     // 允许调用方通过 config.headers['Idempotency-Key'] 显式覆盖。
     const method = (config.method || 'get').toLowerCase()
     const url = config.url || ''
-    if ((method === 'post' || method === 'put' || method === 'patch') && !url.includes('/auth/')) {
+    if ((method === 'post' || method === 'put' || method === 'patch') && !url.startsWith('/auth/')) {
       const existing = (config.headers as Record<string, string> | undefined)?.[
         'Idempotency-Key'
       ]

@@ -15,11 +15,20 @@ export function getPdfTasks(): PdfTask[] {
 }
 
 export function savePdfTasks(tasks: PdfTask[]) {
-  localStorage.setItem(PDF_KEY, JSON.stringify(tasks))
+  try {
+    localStorage.setItem(PDF_KEY, JSON.stringify(tasks.slice(0, 50)))
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      localStorage.setItem(PDF_KEY, JSON.stringify(tasks.slice(0, 20)))
+    }
+  }
 }
 
 export function addPdfTask(task: PdfTask) {
   const tasks = getPdfTasks()
+  // 去重：同 taskId 不重复插入
+  const existing = tasks.findIndex(t => t.taskId === task.taskId)
+  if (existing >= 0) tasks.splice(existing, 1)
   tasks.unshift(task)
   savePdfTasks(tasks)
 }
@@ -49,11 +58,19 @@ export function getAvatarTasks(): AvatarTask[] {
 }
 
 export function saveAvatarTasks(tasks: AvatarTask[]) {
-  localStorage.setItem(AVATAR_KEY, JSON.stringify(tasks))
+  try {
+    localStorage.setItem(AVATAR_KEY, JSON.stringify(tasks.slice(0, 50)))
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      localStorage.setItem(AVATAR_KEY, JSON.stringify(tasks.slice(0, 20)))
+    }
+  }
 }
 
 export function addAvatarTask(task: AvatarTask) {
   const tasks = getAvatarTasks()
+  const existing = tasks.findIndex(t => t.taskId === task.taskId)
+  if (existing >= 0) tasks.splice(existing, 1)
   tasks.unshift(task)
   saveAvatarTasks(tasks)
 }

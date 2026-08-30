@@ -68,6 +68,14 @@ public class GuestAccountGuard {
         }
 
         LocalDate today = LocalDate.now();
+        // 内存降级时防无限增长：超 10000 个 IP 时清理旧日数据
+        if (counters.size() > 10000 && !counters.containsKey(ip)) {
+            counters.entrySet().removeIf(e -> !today.equals(e.getValue().day));
+            if (counters.size() > 10000) {
+                log.warn("GuestAccountGuard memory map too large ({}), rejecting new IP", counters.size());
+                return false;
+            }
+        }
         DailyCounter counter = counters.compute(ip, (k, existing) -> {
             if (existing == null || !today.equals(existing.day)) {
                 return new DailyCounter(today);

@@ -43,8 +43,19 @@ export function sanitizeRichText(html: string) {
       }
 
       for (const attribute of Array.from(child.attributes)) {
-        if (tagName === 'A' && attribute.name === 'href' && /^https?:\/\//i.test(attribute.value.trim())) {
-          continue
+        if (tagName === 'A' && attribute.name === 'href') {
+          const href = attribute.value.trim()
+          try {
+            const url = new URL(href, window.location.origin)
+            if (url.protocol === 'http:' || url.protocol === 'https:') {
+              child.setAttribute('href', url.href)
+              child.setAttribute('rel', 'noopener noreferrer')
+              child.setAttribute('target', '_blank')
+              continue
+            }
+          } catch {
+            // invalid URL, drop
+          }
         }
         child.removeAttribute(attribute.name)
       }

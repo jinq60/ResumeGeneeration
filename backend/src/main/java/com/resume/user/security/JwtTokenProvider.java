@@ -51,6 +51,8 @@ public class JwtTokenProvider {
     @Value("${app.jwt.refresh-token-expiration:604800000}")
     private long refreshTokenExpiration;
 
+    private volatile SecretKey cachedKey;
+
     @PostConstruct
     public void initSecret() {
         if (!StringUtils.hasText(jwtSecret)) {
@@ -61,8 +63,9 @@ public class JwtTokenProvider {
                 throw new IllegalStateException("app.jwt.secret must be configured for non-dev/test profiles.");
             }
         }
-        // Validate the secret early (Base64-decodable and sufficient length).
-        getSigningKey();
+        // Validate and cache the signing key early (Base64-decodable and sufficient length).
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        cachedKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
     private boolean isDevOrTestProfile() {
@@ -80,6 +83,10 @@ public class JwtTokenProvider {
     }
 
     private SecretKey getSigningKey() {
+        SecretKey key = cachedKey;
+        if (key != null) {
+            return key;
+        }
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
@@ -224,17 +231,29 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 校验访问令牌是否有效。
+     * 校验访问令牌是否有效（单次 parse 避免双重验签开销）。
      */
     public boolean validateAccessToken(String token) {
-        return validateToken(token) && isAccessToken(token);
+        try {
+            Claims claims = parseClaims(token);
+            return TOKEN_TYPE_ACCESS.equals(claims.get(CLAIM_TYPE, String.class));
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Invalid access token: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**
-     * 校验刷新令牌是否有效。
+     * 校验刷新令牌是否有效（单次 parse）。
      */
     public boolean validateRefreshToken(String token) {
-        return validateToken(token) && isRefreshToken(token);
+        try {
+            Claims claims = parseClaims(token);
+            return TOKEN_TYPE_REFRESH.equals(claims.get(CLAIM_TYPE, String.class));
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Invalid refresh token: {}", e.getMessage());
+            return false;
+        }
     }
 
     private Claims parseClaims(String token) {

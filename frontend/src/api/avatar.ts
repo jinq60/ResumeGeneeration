@@ -28,9 +28,8 @@ export const avatarApi = {
     if (resumeId) {
       formData.append('resumeId', resumeId)
     }
-    return request.post('/avatars/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }) as Promise<{ id: string; sourceImageUrl: string; fileName: string }>
+    // 让浏览器自动设置 boundary，避免手动指定导致 multipart 解析失败
+    return request.post('/avatars/upload', formData) as Promise<{ id: string; sourceImageUrl: string; fileName: string }>
   },
   optimize(data: OptimizeAvatarRequest): Promise<{ taskId: string; status: string }> {
     return request.post('/avatars/optimize', data) as Promise<{ taskId: string; status: string }>

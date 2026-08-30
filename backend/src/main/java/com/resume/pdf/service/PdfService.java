@@ -185,9 +185,30 @@ public class PdfService {
      */
     private void submitExportAfterCommit(String taskId, String userId, String resumeId, String exportTemplateId) {
         Runnable submit = () -> {
+            // 信号量在线程池外获取，避免占满 4 个 pdfTaskExecutor 线程同时等待导致的死锁
+            boolean acquired;
             try {
-                pdfTaskExecutor.execute(() -> executeExport(taskId, userId, resumeId, exportTemplateId));
+                acquired = exportSemaphore.tryAcquire(SEMAPHORE_WAIT_SECONDS, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                markTaskFailed(taskId, "导出被中断。");
+                return;
+            }
+            if (!acquired) {
+                log.warn("PDF export concurrency limit reached before queueing: taskId={}", taskId);
+                markTaskFailed(taskId, "导出任务繁忙，请稍后再试。");
+                return;
+            }
+            try {
+                pdfTaskExecutor.execute(() -> {
+                    try {
+                        executeExport(taskId, userId, resumeId, exportTemplateId);
+                    } finally {
+                        exportSemaphore.release();
+                    }
+                });
             } catch (RejectedExecutionException e) {
+                exportSemaphore.release();
                 log.warn("PDF export queue full: taskId={}", taskId);
                 PdfTask failed = new PdfTask();
                 failed.setId(taskId);
@@ -210,22 +231,9 @@ public class PdfService {
     }
 
     /**
-     * 后台执行 PDF 导出（专用线程池，信号量限流）。
+     * 后台执行 PDF 导出（信号量已在外层获取，此处仅执行业务）。
      */
     public void executeExport(String taskId, String userId, String resumeId, String exportTemplateId) {
-        boolean acquired;
-        try {
-            acquired = exportSemaphore.tryAcquire(SEMAPHORE_WAIT_SECONDS, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            markTaskFailed(taskId, "导出被中断。");
-            return;
-        }
-        if (!acquired) {
-            log.warn("PDF export concurrency limit reached, task rejected: taskId={}", taskId);
-            markTaskFailed(taskId, "导出任务繁忙，请稍后再试。");
-            return;
-        }
         try {
             Resume resume = resumeService.getResumeEntity(userId, resumeId);
             // 渲染场景容忍 inactive/deleted 模板，历史简历仍可导出
@@ -238,8 +246,6 @@ public class PdfService {
         } catch (Exception e) {
             log.error("PDF export failed: taskId={}", taskId, e);
             markTaskFailed(taskId, "PDF 生成失败，请稍后再试。");
-        } finally {
-            exportSemaphore.release();
         }
     }
 
@@ -385,6 +391,13 @@ public class PdfService {
                  Page page = context.newPage()) {
                 page.navigate(htmlPath.toUri().toString(),
                         new Page.NavigateOptions().setTimeout(60_000));
+                // 等待网络空闲，确保头像等图片加载完成再截图
+                try {
+                    page.waitForLoadState(com.microsoft.playwright.options.LoadState.NETWORKIDLE,
+                            new Page.WaitForLoadStateOptions().setTimeout(10_000));
+                } catch (Exception e) {
+                    log.warn("waitForLoadState timeout, continue to pdf: taskId={}", taskId);
+                }
                 applyOnePageFit(page);
                 page.pdf(new Page.PdfOptions().setPath(pdfPath)
                         .setFormat("A4")
@@ -406,16 +419,27 @@ public class PdfService {
             update.setCompletedAt(LocalDateTime.now());
             update.setUpdatedAt(LocalDateTime.now());
             pdfTaskMapper.updateById(update);
-            notificationService.notify(resume.getUserId(), "pdf", "PDF 导出完成",
-                    "你的简历《" + resume.getTitle() + "》已导出为 PDF，可前往下载中心下载。");
+            try {
+                notificationService.notify(resume.getUserId(), "pdf", "PDF 导出完成",
+                        "你的简历《" + resume.getTitle() + "》已导出为 PDF，可前往下载中心下载。");
+            } catch (Exception ne) {
+                log.warn("PDF success notification failed, ignore: taskId={}", taskId, ne);
+            }
             log.info("generatePdf success: taskId={}, fileSize={}, fileName={}",
                     taskId, update.getFileSize(), update.getFileName());
         } catch (Exception e) {
             log.error("Generate PDF failed: taskId={}", taskId, e);
             // Chromium 崩溃/关闭后丢弃共享实例，下次导出时重建，避免复用已损坏的浏览器
-            if (browser != null && !browser.isConnected()) {
-                log.warn("Shared Chromium seems crashed, discarding for next export");
-                discardBrowser();
+            // 注意：browser 为方法内局部变量，需与共享实例比对，避免误丢新实例
+            if (browser != null) {
+                synchronized (browserLock) {
+                    if (browser == sharedBrowser && !browser.isConnected()) {
+                        log.warn("Shared Chromium seems crashed, discarding for next export");
+                        discardLocked();
+                    } else if (browser != sharedBrowser && !browser.isConnected()) {
+                        try { browser.close(); } catch (Exception ignore) {}
+                    }
+                }
             }
             String msg = e.getMessage() == null ? "" : e.getMessage();
             updateTaskStatus(taskId, BizConstant.TASK_STATUS_FAILED,
@@ -450,9 +474,19 @@ public class PdfService {
                 discardLocked();
             }
             if (sharedBrowser == null) {
-                sharedPlaywright = Playwright.create();
-                sharedBrowser = sharedPlaywright.chromium().launch(buildLaunchOptions());
-                log.info("Shared Chromium launched for PDF export");
+                Playwright pw = null;
+                try {
+                    pw = Playwright.create();
+                    Browser br = pw.chromium().launch(buildLaunchOptions());
+                    sharedPlaywright = pw;
+                    sharedBrowser = br;
+                    log.info("Shared Chromium launched for PDF export");
+                } catch (Exception e) {
+                    if (pw != null) {
+                        try { pw.close(); } catch (Exception ignore) {}
+                    }
+                    throw e;
+                }
             }
             return sharedBrowser;
         }

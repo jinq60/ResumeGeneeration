@@ -137,6 +137,14 @@ public class LoginAttemptGuard {
                 log.warn("Redis record login failure failed, fallback to memory: {}", e.getMessage());
             }
         }
+        if (states.size() > 20000 && !states.containsKey(key)) {
+            // 防御：随机账号撑大内存
+            states.entrySet().removeIf(e -> e.getValue().lockUntil != null && System.currentTimeMillis() >= e.getValue().lockUntil);
+            if (states.size() > 20000) {
+                log.warn("LoginAttemptGuard states too large ({}), rejecting new key to prevent OOM", states.size());
+                return;
+            }
+        }
         states.compute(key, (k, state) -> {
             AttemptState next = state == null ? new AttemptState() : state;
             next.failures++;
@@ -176,7 +184,15 @@ public class LoginAttemptGuard {
                 log.warn("Redis record ip login failure failed, fallback to memory: {}", e.getMessage());
             }
         }
-        states.compute(IP_MEMORY_KEY_PREFIX + ip, (k, state) -> {
+        String memKey = IP_MEMORY_KEY_PREFIX + ip;
+        if (states.size() > 20000 && !states.containsKey(memKey)) {
+            states.entrySet().removeIf(e -> e.getValue().lockUntil != null && System.currentTimeMillis() >= e.getValue().lockUntil);
+            if (states.size() > 20000) {
+                log.warn("LoginAttemptGuard IP states too large, rejecting {}", ip);
+                return;
+            }
+        }
+        states.compute(memKey, (k, state) -> {
             AttemptState next = state == null ? new AttemptState() : state;
             next.failures++;
             if (next.failures >= ipMaxFailures && next.lockUntil == null) {
