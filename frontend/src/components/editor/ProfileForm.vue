@@ -441,18 +441,17 @@ useSectionSync(
 
 /* 紧凑：icon 与 label 无多余留白 — 16 drag + 20 icon + 36 label + 1fr input + 28 eye + 28 delete，gap 6 */
 .magic-field-row {
-  display: grid;
-  grid-template-columns: 16px 20px 36px minmax(0, 1fr) 28px 28px;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 8px 8px 8px 6px;
+  gap: 16px;
+  min-height: auto;
+  padding: 16px 12px;
   background: hsl(var(--st-card));
-  border: 1px solid hsl(var(--st-border));
-  border-radius: var(--st-radius-lg);
-  box-shadow: var(--st-shadow-sm);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  box-shadow: none;
   overflow: hidden;
-  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  transition: border-color 180ms ease, background 180ms ease;
 }
 .magic-field-row :deep(.field-control.el-date-editor),
 .magic-field-row :deep(.el-date-editor),
@@ -468,11 +467,11 @@ useSectionSync(
   width: 143px !important;
 }
 .magic-field-row:hover {
-  border-color: hsl(var(--st-foreground) / 0.14);
-  box-shadow: var(--st-shadow-md);
+  border-color: hsl(var(--st-primary) / 0.2);
+  box-shadow: none;
 }
 .magic-field-row.is-hidden {
-  opacity: 0.62;
+  opacity: 0.75;
 }
 .magic-field-row.is-hidden .field-control.magic-input :deep(.el-input__wrapper) {
   background: hsl(var(--st-secondary) / 0.4);
@@ -491,8 +490,8 @@ useSectionSync(
 }
 
 .magic-drag {
-  width: 16px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -502,7 +501,7 @@ useSectionSync(
   transition: opacity 160ms ease, color 160ms ease;
 }
 .magic-field-row:hover .magic-drag { opacity: 1; color: hsl(var(--st-foreground) / 0.6); }
-.magic-drag-icon { font-size: 14px; }
+.magic-drag-icon { font-size: 20px; }
 
 .magic-icon {
   width: 20px;
@@ -511,31 +510,33 @@ useSectionSync(
   align-items: center;
   justify-content: center;
   color: hsl(var(--st-muted-foreground));
-  background: hsl(var(--st-secondary) / 0.6);
-  border: 1px solid hsl(var(--st-border));
-  border-radius: 5px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .magic-label {
-  font-size: 13px;
+  width: 80px;
+  flex: 0 0 80px;
+  font-size: 14px;
   font-weight: 500;
   color: hsl(var(--st-foreground));
   white-space: nowrap;
   letter-spacing: -0.01em;
   text-align: left;
-  padding-left: 0;
+  padding-left: 4px;
 }
 
-.field-control.magic-input { width: 100%; min-width: 0; }
+.field-control.magic-input { flex: 1; min-width: 0; }
 .magic-input :deep(.el-input__wrapper),
 .magic-input :deep(.el-date-editor.el-input__wrapper),
 :deep(.custom-field-row .el-input__wrapper) {
-  min-height: 36px;
-  height: 36px;
-  padding: 1px 10px;
+  min-height: 40px;
+  height: 40px;
+  padding: 6px 12px;
   background: hsl(var(--st-background));
-  border-radius: 0.5rem; /* 输入框 rounded-lg h-9 语义，视觉上 10px 与 magic ring 1 呼应 */
-  box-shadow: 0 0 0 1px hsl(var(--st-input)) inset, var(--st-shadow-xs);
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 0 0 1px hsl(var(--st-border)) inset;
   transition: box-shadow 160ms ease, background 160ms ease;
 }
 .magic-input :deep(.el-input__wrapper:hover) {
@@ -552,15 +553,14 @@ useSectionSync(
 .magic-input :deep(.el-input__inner::placeholder) { color: hsl(var(--st-muted)); }
 .magic-input :deep(.el-input__count) { font-size: 11px; }
 
-/* 右侧 22px eye/delete，hover 显现 — 对齐 Field 行尾 */
 .magic-action,
 .magic-delete {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9999px;
+  border-radius: 6px;
   border: 1px solid transparent;
   background: transparent;
   color: hsl(var(--st-muted-foreground));

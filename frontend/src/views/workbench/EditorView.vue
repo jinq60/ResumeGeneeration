@@ -1418,23 +1418,23 @@ onBeforeUnmount(() => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  height: calc(100vh - 64px - 16px);
-  background: hsl(48 20% 97%);
+  height: calc(100vh - 64px);
+  background: hsl(var(--st-background));
   overflow: hidden;
-  margin: 8px;
-  border-radius: 16px;
-  border: 1px solid hsl(48 10% 89%);
-  box-shadow: 0 1px 3px rgba(27,27,24,0.05);
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
 }
 
 .editor-secondary-header {
-  height: 56px;
+  height: 64px;
   flex-shrink: 0;
-  background: rgba(255,255,255,0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid hsl(48 10% 89%);
-  padding: 0 16px;
+  background: hsl(var(--st-card));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid hsl(var(--st-border));
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1490,7 +1490,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   overflow-x: hidden;
   gap: 0;
-  background: #F7F7F5;
+  background: hsl(var(--st-background));
 }
 
 .editor-tabs {

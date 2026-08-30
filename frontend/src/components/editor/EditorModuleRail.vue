@@ -121,8 +121,8 @@ function onDrop(targetId: string) {
 
 <style scoped lang="scss">
 .module-rail {
-  width: 280px;
-  flex: 0 0 280px;
+  width: 320px;
+  flex: 0 0 320px;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px;
@@ -133,8 +133,8 @@ function onDrop(targetId: string) {
   gap: 16px;
 }
 .rail-group {
-  background: hsl(48 20% 97%);
-  border: 1px solid hsl(48 10% 89%);
+  background: hsl(var(--st-card));
+  border: 1px solid hsl(var(--st-border));
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(27,27,24,0.05);
   padding: 16px;
@@ -153,9 +153,9 @@ function onDrop(targetId: string) {
 .module-card,
 .typography-button {
   width: 100%;
-  border: 1px solid hsl(48 10% 89%);
-  background: hsl(48 20% 97%);
-  border-radius: 10px;
+  border: 1px solid transparent;
+  background: hsl(var(--st-card));
+  border-radius: 8px;
   color: hsl(60 5% 10%);
   transition: all 160ms ease;
 }
@@ -164,41 +164,43 @@ function onDrop(targetId: string) {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 44px;
+  height: 40px;
   font-weight: 500;
   font-size: 14px;
-  background: white;
-  border: 2px solid hsl(60 5% 10%);
+  background: hsl(var(--st-card));
+  border: 1px solid hsl(var(--st-border));
 }
-.profile-layout-card:hover { background: hsl(48 18% 90%); }
+.profile-layout-card:hover { background: hsl(var(--st-secondary)); border-color: hsl(var(--st-primary) / 0.2); }
 .module-group { display: flex; flex-direction: column; gap: 6px; }
 .module-card {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 44px;
-  min-height: 44px;
+  height: 40px;
+  min-height: 40px;
   padding: 0 12px;
   text-align: left;
   cursor: pointer;
-  background: white;
-  box-shadow: 0 1px 2px rgba(27,27,24,0.04);
+  background: hsl(var(--st-card));
+  border: 1px solid transparent;
+  box-shadow: none;
 }
 .module-card:hover {
-  background: hsl(48 10% 92%);
-  border-color: hsl(48 10% 89%);
-  transform: scale(1.01);
+  background: hsl(var(--st-card));
+  border-color: hsl(var(--st-primary) / 0.2);
+  transform: none;
 }
 .module-card.is-active {
-  background: white;
-  border-color: hsl(60 5% 10%);
-  border-width: 2px;
+  background: hsl(var(--st-card));
+  border-color: hsl(var(--st-primary));
+  border-width: 1.5px;
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(27,27,24,0.08);
+  box-shadow: none;
 }
-.module-card.is-hidden { opacity: 0.6; }
-.drag-handle { color: hsl(60 2% 56%); font-size: 14px; opacity: 0; transition: opacity 120ms; }
-.module-card:hover .drag-handle { opacity: 1; }
+.module-card.is-hidden { opacity: 0.75; }
+.drag-handle { color: hsl(60 2% 56%); font-size: 16px; opacity: 0; transition: opacity 120ms; }
+.module-card:hover .drag-handle { opacity: 0.55; }
+.module-card:hover .drag-handle:hover { opacity: 1; }
 .module-title {
   min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 14px; font-weight: 450;
@@ -206,7 +208,7 @@ function onDrop(targetId: string) {
 .module-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 120ms; }
 .module-card:hover .module-actions { opacity: 1; }
 .module-action {
-  display: grid; place-items: center; width: 22px; height: 22px;
+  display: grid; place-items: center; width: 32px; height: 32px;
   border: 0; border-radius: 6px; background: transparent;
   color: hsl(60 2% 56%); cursor: pointer; transition: all 120ms;
 }
