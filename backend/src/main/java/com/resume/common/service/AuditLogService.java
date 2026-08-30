@@ -35,7 +35,13 @@ public class AuditLogService {
             entry.setUserId(userId);
             entry.setAction(action);
             entry.setTargetId(targetId);
-            entry.setDetail(detail == null || detail.length() <= 512 ? detail : detail.substring(0, 512));
+            if (detail != null && detail.length() > 512) {
+                // 按 codePoint 截断，避免割裂 emoji 代理对
+                int end = detail.offsetByCodePoints(0, 512);
+                entry.setDetail(detail.substring(0, end));
+            } else {
+                entry.setDetail(detail);
+            }
             entry.setCreatedAt(LocalDateTime.now());
             auditLogMapper.insert(entry);
         } catch (Exception e) {

@@ -177,15 +177,18 @@ public class TemplateService {
      */
     @Transactional(rollbackFor = Exception.class)
     public TemplateDTO createTemplate(AdminTemplateRequest request, String operatorId) {
+        // 校验配置可序列化性前置，避免已浪费一次 DB 查询
+        validateConfig(request.getConfig());
         // 查重需包含已删记录（自定义 SQL 绕过 @TableLogic）
         Template exist = findByCodeIncludingDeleted(request.getCode());
-        validateConfig(request.getConfig());
         if (exist != null) {
             if (BizConstant.NOT_DELETED.equals(exist.getDeleted())) {
                 throw new BusinessException(ResultCode.TEMPLATE_CODE_EXISTS, "模板编码已存在。");
             }
-            // 复活被逻辑删除的模板行，回收其占用的唯一索引
+            // 复活被逻辑删除的模板行，回收其占用的唯一索引；保留原创建人
+            String originalCreatedBy = exist.getCreatedBy();
             applyRequestFields(exist, request, operatorId);
+            exist.setCreatedBy(originalCreatedBy);
             exist.setStatus(BizConstant.TEMPLATE_STATUS_ACTIVE);
             exist.setVersion(exist.getVersion() == null ? 1 : exist.getVersion() + 1);
             exist.setDeleted(BizConstant.NOT_DELETED);
@@ -213,13 +216,22 @@ public class TemplateService {
         template.setDescription(request.getDescription());
         template.setConfig(request.getConfig());
         template.setHtmlTemplate(request.getHtmlTemplate());
-        template.setRenderEngine(StringUtils.defaultString(request.getRenderEngine(), BizConstant.RENDER_ENGINE_SERVER));
+        String renderEngine = request.getRenderEngine();
+        // 更新时空串应保留原值而非覆盖为 ""
+        if (StringUtils.isNotBlank(renderEngine)) {
+            template.setRenderEngine(renderEngine);
+        } else if (template.getRenderEngine() == null) {
+            template.setRenderEngine(BizConstant.RENDER_ENGINE_SERVER);
+        }
         template.setIsBuiltin(BizConstant.BUILTIN_NO);
         template.setIsPremium(BizConstant.BUILTIN_NO);
         template.setIsRecommended(request.getIsRecommended() != null && request.getIsRecommended()
                 ? BizConstant.BUILTIN_YES : BizConstant.BUILTIN_NO);
-        template.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
-        template.setCreatedBy(operatorId);
+        template.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : (template.getSortOrder() != null ? template.getSortOrder() : 0));
+        // 仅新建时设置创建人，复活时保留原值
+        if (template.getCreatedBy() == null) {
+            template.setCreatedBy(operatorId);
+        }
     }
 
     /**
@@ -242,7 +254,9 @@ public class TemplateService {
         template.setDescription(request.getDescription());
         template.setConfig(request.getConfig());
         template.setHtmlTemplate(request.getHtmlTemplate());
-        template.setRenderEngine(StringUtils.defaultString(request.getRenderEngine(), template.getRenderEngine()));
+        if (StringUtils.isNotBlank(request.getRenderEngine())) {
+            template.setRenderEngine(request.getRenderEngine());
+        }
         template.setIsRecommended(request.getIsRecommended() != null && request.getIsRecommended()
                 ? BizConstant.BUILTIN_YES : BizConstant.BUILTIN_NO);
         template.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : template.getSortOrder());
