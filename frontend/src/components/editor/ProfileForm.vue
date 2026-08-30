@@ -432,13 +432,16 @@ useSectionSync(
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 .magic-field-row .field-control.el-date-editor,
-.magic-field-row .el-date-editor,
-.magic-field-row .el-date-editor.el-input__wrapper {
-  width: 100% !important; min-width: 0 !important; max-width: 100% !important;
+.magic-field-row .el-date-editor {
+  width: 100%; min-width: 0; max-width: 240px;
   box-sizing: border-box;
 }
+.magic-field-row .el-date-editor.el-input__wrapper { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
 .magic-field-row > .field-control { max-width: 100%; min-width: 0; overflow: hidden; }
 .magic-field-row { column-gap: 8px; }
+
+/* 生日单独收窄至与其它输入同宽，避免压到眼睛（其它 el-input 为 1fr ≈216px，此处限 180 留出 36px 间隙） */
+.magic-field-row:has(.el-date-editor) .field-control.el-date-editor { max-width: 180px; width: 180px !important; }
 .magic-field-row:hover {
   border-color: hsl(var(--st-foreground) / 0.14);
   box-shadow: var(--st-shadow-md);
