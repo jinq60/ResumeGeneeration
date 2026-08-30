@@ -62,12 +62,13 @@ public class AuthController {
      */
     @PostMapping("/login/{method}")
     public R<AuthResponse> loginByMethod(@PathVariable String method,
-                                         @RequestBody Map<String, String> params) {
+                                         @RequestBody Map<String, String> params,
+                                         HttpServletRequest servletRequest) {
         AuthProvider provider = authProviderRegistry.getLoginProvider(method);
         if (!provider.isConfigured()) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "该登录方式暂未开放。");
         }
-        return R.success(provider.authenticate(params == null ? Map.of() : params));
+        return R.success(provider.authenticate(params == null ? Map.of() : params, resolveClientIp(servletRequest)));
     }
 
     /**

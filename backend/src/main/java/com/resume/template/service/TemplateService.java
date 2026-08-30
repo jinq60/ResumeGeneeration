@@ -300,8 +300,8 @@ public class TemplateService {
         templateMapper.deleteById(templateId);
     }
 
-    private void validateConfig(Object config) {
-        if (config == null) {
+    private void validateConfig(Map<String, Object> config) {
+        if (config == null || config.isEmpty()) {
             throw new BusinessException(ResultCode.TEMPLATE_CONFIG_INVALID, "模板配置为必填项。");
         }
         try {

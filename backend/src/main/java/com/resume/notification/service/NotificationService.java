@@ -114,12 +114,14 @@ public class NotificationService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void markAllRead(String userId) {
-        LambdaUpdateWrapper<Notification> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(Notification::getUserId, userId)
-                .eq(Notification::getDeleted, BizConstant.NOT_DELETED)
-                .eq(Notification::getReadFlag, 0)
-                .set(Notification::getReadFlag, 1)
-                .set(Notification::getUpdatedAt, LocalDateTime.now());
+        // 使用 UpdateWrapper 字符串列名避免 Lambda 缓存初始化问题（单元测试 mock 环境下无 MyBatis 全局配置）
+        com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Notification> wrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<>();
+        wrapper.eq("user_id", userId)
+                .eq("deleted", BizConstant.NOT_DELETED)
+                .eq("read_flag", 0)
+                .set("read_flag", 1)
+                .set("updated_at", LocalDateTime.now());
         notificationMapper.update(null, wrapper);
     }
 

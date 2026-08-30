@@ -89,9 +89,21 @@ public class PreviewController {
         if (request == null || request.getResume() == null) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "简历数据不能为空。");
         }
-        // 限制请求体大小，防止超大 JSON 消耗内存/CPU
-        if (servletRequest.getContentLengthLong() > MAX_REQUEST_BODY_BYTES) {
+        // 限制请求体大小，防止超大 JSON 消耗内存/CPU；ContentLengthLong==-1 (chunked) 时需额外校验 sections 序列化长度
+        long contentLength = servletRequest.getContentLengthLong();
+        if (contentLength > MAX_REQUEST_BODY_BYTES) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "预览数据过大。");
+        }
+        if (contentLength == -1) {
+            // chunked 场景：通过 validator 的 MAX_TOTAL_CONTENT_LENGTH 二次兜底，但此处先做粗略 JSON 长度估计
+            try {
+                String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request.getResume().getSections());
+                if (json.length() > MAX_REQUEST_BODY_BYTES) {
+                    throw new BusinessException(ResultCode.PARAM_INVALID, "预览数据过大。");
+                }
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new BusinessException(ResultCode.PARAM_INVALID, "简历数据格式错误。");
+            }
         }
         Resume resume = request.getResume();
         // 结构与长度校验（与保存/导出口径一致）

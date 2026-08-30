@@ -312,13 +312,13 @@
 
       <!-- Pagination -->
       <div
-        v-if="!loading && total > pageSize"
+        v-if="!loading && displayTotal > pageSize"
         class="flex justify-center mt-6"
       >
         <el-pagination
           v-model:current-page="page"
           v-model:page-size="pageSize"
-          :total="total"
+          :total="displayTotal"
           :page-sizes="[12, 24, 48]"
           layout="total, sizes, prev, pager, next"
           background
@@ -502,7 +502,7 @@ const tabs = [
   { label: '全部简历', value: 'all' as const }
 ]
 
-const filteredResumes = computed(() => {
+const filteredAll = computed(() => {
   let list = [...resumes.value]
   if (currentTab.value === 'recent') {
     list.sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
@@ -520,9 +520,28 @@ const filteredResumes = computed(() => {
   return list
 })
 
+const filteredResumes = computed(() => {
+  const all = filteredAll.value
+  const start = (page.value - 1) * pageSize.value
+  return all.slice(start, start + pageSize.value)
+})
+
+const displayTotal = computed(() => {
+  // 当存在客户端过滤时，总数应为过滤后总数而非服务端总数
+  if (sceneFilter.value || keyword.value.trim() || currentTab.value === 'recent') {
+    return filteredAll.value.length
+  }
+  return total.value
+})
+
 function handleSceneFilter(value: string) {
   sceneFilter.value = value
+  page.value = 1
 }
+
+watch([keyword, sceneFilter, currentTab], () => {
+  page.value = 1
+})
 
 function templateName(id?: string) {
   if (!id) return '默认'

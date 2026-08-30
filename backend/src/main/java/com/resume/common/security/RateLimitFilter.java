@@ -49,6 +49,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String ctx = request.getContextPath() == null ? "" : request.getContextPath();
+        String path = uri.startsWith(ctx) ? uri.substring(ctx.length()) : uri;
+        return path.startsWith("/actuator/health")
+                || path.startsWith("/actuator/prometheus")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/swagger-resources");
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String key = resolveKey(request);
@@ -58,6 +70,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         } else {
             log.warn("Rate limit exceeded: key={}", key);
             response.setStatus(429);
+            response.setHeader("Retry-After", String.valueOf(windowMs / 1000));
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
             response.getWriter().write(objectMapper.writeValueAsString(

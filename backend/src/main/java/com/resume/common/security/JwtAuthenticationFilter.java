@@ -39,15 +39,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
         if (StringUtils.hasText(token) && jwtTokenProvider.validateAccessToken(token)) {
             String userId = jwtTokenProvider.getUserId(token);
-            // 账号被禁用/删除后旧 token 尽快失效
+            // 账号被禁用/删除后旧 token 尽快失效；provider 为 null 仅发生在单测 slice（无 user 模块），此时放行以便测试
             UserAccountStatusProvider provider = statusProvider.getIfAvailable();
-            if (provider == null || provider.isEnabled(userId)) {
-                String role = resolveEffectiveRole(provider, userId, jwtTokenProvider.getRole(token));
-                List<GrantedAuthority> authorities = buildAuthorities(role);
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userId, token, authorities);
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            if (provider != null && !provider.isEnabled(userId)) {
+                filterChain.doFilter(request, response);
+                return;
             }
+            String role = resolveEffectiveRole(provider, userId, jwtTokenProvider.getRole(token));
+            if (role == null) {
+                // 用户不存在或已被删除（ADMIN token 降级时实际角色为 null），视为未认证
+                filterChain.doFilter(request, response);
+                return;
+            }
+            List<GrantedAuthority> authorities = buildAuthorities(role);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(userId, token, authorities);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
         }
         filterChain.doFilter(request, response);
     }
@@ -69,7 +76,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return BizConstant.USER_ROLE_USER;
         }
         String actualRole = provider.findRole(userId);
-        return actualRole != null ? actualRole : BizConstant.USER_ROLE_USER;
+        // 用户不存在（已被删除）时，旧 ADMIN token 不再以 USER 身份放行
+        return actualRole;
     }
 
     private List<GrantedAuthority> buildAuthorities(String role) {

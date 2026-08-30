@@ -17,6 +17,9 @@
 - `avatar`：头像上传与一寸照优化任务
 - `pdf`：PDF 导出任务
 - `ai`：多厂商 AI 路由、点评、JD 优化、头像优化与行内写作
+- `audit`：内容审核（admin 端审核简历/导入内容；api-changelog v2.3）
+- `delivery`：投递记录管理（用户端 + 管理端统计/CSV 导出；v2.3）
+- `notification`：通知中心（PDF/AI/头像任务事件；v2.3）
 
 ---
 
@@ -109,20 +112,29 @@ com.resume.{module}/
 common
   ├── user
   ├── template
-  ├── resume ── template (校验/预览，内部包含分享与多格式导出)
-  ├── avatar ── resume (可选回填)
-  ├── pdf ───── resume, template
-  └── ai ────── resume
+  ├── resume ─── template (校验/预览，内部包含分享与多格式导出)
+  │           └─ audit  (新建/导入时自动生成审核记录；v2.3)
+  ├── avatar ─── resume (可选回填)
+  │           └─ ai    (一寸照异步优化；v1.3 占位)
+  ├── pdf ────── resume, template
+  │           └─ notification  (导出完成事件；v2.3)
+  ├── ai ─────── resume
+  │           └─ notification  (AI 任务完成事件；v2.3)
+  ├── audit ──── common
+  ├── delivery ─ resume (校验简历归属；v2.3)
+  └── notification (事件接收方，无下游业务依赖)
 ```
 
 **规则**：
 
 - `common` 不依赖任何业务模块。
 - 业务模块可依赖 `common`。
-- `resume` 可依赖 `template`（查模板是否存在）。
-- `pdf` 可依赖 `resume`、`template`（读简历和模板数据）。
-- `avatar` 可依赖 `resume`（将优化结果回填到简历 profile.avatarUrl）。
-- `ai` 可依赖 `resume`（读取简历内容并回写 AI 任务结果）。
+- `resume` 可依赖 `template`（查模板是否存在）和 `audit`（写入审核记录）。
+- `pdf` 可依赖 `resume`、`template`（读简历和模板数据）和 `notification`（写入导出完成通知）。
+- `avatar` 可依赖 `resume`（将优化结果回填到简历 profile.avatarUrl）和 `ai`（异步任务）。
+- `ai` 可依赖 `resume`（读取简历内容并回写 AI 任务结果）和 `notification`（写入 AI 任务完成通知）。
+- `delivery` 可依赖 `resume`（校验简历归属）。
+- `audit` 仅依赖 `common`。
 - 禁止循环依赖。
 
 ---
@@ -194,6 +206,9 @@ common
 | avatar | `backend/src/main/java/com/resume/avatar/CLAUDE.md` |
 | pdf | `backend/src/main/java/com/resume/pdf/CLAUDE.md` |
 | ai | `backend/src/main/java/com/resume/ai/CLAUDE.md` |
+| audit | `backend/src/main/java/com/resume/audit/CLAUDE.md`（v2.3 引入） |
+| delivery | `backend/src/main/java/com/resume/delivery/CLAUDE.md`（v2.3 引入） |
+| notification | `backend/src/main/java/com/resume/notification/CLAUDE.md`（v2.3 引入） |
 
 ---
 

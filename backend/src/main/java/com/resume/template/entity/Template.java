@@ -21,6 +21,10 @@ public class Template {
     private String thumbnailUrl;
     private String description;
 
+    /**
+     * 模板配置 JSON。保持 Object + JacksonTypeHandler 以兼容 H2 测试库的 JSON 反序列化；
+     * Service 层 via Map 视图操作，实际落库由 JacksonTypeHandler 负责。
+     */
     @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
     private Object config;
 

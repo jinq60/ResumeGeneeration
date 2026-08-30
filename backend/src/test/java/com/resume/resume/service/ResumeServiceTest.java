@@ -56,7 +56,7 @@ class ResumeServiceTest {
 
     @BeforeEach
     void setUp() {
-        resumeSectionValidator = new ResumeSectionValidator();
+        resumeSectionValidator = new ResumeSectionValidator(new com.fasterxml.jackson.databind.ObjectMapper());
         resumeService = new ResumeService(resumeMapper, templateService,
                 pdfService, avatarService, resumeSectionValidator, auditLogService, shareService, contentAuditService);
         lenient().when(resumeMapper.updateById(any(Resume.class))).thenReturn(1);
@@ -250,16 +250,15 @@ class ResumeServiceTest {
         existing.setSections(storedSections);
         when(resumeMapper.selectById(resumeId)).thenReturn(existing);
 
-        // 库中章节非空而请求携带空数组：视为异常路径，拒绝覆盖、保留原值（防数据丢失）
+        // 库中章节非空而请求携带空数组：视为异常路径，显式抛 400 拒绝，避免静默假成功
         UpdateResumeRequest request = new UpdateResumeRequest();
         request.setTitle("我的简历");
         request.setSections(List.of());
 
-        assertDoesNotThrow(() -> resumeService.updateResume(userId, resumeId, request));
-
-        ArgumentCaptor<Resume> captor = ArgumentCaptor.forClass(Resume.class);
-        verify(resumeMapper).updateById(captor.capture());
-        assertSame(storedSections, captor.getValue().getSections());
+        com.resume.common.exception.BusinessException ex = assertThrows(com.resume.common.exception.BusinessException.class,
+                () -> resumeService.updateResume(userId, resumeId, request));
+        assertEquals(com.resume.common.constant.ResultCode.RESUME_SECTION_INVALID, ex.getErrorCode());
+        verify(resumeMapper, org.mockito.Mockito.never()).updateById(any(Resume.class));
     }
 
     private SectionDTO createSection(String type, String title, int order, Object data) {

@@ -124,14 +124,17 @@ import { useSectionSync } from '@/composables/useSectionSync'
 import AiWriterButton from './AiWriterButton.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import { plainTextToRichHtml, richTextToPlainText } from '@/utils/richText'
+import type { Section } from '@/types/resume'
 
 interface Props {
-  sections: any[]
+  sections: Section[]
   resumeId?: string
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits(['update'])
+const emit = defineEmits<{
+  (e: 'update', sections: Section[]): void
+}>()
 
 const formData = ref<{
   content: string
@@ -181,13 +184,14 @@ const templates = {
 // 从sections中提取自我介绍
 function extractIntroduction() {
   if (props.sections) {
-    const introductionSection = props.sections.find((s: any) => s.type === 'introduction')
+    const introductionSection = props.sections.find((s) => s.type === 'introduction')
     if (introductionSection && introductionSection.data) {
-      formData.value.content = introductionSection.data.content || ''
-      formData.value.contentHtml = introductionSection.data.contentHtml || plainTextToRichHtml(formData.value.content)
-      formData.value.style = introductionSection.data.style || 'concise_formal'
-      formData.value.maxWords = introductionSection.data.maxWords || 300
-      formData.value.keywords = introductionSection.data.keywords || []
+      const data = introductionSection.data
+      formData.value.content = data.content || ''
+      formData.value.contentHtml = data.contentHtml || plainTextToRichHtml(formData.value.content)
+      formData.value.style = data.style || 'concise_formal'
+      formData.value.maxWords = data.maxWords || 300
+      formData.value.keywords = data.keywords || []
       formData.value.keywordsText = formData.value.keywords.join(', ')
     }
   }
@@ -227,12 +231,12 @@ useSectionSync(
     const introductionData = {
       content: formData.value.content,
       contentHtml: formData.value.contentHtml,
-      keywords: formData.value.keywordsText ? formData.value.keywordsText.split(',').map(k => k.trim()).filter(k => k) : [],
+      keywords: formData.value.keywordsText ? formData.value.keywordsText.split(',').map((k) => k.trim()).filter((k) => k) : [],
       style: formData.value.style,
       maxWords: formData.value.maxWords
     }
 
-    emit('update', props.sections.map((section: any) => {
+    emit('update', props.sections.map((section) => {
       if (section.type === 'introduction') {
         return {
           ...section,
@@ -241,7 +245,8 @@ useSectionSync(
       }
       return section
     }))
-  }
+  },
+  () => props.sections?.find((s) => s.type === 'introduction')?.data
 )
 </script>
 

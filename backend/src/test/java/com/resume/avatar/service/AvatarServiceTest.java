@@ -62,7 +62,7 @@ class AvatarServiceTest {
 
     @BeforeEach
     void setUp() {
-        avatarService = new AvatarService(avatarTaskMapper, minioStorageService, objectMapper,
+        avatarService = new AvatarService(avatarTaskMapper, minioStorageService,
                 resumeService, aiAvatarService);
     }
 
@@ -140,5 +140,22 @@ class AvatarServiceTest {
         ArgumentCaptor<AvatarTask> captor = ArgumentCaptor.forClass(AvatarTask.class);
         verify(avatarTaskMapper).insert(captor.capture());
         assertEquals(BizConstant.TASK_STATUS_PENDING, captor.getValue().getStatus());
+    }
+
+    @Test
+    void uploadAvatar_rejectsTextFileWithImagePngContentType() throws Exception {
+        // 关键安全测试：伪造 Content-Type = image/png 但实际是 HTML/文本，
+        // 必须被魔数检测拦截（validation-rules §9.1 / security-guide §1.4）。
+        org.springframework.mock.web.MockMultipartFile fakeImage = new org.springframework.mock.web.MockMultipartFile(
+                "file",
+                "malicious.png",
+                "image/png",
+                "<html><script>alert(1)</script></html>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> avatarService.uploadAvatar("user_1", fakeImage, null));
+        assertEquals(ResultCode.AVATAR_FORMAT_UNSUPPORTED, ex.getErrorCode());
+        // 关键：未通过魔数校验，绝不能上传到 MinIO
+        verify(minioStorageService, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
     }
 }

@@ -8,14 +8,15 @@ import com.resume.common.exception.BusinessException;
 import com.resume.common.service.ResumeRenderService;
 import com.resume.resume.entity.Resume;
 import com.resume.resume.mapper.ResumeMapper;
+import com.resume.resume.service.ResumeService;
 import com.resume.resume.share.dto.ShareResponse;
 import com.resume.resume.share.entity.ResumeShare;
 import com.resume.resume.share.mapper.ResumeShareMapper;
 import com.resume.template.entity.Template;
 import com.resume.template.service.TemplateService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +33,6 @@ import java.util.Base64;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ShareService {
 
     public static final String SHARE_STATUS_ACTIVE = "active";
@@ -42,8 +42,24 @@ public class ShareService {
     private final ResumeMapper resumeMapper;
     private final ResumeRenderService resumeRenderService;
     private final TemplateService templateService;
+    /**
+     * 用 @Lazy 打破与 ResumeService 的循环（ResumeService -> ShareService.revokeByResume）。
+     * 公共 renderSharePage(token) 仍直接用 ResumeMapper（无 userId 上下文）。
+     */
+    @Lazy
+    private final ResumeService resumeService;
 
     private final SecureRandom secureRandom = new SecureRandom();
+
+    public ShareService(ResumeShareMapper resumeShareMapper, ResumeMapper resumeMapper,
+                        ResumeRenderService resumeRenderService, TemplateService templateService,
+                        @Lazy ResumeService resumeService) {
+        this.resumeShareMapper = resumeShareMapper;
+        this.resumeMapper = resumeMapper;
+        this.resumeRenderService = resumeRenderService;
+        this.templateService = templateService;
+        this.resumeService = resumeService;
+    }
 
     /**
      * 创建或轮换分享（同一简历只保留一条有效分享）。
@@ -205,17 +221,10 @@ public class ShareService {
     }
 
     /**
-     * 校验简历归属（借用 ResumeService 的访问控制）。
+     * 校验简历归属（走 ResumeService.getResumeEntity 统一访问控制，避免散落 ResumeMapper 调用）。
      */
     private void resumeServiceAccessCheck(String userId, String resumeId) {
-        // 仅做归属校验，不返回值
-        Resume resume = resumeMapper.selectById(resumeId);
-        if (resume == null || BizConstant.DELETED.equals(resume.getDeleted())) {
-            throw new BusinessException(ResultCode.RESUME_NOT_FOUND, "简历不存在。");
-        }
-        if (!userId.equals(resume.getUserId())) {
-            throw new BusinessException(ResultCode.ACCESS_DENIED, "无权访问该资源。");
-        }
+        resumeService.getResumeEntity(userId, resumeId);
     }
 
     private String generateToken() {

@@ -50,8 +50,9 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     private static final String HEADER_KEY = "Idempotency-Key";
     private static final int TTL_HOURS = 24;
     private static final Set<String> IDEMPOTENT_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
-    private static final long WAIT_TIMEOUT_MS = 5_000;
+    private static final long WAIT_TIMEOUT_MS = 30_000;
     private static final int STATUS_IN_FLIGHT = 0;
+    private static final int MAX_RESPONSE_BODY_BYTES = 64 * 1024;
 
     private final IdempotencyRecordMapper idempotencyRecordMapper;
     private final ObjectMapper objectMapper;
@@ -146,10 +147,23 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
     private void replay(IdempotencyRecord record, HttpServletResponse response) throws IOException {
         log.debug("Idempotency key replay: key={}", record.getIdempotencyKey());
-        response.setStatus(record.getResponseStatus());
+        Integer status = record.getResponseStatus();
+        if (status == null || status <= STATUS_IN_FLIGHT || status < 100 || status > 599) {
+            log.warn("Invalid idempotency status, not replaying: key={} status={}", record.getIdempotencyKey(), status);
+            response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            response.getWriter().write(objectMapper.writeValueAsString(R.error(ResultCode.INTERNAL_ERROR, "幂等记录异常，请重试。")));
+            return;
+        }
+        response.setStatus(status);
         response.setContentType(record.getResponseContentType());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write(record.getResponseBody());
+        String body = record.getResponseBody() != null ? record.getResponseBody() : "";
+        if (body.length() > MAX_RESPONSE_BODY_BYTES) {
+            body = body.substring(0, MAX_RESPONSE_BODY_BYTES);
+        }
+        response.getWriter().write(body);
     }
 
     /**
@@ -166,19 +180,35 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
     private IdempotencyRecord waitForCompletion(String scopedKey) {
         CompletableFuture<IdempotencyRecord> future = inFlight.get(scopedKey);
-        if (future == null) {
-            return null;
+        if (future != null) {
+            try {
+                IdempotencyRecord result = future.get(WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                if (result != null) {
+                    return result;
+                }
+            } catch (TimeoutException e) {
+                // 本地等待超时，降级为 DB 轮询（跨实例场景）
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+            } catch (ExecutionException e) {
+                return null;
+            }
         }
-        try {
-            return future.get(WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
-            return null;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return null;
-        } catch (ExecutionException e) {
-            return null;
+        // 跨实例降级：轮询 DB 最多 5 次，每次 500ms
+        for (int i = 0; i < 5; i++) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return null;
+            }
+            IdempotencyRecord polled = idempotencyRecordMapper.selectById(scopedKey);
+            if (polled != null && polled.getResponseStatus() != null && polled.getResponseStatus() > STATUS_IN_FLIGHT) {
+                return polled;
+            }
         }
+        return null;
     }
 
     private boolean claim(String scopedKey, String userId, HttpServletRequest request) {
@@ -205,6 +235,10 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     private IdempotencyRecord complete(String scopedKey, int status, ContentCachingResponseWrapper wrapped) {
         try {
             byte[] body = wrapped.getContentAsByteArray();
+            if (body.length > MAX_RESPONSE_BODY_BYTES) {
+                log.warn("Idempotency response too large, truncating: key={} size={}", scopedKey, body.length);
+                body = java.util.Arrays.copyOf(body, MAX_RESPONSE_BODY_BYTES);
+            }
             IdempotencyRecord record = new IdempotencyRecord();
             record.setIdempotencyKey(scopedKey);
             record.setResponseStatus(status);

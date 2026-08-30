@@ -192,7 +192,12 @@ public class ResumeRenderService {
             return null;
         }
         try (InputStream in = resource.getInputStream()) {
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            byte[] bytes = in.readAllBytes();
+            if (bytes.length > 512 * 1024) {
+                log.warn("Template skeleton too large, fallback to builtin: {} size={}", path, bytes.length);
+                return null;
+            }
+            return new String(bytes, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.warn("Read template skeleton failed: {}", path, e);
             return null;
@@ -209,18 +214,20 @@ public class ResumeRenderService {
         String pageMargin = settings.getPagePadding() != null
                 ? cssNumber(settings.getPagePadding()) + "mm"
                 : getString(page, "margin", "20mm");
-        String fontFamily = settings.getFontFamily() != null
+        String rawFontFamily = settings.getFontFamily() != null
                 ? settings.getFontFamily()
                 : getString(font, "family", RenderSettings.DEFAULT_FONT_FAMILY);
+        String fontFamily = sanitizeFontFamily(rawFontFamily);
         String mainFontSize = settings.getBaseFontSize() != null
                 ? cssNumber(settings.getBaseFontSize()) + "pt"
                 : getString(font, "mainSize", "10.5pt");
         String lineHeight = settings.getLineHeight() != null
                 ? cssNumber(settings.getLineHeight())
                 : getString(font, "lineHeight", "1.5");
-        String accentColor = settings.getAccentColor() != null
+        String rawAccent = settings.getAccentColor() != null
                 ? settings.getAccentColor()
                 : getString(color, "accent", "#1a5276");
+        String accentColor = sanitizeHexColor(rawAccent);
         String sectionSpacing = settings.getSectionSpacing() != null
                 ? cssNumber(settings.getSectionSpacing()) + "px"
                 : getString(config, "moduleSpacing", "16px");
@@ -293,9 +300,10 @@ public class ResumeRenderService {
 
     private String buildOverrideCss(RenderSettings settings) {
         StringBuilder override = new StringBuilder();
-        if (settings.getFontFamily() != null) {
+        String safeFont = sanitizeFontFamily(settings.getFontFamily());
+        if (safeFont != null) {
             override.append("body, .resume-page { font-family: ")
-                    .append(settings.getFontFamily()).append(" !important; }\n");
+                    .append(safeFont).append(" !important; }\n");
         }
         if (settings.getBaseFontSize() != null) {
             override.append(".resume-page { font-size: ")
@@ -313,13 +321,14 @@ public class ResumeRenderService {
             override.append(".section { margin-bottom: ")
                     .append(cssNumber(settings.getSectionSpacing())).append("px !important; }\n");
         }
-        if (settings.getAccentColor() != null) {
+        String safeAccent = sanitizeHexColor(settings.getAccentColor());
+        if (safeAccent != null) {
             override.append(".section-title, .rich-text a { color: ")
-                    .append(settings.getAccentColor()).append(" !important; }\n")
+                    .append(safeAccent).append(" !important; }\n")
                     .append(".section-title { border-color: ")
-                    .append(settings.getAccentColor()).append(" !important; }\n")
+                    .append(safeAccent).append(" !important; }\n")
                     .append(".resume-page { --resume-accent-color: ")
-                    .append(settings.getAccentColor()).append("; }\n");
+                    .append(safeAccent).append("; }\n");
         }
         return override.toString();
     }
@@ -329,6 +338,28 @@ public class ResumeRenderService {
             return "0";
         }
         return value % 1 == 0 ? String.valueOf(value.intValue()) : String.valueOf(value);
+    }
+
+    private static String sanitizeHexColor(String color) {
+        if (color == null) {
+            return null;
+        }
+        String trimmed = color.trim();
+        return trimmed.matches("^#[0-9a-fA-F]{6}$") ? trimmed : null;
+    }
+
+    private static String sanitizeFontFamily(String fontFamily) {
+        if (fontFamily == null) {
+            return null;
+        }
+        // 仅允许 RenderSettings 白名单中的字体（防御模板配置投毒）
+        java.util.Set<String> allowed = java.util.Set.of(
+                RenderSettings.DEFAULT_FONT_FAMILY,
+                "Arial, sans-serif",
+                "\"Source Han Sans SC\", \"Noto Sans SC\", sans-serif",
+                "\"SimSun\", serif"
+        );
+        return allowed.contains(fontFamily) ? fontFamily : null;
     }
 
     private String renderSection(SectionDTO section, RenderOptions options) {

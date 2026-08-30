@@ -229,17 +229,14 @@ public class ResumeService {
             resume.setTemplateId(request.getTemplateId());
         }
         if (request.getSections() != null) {
-            // 防护：当前产品没有"清空全部章节"的功能。若请求携带空 sections 而库中已有内容，
-            // 视为上游异常路径（如 TypeHandler 反序列化失败被静默吞掉后回传），拒绝覆盖，
-            // 保留库中原值并记 error 日志，防止把空数组写回 DB 造成不可逆数据丢失。
             if (request.getSections().isEmpty()
                     && resume.getSections() != null && !resume.getSections().isEmpty()) {
                 log.error("Rejected update with empty sections to protect existing data: userId={}, resumeId={}",
                         userId, resumeId);
-            } else {
-                resumeSectionValidator.validateDraft(request.getSections());
-                resume.setSections(request.getSections());
+                throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "简历模块不能为空。");
             }
+            resumeSectionValidator.validateDraft(request.getSections());
+            resume.setSections(request.getSections());
         }
         if (request.getRenderSettings() != null) {
             resume.setRenderSettings(RenderSettings.sanitized(request.getRenderSettings()));
@@ -299,7 +296,18 @@ public class ResumeService {
         copy.setTargetPosition(source.getTargetPosition());
         copy.setTargetIndustry(source.getTargetIndustry());
         copy.setTemplateId(source.getTemplateId());
-        copy.setSections(source.getSections());
+        // 深拷贝 sections，避免与源对象共享同一 List/Map 引用导致事务内污染
+        if (source.getSections() != null) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                String json = om.writeValueAsString(source.getSections());
+                java.util.List<com.resume.resume.dto.SectionDTO> copied = om.readValue(json,
+                        om.getTypeFactory().constructCollectionType(java.util.List.class, com.resume.resume.dto.SectionDTO.class));
+                copy.setSections(copied);
+            } catch (Exception e) {
+                copy.setSections(new java.util.ArrayList<>(source.getSections()));
+            }
+        }
         copy.setRenderSettings(RenderSettings.copyOf(source.getRenderSettings()));
         copy.setStatus(BizConstant.RESUME_STATUS_ACTIVE);
         copy.setDeleted(BizConstant.NOT_DELETED);
@@ -421,7 +429,7 @@ public class ResumeService {
     }
 
     private void validateScene(String scene) {
-        if (StringUtils.isBlank(scene) || !Arrays.asList(BizConstant.SCENES).contains(scene)) {
+        if (StringUtils.isBlank(scene) || !BizConstant.SCENES.contains(scene)) {
             throw new BusinessException(ResultCode.RESUME_SCENE_INVALID, "使用场景不正确。");
         }
     }
@@ -457,7 +465,7 @@ public class ResumeService {
 
     private SectionDTO createSection(String type, String title, int order, Object data) {
         SectionDTO section = new SectionDTO();
-        section.setId("sec_" + System.currentTimeMillis() + "_" + order);
+        section.setId("sec_" + java.util.UUID.randomUUID().toString().replace("-", "") + "_" + order);
         section.setType(type);
         section.setTitle(title);
         section.setOrder(order);

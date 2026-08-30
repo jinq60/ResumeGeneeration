@@ -170,18 +170,18 @@ async function handleLogout() {
 
 <style scoped lang="scss">
 .app-sidebar {
-  width: var(--st-sidebar-current-width, 220px);
+  width: var(--st-sidebar-current-width, 240px);
   height: 100vh;
   position: fixed;
   left: 0;
   top: 0;
-  background: var(--st-surface-container-lowest);
+  background: #FFFFFF;
   color: var(--st-on-surface);
   display: flex;
   flex-direction: column;
   z-index: 40;
-  border-right: 1px solid var(--st-outline-variant);
-  transition: width 180ms ease, transform 180ms ease;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 200ms ease;
 }
 
 .sidebar-collapse-toggle {
@@ -207,16 +207,17 @@ async function handleLogout() {
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: var(--st-stack-md);
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--st-outline-variant);
+  gap: 12px;
+  height: 64px;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .sidebar-brand-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--st-radius-lg);
-  background: var(--st-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #171717;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -224,41 +225,42 @@ async function handleLogout() {
 
 .sidebar-brand-name {
   font-weight: 600;
-  font-size: 16px;
-  letter-spacing: -0.01em;
-  color: var(--st-on-surface);
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  color: #171717;
 }
 
 .sidebar-nav {
   flex: 1;
-  padding: 12px 8px;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   overflow-y: auto;
 }
 
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: var(--st-stack-md);
-  padding: 10px 12px;
-  border-radius: var(--st-radius-md);
+  gap: 12px;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 500;
-  color: var(--st-on-surface-variant);
-  transition: all 0.2s ease;
+  font-weight: 450;
+  color: #666666;
+  transition: background 180ms ease, color 180ms ease;
   text-decoration: none;
 
   &:hover {
-    color: var(--st-on-surface);
-    background: var(--st-surface-container-low);
+    color: #171717;
+    background: rgba(0, 0, 0, 0.04);
   }
 
   &.is-active {
-    color: var(--st-primary);
-    background: var(--st-primary-container);
-    font-weight: 600;
+    color: #171717;
+    background: rgba(0, 0, 0, 0.06);
+    font-weight: 500;
   }
 }
 

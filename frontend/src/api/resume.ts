@@ -20,6 +20,13 @@ export interface UpdateResumeRequest {
   version?: number
 }
 
+/**
+ * 分页响应。
+ *
+ * 后端实际返回 MyBatis-Plus 风格：`records/total/size/current/pages`。
+ * api-spec §12 写的是 `list/total/page/size/pages`（spring-data 风格）。
+ * 后端目前是前者；类型以实际响应为准，等后端统一切换后再回写 spec。
+ */
 export interface Page<T> {
   records: T[]
   total: number
@@ -73,6 +80,23 @@ export interface SectionOptimization {
   reasoning: string
 }
 
+export interface ResumeReviewSuggestion {
+  sectionType?: string
+  title: string
+  problem: string
+  advice: string
+  priority: 'high' | 'medium' | 'low' | string
+}
+
+export interface ResumeReviewResult {
+  reviewId: string
+  overallScore: number
+  dimensionScores: Record<string, number>
+  suggestions: ResumeReviewSuggestion[]
+  highlights: string[]
+  createdAt: string
+}
+
 export interface ResumeOptimizeResult {
   taskId: string
   resumeId: string
@@ -111,11 +135,11 @@ export const resumeApi = {
   rename(id: string, title: string): Promise<Resume> {
     return request.put(`/resumes/${id}/title`, { title }) as Promise<Resume>
   },
-  review(id: string, data: { jobDescription: string }): Promise<any> {
-    return request.post(`/resumes/${id}/reviews`, data) as Promise<any>
+  review(id: string, data: { jobDescription?: string; focusAreas?: string[] }): Promise<{ reviewId: string; resumeId: string; createdAt: string }> {
+    return request.post(`/resumes/${id}/reviews`, data) as Promise<{ reviewId: string; resumeId: string; createdAt: string }>
   },
-  getLatestReview(id: string): Promise<any> {
-    return request.get(`/resumes/${id}/reviews/latest`) as Promise<any>
+  getLatestReview(id: string): Promise<ResumeReviewResult | null> {
+    return request.get(`/resumes/${id}/reviews/latest`) as Promise<ResumeReviewResult | null>
   },
   createOptimizeTask(id: string, data: ResumeOptimizeRequest): Promise<{ taskId: string; resumeId: string; status: string }> {
     return request.post(`/resumes/${id}/optimize`, data) as Promise<{ taskId: string; resumeId: string; status: string }>

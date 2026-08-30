@@ -1,12 +1,15 @@
 package com.resume.avatar.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * 头像优化任务实体。
@@ -25,7 +28,12 @@ public class AvatarTask {
     private String backgroundType;
     private String style;
 
-    private String options;
+    /**
+     * 优化选项：keepIdentity / enhanceQuality / removeBackground / brightenSkin 等布尔键值对。
+     * data-model-and-ddl.md §4.4 要求使用 TypeHandler 强类型映射，禁止手动 JSON 序列化。
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Map<String, Object> options;
 
     private String status;
     private String errorMsg;

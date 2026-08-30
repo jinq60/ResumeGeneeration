@@ -18,6 +18,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -108,15 +109,25 @@ public class SecurityConfig {
                 }))
             // 链内顺序：JWT 认证 → 限流 → 幂等 → UsernamePasswordAuthenticationFilter。
             // JWT 必须先于限流执行，使限流能按已认证的 userId 计数（见 RateLimitFilter.resolveKey）。
+            // 注意：addFilterBefore 多次以同一锚点插入时，后插入者更靠近锚点（更先执行），
+            // 故不能连续三次 addFilterBefore(..., UsernamePassword)，否则实际顺序为 Idempotency→RateLimit→Jwt。
+            // 此处采用 addFilterBefore + addFilterAfter 保证声明顺序即执行顺序。
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-            // 幂等过滤器必须在认证之后执行，防止重放绕过 JWT 校验
-            .addFilterAfter(idempotencyFilter, JwtAuthenticationFilter.class)
+            .addFilterAfter(rateLimitFilter, JwtAuthenticationFilter.class)
+            .addFilterAfter(idempotencyFilter, RateLimitFilter.class)
+            // 全局安全头（API 与静态资源均生效，StaticResourceController 另有细化 CSP）
+            .headers(headers -> headers
+                    .frameOptions(frame -> frame.deny())
+                    .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                    .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+            )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**", "/templates", "/templates/**").permitAll()
+                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/templates", "/templates/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/share/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                .requestMatchers("/uploads/**", "/templates/**", "/share/**").permitAll()
+                .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                 .anyRequest().authenticated()
             );
@@ -130,10 +141,15 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .toList();
+        if (origins.contains("*") && origins.size() == 1) {
+            throw new IllegalStateException("CORS allowedOrigins cannot be '*' when allowCredentials is true");
+        }
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Idempotency-Key", "X-Trace-Id"));
+        configuration.setExposedHeaders(List.of("Content-Disposition"));
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

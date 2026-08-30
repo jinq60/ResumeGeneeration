@@ -1,7 +1,5 @@
 package com.resume.ai.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.ai.config.AiPromptTemplates;
 import com.resume.ai.config.AiProperties;
 import com.resume.ai.dto.AiChatRequest;
@@ -54,7 +52,6 @@ public class AiAvatarService {
     private final ProviderRouter providerRouter;
     private final AiPromptTemplates promptTemplates;
     private final MinioStorageService minioStorageService;
-    private final ObjectMapper objectMapper;
     @Lazy
     private final ResumeService resumeService;
     private final com.resume.notification.service.NotificationService notificationService;
@@ -203,23 +200,15 @@ public class AiAvatarService {
     }
 
     /**
-     * 将 AI 返回的优化描述合并进任务 options JSON，供前端展示。
+     * 将 AI 返回的优化描述合并进任务 options（Map），供前端展示。
+     * AvatarTask.options 已改为 Map<String, Object> + JacksonTypeHandler，
+     * 直接读写 Map 即可，MyBatis-Plus 会负责 JSON 序列化。
      */
     private void mergeAiDescription(AvatarTask task, String description) {
-        Map<String, Object> options;
-        try {
-            options = StringUtils.isNotBlank(task.getOptions())
-                    ? objectMapper.readValue(task.getOptions(), new TypeReference<Map<String, Object>>() {
-                    })
-                    : new java.util.HashMap<>();
-        } catch (Exception e) {
-            options = new java.util.HashMap<>();
-        }
+        Map<String, Object> options = task.getOptions() != null
+                ? task.getOptions()
+                : new java.util.HashMap<>();
         options.put("aiDescription", description == null ? "" : description);
-        try {
-            task.setOptions(objectMapper.writeValueAsString(options));
-        } catch (Exception e) {
-            log.warn("Serialize avatar options failed: {}", e.getMessage());
-        }
+        task.setOptions(options);
     }
 }

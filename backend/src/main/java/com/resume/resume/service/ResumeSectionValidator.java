@@ -1,15 +1,15 @@
 package com.resume.resume.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
-import com.resume.common.enums.SectionType;
 import com.resume.common.exception.BusinessException;
 import com.resume.common.service.RichTextSanitizer;
 import com.resume.resume.dto.SectionDTO;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +26,10 @@ import java.util.regex.Pattern;
  * </ul>
  */
 @Component
+@RequiredArgsConstructor
 public class ResumeSectionValidator {
+
+    private final ObjectMapper objectMapper;
 
     private static final Pattern PHONE = Pattern.compile("^1[3-9]\\d{9}$");
     private static final Pattern EMAIL = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
@@ -78,13 +81,16 @@ public class ResumeSectionValidator {
                     || section.getOrder() < 0 || section.getVisible() == null || section.getData() == null) {
                 throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "简历模块数据不正确。");
             }
-            if (!Arrays.asList(BizConstant.SECTION_TYPES).contains(section.getType())) {
+            if (!BizConstant.SECTION_TYPES.contains(section.getType())) {
                 throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "模块类型不正确。");
             }
             if (!ids.add(section.getId())) {
                 throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "模块 ID 重复。");
             }
-            if (section.getData() != null) {
+            try {
+                String json = objectMapper.writeValueAsString(section);
+                totalContentLength += json.length();
+            } catch (Exception e) {
                 totalContentLength += section.getData().toString().length();
             }
             if (totalContentLength > MAX_TOTAL_CONTENT_LENGTH) {
@@ -120,7 +126,7 @@ public class ResumeSectionValidator {
             throw new BusinessException(ResultCode.RESUME_PROFILE_NAME_REQUIRED, "姓名格式不正确。");
         }
 
-        validateEnumIfPresent(profile, "gender", Arrays.asList(BizConstant.GENDERS), "性别格式不正确。");
+        validateEnumIfPresent(profile, "gender", BizConstant.GENDERS, "性别格式不正确。");
         validatePatternIfPresent(profile, "birthDate", YYYY_MM, "出生年月格式不正确。");
         validatePhoneIfPresent(profile);
         validateEmailIfPresent(profile, "email");
@@ -195,7 +201,7 @@ public class ResumeSectionValidator {
             validateStringIfPresent(item, "company", 128, "公司名称过长。", strict, ResultCode.RESUME_SECTION_INVALID, "公司名称为必填项。");
             validateStringIfPresent(item, "department", 64, "部门名称过长。", false, 0, null);
             validateStringIfPresent(item, "position", 64, "职位描述过长。", strict, ResultCode.RESUME_SECTION_INVALID, "职位为必填项。");
-            validateEnumIfPresent(item, "type", Arrays.asList(BizConstant.WORK_TYPES), "工作类型不正确。");
+            validateEnumIfPresent(item, "type", BizConstant.WORK_TYPES, "工作类型不正确。");
             validateStringIfPresent(item, "city", 50, "工作城市过长。", false, 0, null);
             validateDateRange(item, "入职时间格式不正确。", "离职时间格式不正确。");
             validateRichTextList(item, "description", "descriptionHtml", 1, 8, 200, 1600, strict,
@@ -220,7 +226,7 @@ public class ResumeSectionValidator {
             Map<String, Object> item = (Map<String, Object>) obj;
             validateStringIfPresent(item, "name", 128, "项目名称过长。", strict, ResultCode.RESUME_SECTION_INVALID, "项目名称为必填项。");
             validateStringIfPresent(item, "role", 64, "项目角色描述过长。", false, 0, null);
-            validateEnumIfPresent(item, "type", Arrays.asList(BizConstant.PROJECT_TYPES), "项目类型不正确。");
+            validateEnumIfPresent(item, "type", BizConstant.PROJECT_TYPES, "项目类型不正确。");
             validateDateRange(item, "项目开始时间格式不正确。", "项目结束时间格式不正确。");
             validateStringArray(item, "techStack", 32, "技术栈标签过长。");
             validateStringIfPresent(item, "background", 500, "项目背景描述过长。", false, 0, null);
@@ -248,7 +254,7 @@ public class ResumeSectionValidator {
                 throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "技能项数据格式不正确。");
             }
             Map<String, Object> item = (Map<String, Object>) obj;
-            validateEnumIfPresent(item, "category", Arrays.asList(BizConstant.SKILL_CATEGORIES), "技能分类不正确。");
+            validateEnumIfPresent(item, "category", BizConstant.SKILL_CATEGORIES, "技能分类不正确。");
 
             Object rawItems = item.get("items");
             if (!(rawItems instanceof List)) {
@@ -270,7 +276,7 @@ public class ResumeSectionValidator {
                 }
                 Map<String, Object> skill = (Map<String, Object>) skillObj;
                 validateStringIfPresent(skill, "name", 64, "技能名称过长。", strict, ResultCode.RESUME_SECTION_INVALID, "技能名称为必填项。");
-                validateEnumIfPresent(skill, "level", Arrays.asList(BizConstant.SKILL_LEVELS), "熟练程度不正确。");
+                validateEnumIfPresent(skill, "level", BizConstant.SKILL_LEVELS, "熟练程度不正确。");
             }
         }
     }
@@ -289,7 +295,7 @@ public class ResumeSectionValidator {
         }
         validateRichTextIfPresent(item, "contentHtml", 500, "自我介绍富文本过长。");
         validateStringArray(item, "keywords", 20, "关键词过长。");
-        validateEnumIfPresent(item, "style", Arrays.asList(BizConstant.INTRODUCTION_STYLES), "自我介绍风格不正确。");
+        validateEnumIfPresent(item, "style", BizConstant.INTRODUCTION_STYLES, "自我介绍风格不正确。");
 
         Object maxWords = item.get("maxWords");
         if (maxWords instanceof Number n && n.intValue() > 500) {
@@ -350,6 +356,13 @@ public class ResumeSectionValidator {
     private void validateUrlIfPresent(Map<String, Object> map, String key) {
         String value = getString(map, key);
         if (StringUtils.isBlank(value)) {
+            return;
+        }
+        // 站内相对路径 /uploads/** 来自头像上传，视为合法（避免头像回填后保存校验失败）
+        if (value.startsWith("/uploads/")) {
+            if (value.length() > 512) {
+                throw new BusinessException(ResultCode.RESUME_PROFILE_URL_INVALID, "请输入正确的网址格式。");
+            }
             return;
         }
         if (value.length() > 512 || !URL.matcher(value).matches()) {
@@ -420,12 +433,12 @@ public class ResumeSectionValidator {
                                       boolean required, String requiredMessage, String listTooLongMessage,
                                       String richTextTooLongMessage) {
         String richText = getString(item, htmlKey);
-        if (StringUtils.isNotBlank(RichTextSanitizer.toPlainText(richText))) {
+        boolean hasRich = StringUtils.isNotBlank(RichTextSanitizer.toPlainText(richText));
+        if (hasRich) {
             validateRichTextIfPresent(item, htmlKey, richTextMaxLength, richTextTooLongMessage);
-            return;
         }
         validateStringList(item, listKey, minSize, maxSize, itemMaxLength,
-                required, requiredMessage, listTooLongMessage);
+                required && !hasRich, requiredMessage, listTooLongMessage);
     }
 
     @SuppressWarnings("unchecked")

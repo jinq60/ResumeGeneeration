@@ -37,16 +37,17 @@ public class NotificationController {
         return R.success(Map.of("count", notificationService.unreadCount(userId)));
     }
 
+    // 字面量 /read-all 必须优先于 /{id}/read，避免 Spring 将 "read-all" 误作 {id}
+    @PutMapping("/read-all")
+    public R<Void> markAllRead(@AuthenticationPrincipal String userId) {
+        notificationService.markAllRead(userId);
+        return R.success();
+    }
+
     @PutMapping("/{id}/read")
     public R<Void> markRead(@AuthenticationPrincipal String userId,
                             @PathVariable String id) {
         notificationService.markRead(userId, id);
-        return R.success();
-    }
-
-    @PutMapping("/read-all")
-    public R<Void> markAllRead(@AuthenticationPrincipal String userId) {
-        notificationService.markAllRead(userId);
         return R.success();
     }
 

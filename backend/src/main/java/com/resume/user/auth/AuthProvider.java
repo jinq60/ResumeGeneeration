@@ -26,6 +26,14 @@ public interface AuthProvider {
     AuthResponse authenticate(Map<String, String> params);
 
     /**
+     * 执行认证（带客户端 IP，用于 IP 维度限流/喷洒防御）。
+     * 默认委托不带 IP 的实现，Password 等需 IP 维度的提供商应重写。
+     */
+    default AuthResponse authenticate(Map<String, String> params, String clientIp) {
+        return authenticate(params);
+    }
+
+    /**
      * 是否已配置可用（未配置时返回降级结果）。
      */
     default boolean isConfigured() {

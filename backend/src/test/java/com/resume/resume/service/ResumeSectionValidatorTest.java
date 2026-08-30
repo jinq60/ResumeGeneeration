@@ -18,7 +18,7 @@ class ResumeSectionValidatorTest {
 
     @BeforeEach
     void setUp() {
-        validator = new ResumeSectionValidator();
+        validator = new ResumeSectionValidator(new com.fasterxml.jackson.databind.ObjectMapper());
     }
 
     @Test

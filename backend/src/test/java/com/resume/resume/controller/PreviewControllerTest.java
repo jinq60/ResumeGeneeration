@@ -71,7 +71,7 @@ class PreviewControllerTest {
         Template template = new Template();
         template.setId("template_classic_single");
         template.setCode("template_classic_single");
-        template.setConfig("{}");
+        template.setConfig(java.util.Map.of());
         template.setHtmlTemplate("classic_single");
 
         PreviewResumeRequest request = new PreviewResumeRequest();

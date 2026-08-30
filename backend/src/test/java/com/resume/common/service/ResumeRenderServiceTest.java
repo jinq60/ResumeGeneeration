@@ -51,7 +51,7 @@ class ResumeRenderServiceTest {
         template.setId("template_1");
         // htmlTemplate 留空 -> 触发回退到内置单栏渲染器
         template.setHtmlTemplate(null);
-        template.setConfig("{}");
+        template.setConfig(Map.of());
 
         String html = renderService.render(resume, template);
 
@@ -90,7 +90,7 @@ class ResumeRenderServiceTest {
         template.setId("template_classic_single");
         // 指向 classpath:templates/resume/classic-single.html
         template.setHtmlTemplate("classic-single");
-        template.setConfig("{\"color\":{\"primary\":\"#333333\",\"accent\":\"#1a5276\"}}");
+        template.setConfig(Map.of("color", Map.of("primary", "#333333", "accent", "#1a5276")));
 
         String html = renderService.render(resume, template);
 
@@ -123,7 +123,7 @@ class ResumeRenderServiceTest {
 
         Template template = new Template();
         template.setHtmlTemplate(null);
-        template.setConfig("{}");
+        template.setConfig(Map.of());
 
         String html = renderService.render(resume, template);
 
@@ -148,7 +148,7 @@ class ResumeRenderServiceTest {
 
         Template template = new Template();
         template.setHtmlTemplate(null);
-        template.setConfig("{}");
+        template.setConfig(Map.of());
 
         String html = renderService.render(resume, template);
 
@@ -173,7 +173,7 @@ class ResumeRenderServiceTest {
 
         Template template = new Template();
         template.setHtmlTemplate(null);
-        template.setConfig("{}");
+        template.setConfig(Map.of());
 
         String html = renderService.render(resume, template);
 
@@ -205,7 +205,7 @@ class ResumeRenderServiceTest {
 
         Template template = new Template();
         template.setHtmlTemplate(null);
-        template.setConfig("{}");
+        template.setConfig(Map.of());
 
         String html = renderService.render(resume, template);
 
@@ -231,7 +231,7 @@ class ResumeRenderServiceTest {
 
         Template template = new Template();
         template.setHtmlTemplate(null);
-        template.setConfig("{}");
+        template.setConfig(Map.of());
 
         String html = renderService.render(resume, template);
 

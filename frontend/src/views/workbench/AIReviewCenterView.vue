@@ -56,24 +56,24 @@
         </p>
 
         <div class="mt-stack-lg flex flex-col gap-2">
-          <label class="text-label-md font-bold text-on-surface-variant">
+          <label class="text-[13px] font-medium text-[#171717]">
             选择简历
           </label>
-          <select
+          <el-select
             v-model="selectedResumeId"
-            class="w-full h-[42px] bg-surface-container-low border border-outline-variant rounded-lg px-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+            placeholder="请选择要点评的简历"
+            class="w-full"
+            style="--el-border-color: rgba(0,0,0,0.08); --el-fill-color-blank: #FFFFFF;"
+            size="large"
           >
-            <option value="">
-              请选择要点评的简历
-            </option>
-            <option
+            <el-option label="请选择要点评的简历" value="" disabled />
+            <el-option
               v-for="resume in resumes"
               :key="resume.id"
+              :label="resume.title"
               :value="resume.id"
-            >
-              {{ resume.title }}
-            </option>
-          </select>
+            />
+          </el-select>
           <p
             v-if="!loading && resumes.length === 0"
             class="text-body-md text-on-surface-variant"

@@ -52,8 +52,22 @@ public class MinioConfig {
     @Bean
     public MinioClient minioClient() {
         if (endpoint == null || endpoint.isBlank()) {
-            log.warn("app.minio.endpoint not configured -> MinIO disabled; file upload/download will fail at runtime");
-            endpoint = "http://localhost:9000";
+            throw new IllegalStateException(
+                    "MinIO endpoint must be configured via app.minio.endpoint (env: APP_MINIO_ENDPOINT). "
+                            + "Local dev should set it in application-dev.yml (e.g. http://localhost:9000).");
+        }
+        // 校验 URL 合法性，避免 ftp:// 等非法协议在运行时才暴露
+        try {
+            java.net.URI uri = java.net.URI.create(endpoint.trim());
+            String scheme = uri.getScheme();
+            if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+                throw new IllegalStateException("MinIO endpoint must be http(s) URL: " + endpoint);
+            }
+            if (uri.getHost() == null) {
+                throw new IllegalStateException("MinIO endpoint must contain host: " + endpoint);
+            }
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("Invalid MinIO endpoint: " + endpoint, e);
         }
         // 凭据缺失必须显式报错，禁止静默回退到众所周知的 minioadmin/minioadmin 掩盖配置错误；
         // 本地开发可在 application-dev.yml 中显式声明默认值

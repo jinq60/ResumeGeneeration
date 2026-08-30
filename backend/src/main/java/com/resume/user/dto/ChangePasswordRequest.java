@@ -12,6 +12,7 @@ import lombok.Data;
 public class ChangePasswordRequest {
 
     @NotBlank(message = "当前密码为必填项。")
+    @Size(min = 1, max = 72, message = "当前密码长度不能超过 72 位。")
     private String oldPassword;
 
     @NotBlank(message = "新密码为必填项。")

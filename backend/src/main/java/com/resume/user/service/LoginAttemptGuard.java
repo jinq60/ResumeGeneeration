@@ -51,27 +51,32 @@ public class LoginAttemptGuard {
     @Autowired(required = false)
     private ObjectProvider<RedisTemplate<String, String>> redisTemplateProvider;
 
+    private String normalizeAccount(String account) {
+        return account == null ? null : account.trim().toLowerCase();
+    }
+
     /**
      * 账号是否处于锁定状态。
      */
     public boolean isLocked(String account) {
-        if (account == null) {
+        String key = normalizeAccount(account);
+        if (key == null || key.isEmpty()) {
             return false;
         }
         RedisTemplate<String, String> redis = redis();
         if (redis != null) {
             try {
-                return Boolean.TRUE.equals(redis.hasKey(LOCK_KEY_PREFIX + account));
+                return Boolean.TRUE.equals(redis.hasKey(LOCK_KEY_PREFIX + key));
             } catch (Exception e) {
                 log.warn("Redis check login lock failed, fallback to memory: {}", e.getMessage());
             }
         }
-        AttemptState state = states.get(account);
+        AttemptState state = states.get(key);
         if (state == null) {
             return false;
         }
         if (state.lockUntil != null && System.currentTimeMillis() >= state.lockUntil) {
-            states.remove(account);
+            states.remove(key);
             return false;
         }
         return state.failures >= maxFailures;
@@ -108,21 +113,22 @@ public class LoginAttemptGuard {
      * 记录一次登录失败；达到上限时触发锁定。
      */
     public void recordFailure(String account) {
-        if (account == null) {
+        String key = normalizeAccount(account);
+        if (key == null || key.isEmpty()) {
             return;
         }
         RedisTemplate<String, String> redis = redis();
         if (redis != null) {
             try {
                 Duration lockout = Duration.ofMinutes(lockoutMinutes);
-                String failKey = FAIL_KEY_PREFIX + account;
+                String failKey = FAIL_KEY_PREFIX + key;
                 Long failures = redis.opsForValue().increment(failKey);
                 // 每次都重设 TTL：即使首次 expire 因异常丢失也不会导致计数永不过期
                 if (failures != null) {
                     redis.expire(failKey, lockout);
                 }
                 if (failures != null && failures >= maxFailures) {
-                    redis.opsForValue().set(LOCK_KEY_PREFIX + account, "1", lockout);
+                    redis.opsForValue().set(LOCK_KEY_PREFIX + key, "1", lockout);
                     log.warn("Login account locked: account={}, failures={}, lockoutMinutes={}",
                             account, failures, lockoutMinutes);
                 }
@@ -131,7 +137,7 @@ public class LoginAttemptGuard {
                 log.warn("Redis record login failure failed, fallback to memory: {}", e.getMessage());
             }
         }
-        states.compute(account, (k, state) -> {
+        states.compute(key, (k, state) -> {
             AttemptState next = state == null ? new AttemptState() : state;
             next.failures++;
             if (next.failures >= maxFailures && next.lockUntil == null) {
@@ -186,18 +192,19 @@ public class LoginAttemptGuard {
      * 登录成功后复位（仅账号维度）。
      */
     public void reset(String account) {
-        if (account != null) {
+        String key = normalizeAccount(account);
+        if (key != null && !key.isEmpty()) {
             RedisTemplate<String, String> redis = redis();
             if (redis != null) {
                 try {
-                    redis.delete(FAIL_KEY_PREFIX + account);
-                    redis.delete(LOCK_KEY_PREFIX + account);
+                    redis.delete(FAIL_KEY_PREFIX + key);
+                    redis.delete(LOCK_KEY_PREFIX + key);
                     return;
                 } catch (Exception e) {
                     log.warn("Redis reset login state failed, fallback to memory: {}", e.getMessage());
                 }
             }
-            states.remove(account);
+            states.remove(key);
         }
     }
 

@@ -341,12 +341,50 @@ public class AdminUserService {
     }
 
     private String generateTemporaryPassword() {
+        // api-changelog v2.4: 临时密码必须同时包含字母与数字。
+        // 简单随机采样无法保证二者同时出现（约 19% 概率被自身复杂度校验拒绝），
+        // 因此采用「先固定一位字母 + 一位数字，剩余位随机」的策略，并加入极少循环兜底。
         SecureRandom random = new SecureRandom();
-        StringBuilder sb = new StringBuilder(tempPasswordLength);
-        for (int i = 0; i < tempPasswordLength; i++) {
-            sb.append(TEMP_PASSWORD_CHARS.charAt(random.nextInt(TEMP_PASSWORD_CHARS.length())));
+        for (int attempt = 0; attempt < 8; attempt++) {
+            StringBuilder sb = new StringBuilder(tempPasswordLength);
+            // 首位放一个字母
+            sb.append(LETTER_CHARS.charAt(random.nextInt(LETTER_CHARS.length())));
+            // 第二位放一个数字
+            sb.append(DIGIT_CHARS.charAt(random.nextInt(DIGIT_CHARS.length())));
+            for (int i = 2; i < tempPasswordLength; i++) {
+                sb.append(TEMP_PASSWORD_CHARS.charAt(random.nextInt(TEMP_PASSWORD_CHARS.length())));
+            }
+            // 随机打乱前两位
+            char[] chars = sb.toString().toCharArray();
+            for (int i = chars.length - 1; i > 0; i--) {
+                int j = random.nextInt(i + 1);
+                char tmp = chars[i];
+                chars[i] = chars[j];
+                chars[j] = tmp;
+            }
+            String password = new String(chars);
+            if (containsLetterAndDigit(password)) {
+                return password;
+            }
         }
-        return sb.toString();
+        // 极端兜底：理论上随机打乱 + 8 次循环不可能还缺字符
+        throw new IllegalStateException("Failed to generate temporary password satisfying complexity rules");
+    }
+
+    private static final String LETTER_CHARS =
+            "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
+    private static final String DIGIT_CHARS = "23456789";
+
+    private static boolean containsLetterAndDigit(String s) {
+        boolean hasLetter = false;
+        boolean hasDigit = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isLetter(c)) hasLetter = true;
+            else if (Character.isDigit(c)) hasDigit = true;
+            if (hasLetter && hasDigit) return true;
+        }
+        return false;
     }
 
     private String maskPhone(String phone) {

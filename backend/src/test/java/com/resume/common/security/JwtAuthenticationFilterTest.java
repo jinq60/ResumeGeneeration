@@ -105,15 +105,13 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void shouldDowngradeToUserWhenRoleLookupReturnsNull() throws Exception {
-        // DB 查无该用户（如已被删除）：保守降级为普通用户
+        // DB 查无该用户（如已被删除）：旧 ADMIN token 不再以 USER 身份放行，直接视为未认证
         mockToken("user_1", BizConstant.USER_ROLE_ADMIN);
         when(statusProvider.findRole("user_1")).thenReturn(null);
 
         filter.doFilterInternal(request(), new MockHttpServletResponse(), filterChain);
 
-        List<String> authorities = currentAuthorities();
-        assertFalse(authorities.contains("ROLE_ADMIN"));
-        assertTrue(authorities.contains("ROLE_USER"));
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
     @Test

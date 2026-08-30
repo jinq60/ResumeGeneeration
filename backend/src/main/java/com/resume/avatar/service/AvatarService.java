@@ -2,8 +2,6 @@ package com.resume.avatar.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.ai.service.AiAvatarService;
 import com.resume.avatar.dto.AvatarTaskResponse;
 import com.resume.avatar.dto.AvatarUploadResponse;
@@ -44,7 +42,6 @@ public class AvatarService {
 
     private final AvatarTaskMapper avatarTaskMapper;
     private final MinioStorageService minioStorageService;
-    private final ObjectMapper objectMapper;
     private final ResumeService resumeService;
     @Lazy
     private final AiAvatarService aiAvatarService;
@@ -90,7 +87,7 @@ public class AvatarService {
         task.setResultImageUrl(sourceUrl);
         task.setBackgroundType(BizConstant.AVATAR_BACKGROUND_WHITE);
         task.setStyle(BizConstant.AVATAR_STYLE_FORMAL);
-        task.setOptions(toJson(defaultOptions()));
+        task.setOptions(defaultOptions());
         task.setStatus(BizConstant.TASK_STATUS_SUCCESS);
         task.setCompletedAt(LocalDateTime.now());
         task.setDeleted(BizConstant.NOT_DELETED);
@@ -122,10 +119,10 @@ public class AvatarService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> optimizeAvatar(String userId, OptimizeAvatarRequest request) {
         // 校验背景类型：P0 仅支持 white/blue/red
-        if (!Arrays.asList(BizConstant.AVATAR_BACKGROUND_TYPES_P0).contains(request.getBackgroundType())) {
+        if (!BizConstant.AVATAR_BACKGROUND_TYPES_P0.contains(request.getBackgroundType())) {
             throw new BusinessException(ResultCode.AVATAR_BACKGROUND_TYPE_INVALID, "背景类型不正确，P0 仅支持 white/blue/red。");
         }
-        if (!Arrays.asList(BizConstant.AVATAR_STYLES).contains(request.getStyle())) {
+        if (!BizConstant.AVATAR_STYLES.contains(request.getStyle())) {
             throw new BusinessException(ResultCode.AVATAR_STYLE_INVALID, "照片风格不正确。");
         }
 
@@ -145,7 +142,7 @@ public class AvatarService {
         task.setResultImageUrl(request.getSourceImageUrl());
         task.setBackgroundType(request.getBackgroundType());
         task.setStyle(request.getStyle());
-        task.setOptions(toJson(buildOptions(request)));
+        task.setOptions(buildOptions(request));
         task.setStatus(BizConstant.TASK_STATUS_PENDING);
         task.setDeleted(BizConstant.NOT_DELETED);
         task.setCreatedAt(LocalDateTime.now());
@@ -344,10 +341,12 @@ public class AvatarService {
     /**
      * 通过文件头魔数识别真实图片格式，返回 jpg/png/webp；非法返回 null。
      * 防止伪造 Content-Type 上传任意内容。
+     * 使用 file.getBytes() 避免 InputStream 12 字节消耗问题（见 ImageMagicUtil）。
      */
     private String detectImageFormat(MultipartFile file) {
-        try (java.io.InputStream in = file.getInputStream()) {
-            String format = ImageMagicUtil.detectFormat(in);
+        try {
+            byte[] bytes = file.getBytes();
+            String format = ImageMagicUtil.detectFormat(bytes.length >= 12 ? java.util.Arrays.copyOf(bytes, 12) : bytes);
             // 头像仅允许 jpg/png/webp，gif 等其它格式视为不支持
             return "jpg".equals(format) || "png".equals(format) || "webp".equals(format) ? format : null;
         } catch (IOException e) {
@@ -371,14 +370,6 @@ public class AvatarService {
         options.put("removeBackground", request.getRemoveBackground() != null ? request.getRemoveBackground() : false);
         options.put("brightenSkin", request.getBrightenSkin() != null ? request.getBrightenSkin() : false);
         return options;
-    }
-
-    private String toJson(Object obj) {
-        try {
-            return objectMapper.writeValueAsString(obj);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException(ResultCode.PARAM_INVALID, "参数序列化失败。");
-        }
     }
 
     private AvatarTaskResponse toResponse(AvatarTask task) {

@@ -2,6 +2,7 @@ package com.resume.user.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -14,6 +15,7 @@ public class LoginRequest {
     private String account;
 
     @NotBlank(message = "密码为必填项。")
+    @Size(min = 1, max = 32, message = "密码长度不能超过 32 位。")
     private String password;
 
     @Pattern(regexp = "^(phone|email)$", message = "登录类型不正确。")

@@ -85,7 +85,25 @@ public class StaticResourceController {
     }
 
     private void validateObjectName(String objectName) {
-        if (StringUtils.isBlank(objectName) || objectName.contains("..") || objectName.startsWith("/")) {
+        if (StringUtils.isBlank(objectName) || objectName.length() > 512) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
+        }
+        String decoded;
+        try {
+            decoded = java.net.URLDecoder.decode(objectName, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
+        }
+        if (decoded.contains("..") || decoded.contains("\\") || decoded.contains("//") || decoded.startsWith("/")) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
+        }
+        java.nio.file.Path normalized = java.nio.file.Paths.get(decoded).normalize();
+        String normStr = normalized.toString().replace("\\", "/");
+        if (normStr.contains("..") || normStr.startsWith("/") || normStr.startsWith("\\")) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
+        }
+        String lowered = objectName.toLowerCase();
+        if (lowered.contains("%2e") || lowered.contains("%2f") || lowered.contains("%5c")) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
         }
     }
@@ -98,6 +116,7 @@ public class StaticResourceController {
         org.springframework.http.ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
                 .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'")
                 .cacheControl(cacheable
                         ? CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic()
                         : CacheControl.noStore());

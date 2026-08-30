@@ -46,9 +46,9 @@ function toggleSidebar() {
 
 <style scoped lang="scss">
 .workbench-layout {
-  --st-sidebar-current-width: var(--st-sidebar-width, 220px);
+  --st-sidebar-current-width: var(--st-sidebar-width, 240px);
   min-height: 100vh;
-  background: var(--st-background);
+  background: #F7F7F5;
 }
 
 .workbench-main {
@@ -57,13 +57,16 @@ function toggleSidebar() {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #F7F7F5;
 }
 
 .workbench-content {
   flex: 1;
   width: 100%;
+  max-width: 1440px;
   min-width: 0;
-  padding: clamp(20px, 2.2vw, 40px) clamp(20px, 2.5vw, 48px);
+  margin: 0 auto;
+  padding: 32px clamp(24px, 3vw, 48px) 48px;
 }
 
 .workbench-layout.is-sidebar-collapsed {

@@ -50,6 +50,10 @@ public class AiWritingService {
 
     private static final int MAX_TEXT_LENGTH = 2000;
     private static final int MAX_PROMPT_TOKENS = 1500;
+    // api-spec §7.10 字段长度上限
+    private static final int MAX_SECTION_TYPE_LENGTH = 32;
+    private static final int MAX_FIELD_LENGTH = 64;
+    private static final int MAX_TARGET_LANG_LENGTH = 16;
 
     private static final Set<String> ACTIONS = Set.of("generate", "polish", "shorten", "expand", "translate");
 
@@ -92,6 +96,10 @@ public class AiWritingService {
         String originalText = StringUtils.defaultString(request.getOriginalText());
         validateOriginalText(request, originalText);
 
+        if (inFlight.size() > 10000) {
+            log.warn("AiWriting inFlight map too large ({}), possible abuse, clearing", inFlight.size());
+            inFlight.clear();
+        }
         AtomicInteger counter = inFlight.computeIfAbsent(userId, k -> new AtomicInteger());
         if (counter.incrementAndGet() > aiProperties.getRateLimit().getMaxConcurrentPerUser()) {
             counter.decrementAndGet();
@@ -137,6 +145,10 @@ public class AiWritingService {
         String originalText = StringUtils.defaultString(request.getOriginalText());
         validateOriginalText(request, originalText);
 
+        if (inFlight.size() > 10000) {
+            log.warn("AiWriting stream inFlight too large, clearing");
+            inFlight.clear();
+        }
         AtomicInteger counter = inFlight.computeIfAbsent(userId, k -> new AtomicInteger());
         if (counter.incrementAndGet() > aiProperties.getRateLimit().getMaxConcurrentPerUser()) {
             counter.decrementAndGet();
@@ -265,15 +277,31 @@ public class AiWritingService {
         aiDailyQuotaService.consume(userId, FEATURE_KEY, dailyLimit);
     }
 
-    private void validateRequest(ResumeAiWriteRequest request) {        if (!FIELD_WHITELIST.containsKey(request.getSectionType())
+    private void validateRequest(ResumeAiWriteRequest request) {
+        // api-spec §7.10 字段长度上限
+        if (StringUtils.length(request.getSectionType()) > MAX_SECTION_TYPE_LENGTH) {
+            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID,
+                    "模块类型长度不能超过 " + MAX_SECTION_TYPE_LENGTH + " 字符。");
+        }
+        if (StringUtils.length(request.getField()) > MAX_FIELD_LENGTH) {
+            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID,
+                    "字段名长度不能超过 " + MAX_FIELD_LENGTH + " 字符。");
+        }
+        if (!FIELD_WHITELIST.containsKey(request.getSectionType())
                 || !FIELD_WHITELIST.get(request.getSectionType()).contains(request.getField())) {
             throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "该字段暂不支持 AI 写作。");
         }
         if (!ACTIONS.contains(request.getAction())) {
             throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "不支持的 AI 写作动作。");
         }
-        if ("translate".equals(request.getAction()) && StringUtils.isBlank(request.getTargetLang())) {
-            throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "翻译需要指定目标语言。");
+        if ("translate".equals(request.getAction())) {
+            if (StringUtils.isBlank(request.getTargetLang())) {
+                throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID, "翻译需要指定目标语言。");
+            }
+            if (request.getTargetLang().length() > MAX_TARGET_LANG_LENGTH) {
+                throw new BusinessException(ResultCode.AI_WRITING_FIELD_INVALID,
+                        "目标语言长度不能超过 " + MAX_TARGET_LANG_LENGTH + " 字符。");
+            }
         }
     }
 

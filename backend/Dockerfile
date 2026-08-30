@@ -38,7 +38,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends fonts-noto-cjk && \
     rm -rf /var/lib/apt/lists/*
 
-RUN mvn -B clean package -DskipTests && \
+RUN mvn -B clean package -Dmaven.test.skip=true && \
     mvn -B exec:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps chromium" && \
     rm -rf /root/.m2/repository /app/src /app/pom.xml /app/target/*.original
 

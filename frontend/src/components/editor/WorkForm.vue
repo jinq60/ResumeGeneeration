@@ -115,12 +115,12 @@
                 :resume-id="resumeId"
                 section-type="work"
                 field="description"
-                :get-original-text="() => item.descriptionText"
+                :get-original-text="() => item.descriptionText ?? ''"
                 @apply="(content: string) => applyAiContent(item, content)"
               />
             </div>
             <RichTextEditor
-              :model-value="item.descriptionHtml"
+              :model-value="item.descriptionHtml ?? ''"
               placeholder="请输入工作描述，用换行分隔多个要点"
               @update:model-value="updateRichText(item, 'description', $event)"
             />
@@ -129,7 +129,7 @@
 
         <el-form-item label="工作成就">
           <RichTextEditor
-            :model-value="item.achievementsHtml"
+            :model-value="item.achievementsHtml ?? ''"
             placeholder="请输入工作成就，用换行分隔多个要点"
             @update:model-value="updateRichText(item, 'achievements', $event)"
           />
@@ -178,24 +178,43 @@ import { useSectionSync } from '@/composables/useSectionSync'
 import AiWriterButton from './AiWriterButton.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import { plainTextToRichHtml, richTextToPlainText } from '@/utils/richText'
+import type { Section, WorkItem } from '@/types/resume'
+
+/**
+ * 编辑态扩展字段：dateRange 用于 el-date-picker 月份范围，*Text 用于 textarea↔数组镜像。
+ * 提交前会投影回 WorkItem（去除这些 UI 字段）。
+ */
+type WorkItemDraft = WorkItem & {
+  dateRange?: string[]
+  descriptionText?: string
+  achievementsText?: string
+  techStackText?: string
+}
 
 interface Props {
-  sections: any[]
+  sections: Section[]
   resumeId?: string
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits(['update'])
+const emit = defineEmits<{
+  (e: 'update', sections: Section[]): void
+}>()
 
-const workList = ref<any[]>([])
+const workList = ref<WorkItemDraft[]>([])
+
+function nextWorkId() {
+  return `work_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+}
 
 // 从sections中提取工作经历
 function extractWork() {
   if (props.sections) {
-    const workSection = props.sections.find((s: any) => s.type === 'work')
-    if (workSection && workSection.data) {
-      workList.value = workSection.data.map((item: any) => ({
+    const workSection = props.sections.find((s) => s.type === 'work')
+    if (workSection && Array.isArray(workSection.data)) {
+      workList.value = (workSection.data as WorkItem[]).map((item) => ({
         ...item,
+        id: item.id || nextWorkId(),
         dateRange: item.startDate && item.endDate ? [item.startDate, item.endDate] : [],
         descriptionText: item.description ? item.description.join('\n') : '',
         descriptionHtml: item.descriptionHtml || plainTextToRichHtml(item.description ? item.description.join('\n') : ''),
@@ -205,7 +224,7 @@ function extractWork() {
       }))
     }
   }
-  
+
   // 如果没有工作经历，添加一个默认的
   if (workList.value.length === 0) {
     addWork()
@@ -214,6 +233,7 @@ function extractWork() {
 
 function addWork() {
   workList.value.push({
+    id: nextWorkId(),
     company: '',
     position: '',
     department: '',
@@ -239,7 +259,7 @@ function removeWork(index: number) {
   workList.value.splice(index, 1)
 }
 
-function handleDateRangeChange(item: any) {
+function handleDateRangeChange(item: WorkItemDraft) {
   if (item.dateRange && item.dateRange.length === 2) {
     item.startDate = item.dateRange[0]
     item.endDate = item.dateRange[1]
@@ -249,12 +269,12 @@ function handleDateRangeChange(item: any) {
   }
 }
 
-function updateRichText(item: any, field: 'description' | 'achievements', html: string) {
+function updateRichText(item: WorkItemDraft, field: 'description' | 'achievements', html: string) {
   item[`${field}Html`] = html
   item[`${field}Text`] = richTextToPlainText(html)
 }
 
-function applyAiContent(item: any, content: string) {
+function applyAiContent(item: WorkItemDraft, content: string) {
   item.descriptionText = content
   item.descriptionHtml = plainTextToRichHtml(content)
 }
@@ -268,14 +288,14 @@ useSectionSync(
   () => props.sections,
   extractWork,
   () => {
-    const workData = workList.value.map((item: any) => ({
+    const workData: WorkItem[] = workList.value.map((item) => ({
       ...item,
-      description: item.descriptionText ? item.descriptionText.split('\n').map((d: string) => d.trim()).filter((d: string) => d) : [],
-      achievements: item.achievementsText ? item.achievementsText.split('\n').map((a: string) => a.trim()).filter((a: string) => a) : [],
-      techStack: item.techStackText ? item.techStackText.split(',').map((t: string) => t.trim()).filter((t: string) => t) : []
+      description: item.descriptionText ? item.descriptionText.split('\n').map((d) => d.trim()).filter((d) => d) : [],
+      achievements: item.achievementsText ? item.achievementsText.split('\n').map((a) => a.trim()).filter((a) => a) : [],
+      techStack: item.techStackText ? item.techStackText.split(',').map((t) => t.trim()).filter((t) => t) : []
     }))
 
-    emit('update', props.sections.map((section: any) => {
+    emit('update', props.sections.map((section) => {
       if (section.type === 'work') {
         return {
           ...section,
@@ -284,7 +304,8 @@ useSectionSync(
       }
       return section
     }))
-  }
+  },
+  () => props.sections?.find((s) => s.type === 'work')?.data
 )
 </script>
 

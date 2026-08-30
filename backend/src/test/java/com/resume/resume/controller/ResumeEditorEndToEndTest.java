@@ -132,7 +132,7 @@ class ResumeEditorEndToEndTest {
         template.setCode("editor_test_tpl" + System.nanoTime());
         template.setName("编辑器测试模板");
         template.setCategory("classic");
-        template.setConfig("{}");
+        template.setConfig(java.util.Map.of());
         template.setHtmlTemplate("classic_single");
         template.setStatus("active");
         template.setIsBuiltin(0);

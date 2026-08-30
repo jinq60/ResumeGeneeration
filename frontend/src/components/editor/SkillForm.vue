@@ -2,7 +2,7 @@
   <div class="skill-form">
     <div
       v-for="(category, index) in skillCategories"
-      :key="index"
+      :key="category.id || index"
       class="skill-category"
     >
       <div class="category-header">
@@ -20,13 +20,14 @@
 
       <div
         v-for="(skill, skillIndex) in category.items"
-        :key="skillIndex"
+        :key="skill.id || skillIndex"
         class="skill-item"
       >
         <el-input
           v-model="skill.name"
           placeholder="技能名称"
           style="width: 200px"
+          maxlength="64"
         />
         <el-select
           v-model="skill.level"
@@ -86,17 +87,22 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
-import type { SkillItem } from '@/types/resume'
+import type { Section, SkillItem } from '@/types/resume'
 import { useSectionSync } from '@/composables/useSectionSync'
 
+type SkillDraftItem = { id?: string; name: string; level?: string; highlight?: boolean }
+type SkillDraftCategory = { id?: string; category: string; items: SkillDraftItem[] }
+
 interface Props {
-  sections: any[]
+  sections: Section[]
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits(['update'])
+const emit = defineEmits<{
+  (e: 'update', sections: Section[]): void
+}>()
 
-const skillCategories = ref<any[]>([])
+const skillCategories = ref<SkillDraftCategory[]>([])
 
 const CATEGORY_OPTIONS = [
   { label: '编程语言', value: 'programming_language' },
@@ -112,18 +118,32 @@ const CATEGORY_OPTIONS = [
 ]
 
 function getCategoryLabel(value: string): string {
-  const option = CATEGORY_OPTIONS.find(opt => opt.value === value)
+  const option = CATEGORY_OPTIONS.find((opt) => opt.value === value)
   return option ? option.label : value
+}
+
+function nextCategoryId() {
+  return `skill_cat_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+}
+
+function nextSkillId() {
+  return `skill_${Date.now()}_${Math.floor(Math.random() * 1000)}`
 }
 
 // 从sections中提取技能
 function extractSkills() {
   if (props.sections) {
-    const skillSection = props.sections.find((s: any) => s.type === 'skill')
+    const skillSection = props.sections.find((s) => s.type === 'skill')
     if (skillSection && Array.isArray(skillSection.data)) {
-      skillCategories.value = skillSection.data.map((item: SkillItem) => ({
+      skillCategories.value = (skillSection.data as SkillItem[]).map((item) => ({
+        id: item.id || nextCategoryId(),
         category: item.category,
-        items: item.items || []
+        items: (item.items || []).map((skill) => ({
+          id: skill.name ? `skill_${skill.name}_${Math.random().toString(36).slice(2, 7)}` : nextSkillId(),
+          name: skill.name,
+          level: skill.level,
+          highlight: skill.highlight
+        }))
       }))
     }
   }
@@ -137,20 +157,22 @@ function extractSkills() {
 function addCategory(categoryValue?: string) {
   const category = categoryValue || 'other'
   skillCategories.value.push({
+    id: nextCategoryId(),
     category,
     items: []
   })
 }
 
-function addSkillItem(category: any) {
+function addSkillItem(category: SkillDraftCategory) {
   category.items.push({
+    id: nextSkillId(),
     name: '',
     level: 'familiar',
     highlight: false
   })
 }
 
-function removeSkillItem(category: any, skillIndex: number) {
+function removeSkillItem(category: SkillDraftCategory, skillIndex: number) {
   category.items.splice(skillIndex, 1)
 }
 
@@ -163,14 +185,19 @@ useSectionSync(
   () => props.sections,
   extractSkills,
   () => {
-    const skillData = skillCategories.value
-      .filter(cat => cat.items.length > 0)
-      .map(cat => ({
+    const skillData: SkillItem[] = skillCategories.value
+      .filter((cat) => cat.items.length > 0)
+      .map((cat) => ({
+        id: cat.id,
         category: cat.category,
-        items: cat.items
+        items: cat.items.map((skill) => ({
+          name: skill.name,
+          level: skill.level,
+          highlight: skill.highlight
+        }))
       }))
 
-    emit('update', props.sections.map((section: any) => {
+    emit('update', props.sections.map((section) => {
       if (section.type === 'skill') {
         return {
           ...section,
@@ -179,7 +206,8 @@ useSectionSync(
       }
       return section
     }))
-  }
+  },
+  () => props.sections?.find((s) => s.type === 'skill')?.data
 )
 </script>
 

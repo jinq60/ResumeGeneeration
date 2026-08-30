@@ -124,16 +124,16 @@ ResumeGeneeration/
 
 ```
 common
-├── 被 user、resume、template、avatar、pdf、ai 依赖
+├── 被 user、resume、template、avatar、pdf、ai、audit、delivery、notification 依赖
 ├── 提供：R、异常、JWT 过滤器、SecurityConfig、MinIO 服务、全局异常处理
 
 user
-├── 被 resume、avatar、pdf 依赖（通过 userId 关联、JWT 解析）
+├── 被 resume、avatar、pdf、delivery、notification 依赖（通过 userId 关联、JWT 解析）
 ├── 提供：User 实体、JWT Token 生成、当前用户上下文
 
 resume
 ├── 依赖：common、user、template
-├── 被 pdf、avatar、ai 依赖；内部包含 share 子包
+├── 被 pdf、avatar、ai、audit、delivery 依赖；内部包含 share 子包
 ├── 提供：Resume 实体、简历 CRUD、Section 校验、预览、分享和多格式导出
 
 template
@@ -142,16 +142,30 @@ template
 ├── 提供：Template 实体、模板列表、后台模板 CRUD
 
 avatar
-├── 依赖：common、user、resume（可选回填）
+├── 依赖：common、user、resume（可选回填）、ai（异步任务）
 ├── 提供：头像上传、一寸照优化任务
 
 pdf
-├── 依赖：common、user、resume、template
+├── 依赖：common、user、resume、template、notification（导出完成事件）
 ├── 提供：PDF 导出任务、下载
 
 ai
-├── 依赖：common、resume
+├── 依赖：common、resume、notification（任务完成事件）
 ├── 提供：多厂商 LLM 路由、AI 点评、JD 优化、头像优化和行内写作
+
+audit
+├── 依赖：common
+├── 被 resume 依赖（创建/导入简历时自动生成审核记录）
+├── 提供：内容审核服务（admin 端审核 / 通过 / 标记警告）
+
+delivery
+├── 依赖：common、user、resume（校验简历归属）
+├── 提供：投递记录管理、admin 端统计与 CSV 导出
+
+notification
+├── 依赖：common
+├── 被 pdf、ai 依赖（事件接收方，无下游业务依赖）
+├── 提供：通知中心（未读数 / 已读 / 删除）
 ```
 
 **依赖原则**：

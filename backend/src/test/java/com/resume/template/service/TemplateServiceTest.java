@@ -72,7 +72,10 @@ class TemplateServiceTest {
     @Test
     void createTemplate_shouldRejectInvalidConfig() {
         AdminTemplateRequest request = buildRequest("classic-invalid-config");
-        request.setConfig(new NonSerializableConfig());
+        // Map 包含不可序列化对象，触发 Jackson 失败；NonSerializableConfig 含自引用
+        Map<String, Object> invalid = new java.util.HashMap<>();
+        invalid.put("bad", new NonSerializableConfig());
+        request.setConfig(invalid);
         when(templateMapper.selectByCodeIncludingDeleted("classic-invalid-config")).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,

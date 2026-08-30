@@ -53,7 +53,7 @@ public class SectionOptimizationListTypeHandler extends BaseTypeHandler<List<Res
         return parse(cs.getString(columnIndex));
     }
 
-    private List<ResumeOptimizeResponse.SectionOptimization> parse(String json) {
+    private List<ResumeOptimizeResponse.SectionOptimization> parse(String json) throws SQLException {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
@@ -61,7 +61,7 @@ public class SectionOptimizationListTypeHandler extends BaseTypeHandler<List<Res
             return MAPPER.readValue(json, TYPE_REF);
         } catch (Exception e) {
             log.error("Failed to deserialize optimizations: {}", json, e);
-            return Collections.emptyList();
+            throw new SQLException("Failed to deserialize optimizations: " + e.getMessage(), e);
         }
     }
 }

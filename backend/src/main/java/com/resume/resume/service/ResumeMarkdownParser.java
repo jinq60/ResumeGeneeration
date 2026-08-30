@@ -101,7 +101,7 @@ public final class ResumeMarkdownParser {
 
         SectionDTO build(int order) {
             SectionDTO section = new SectionDTO();
-            section.setId("sec_" + System.currentTimeMillis() + "_" + order);
+            section.setId("sec_" + java.util.UUID.randomUUID().toString().replace("-", "") + "_" + order);
             section.setType(type);
             section.setTitle(rawTitle);
             section.setOrder(order);
@@ -148,7 +148,8 @@ public final class ResumeMarkdownParser {
                             })
                             .toList();
                     Map<String, Object> category = new java.util.HashMap<>();
-                    category.put("category", "技能");
+                    // 使用白名单中的分类，避免校验失败（原 "技能" 不在 SKILL_CATEGORIES 中）
+                    category.put("category", "other");
                     category.put("items", items);
                     return List.of(category);
                 }

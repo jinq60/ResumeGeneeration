@@ -133,7 +133,7 @@ class ResumeServiceIntegrationTest {
         template.setCode("it_tpl_" + System.nanoTime());
         template.setName("集成测试模板");
         template.setCategory("classic");
-        template.setConfig("{}");
+        template.setConfig(java.util.Map.of());
         template.setHtmlTemplate("test.html");
         template.setStatus(BizConstant.TEMPLATE_STATUS_ACTIVE);
         template.setIsBuiltin(BizConstant.BUILTIN_NO);

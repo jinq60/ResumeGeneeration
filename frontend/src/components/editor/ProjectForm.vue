@@ -126,12 +126,12 @@
                 :resume-id="resumeId"
                 section-type="project"
                 field="description"
-                :get-original-text="() => item.descriptionText"
+                :get-original-text="() => item.descriptionText ?? ''"
                 @apply="(content: string) => applyAiContent(item, content)"
               />
             </div>
             <RichTextEditor
-              :model-value="item.descriptionHtml"
+              :model-value="item.descriptionHtml ?? ''"
               placeholder="请输入项目描述，用换行分隔多个要点"
               @update:model-value="updateRichText(item, 'description', $event)"
             />
@@ -140,7 +140,7 @@
 
         <el-form-item label="项目成就">
           <RichTextEditor
-            :model-value="item.achievementsHtml"
+            :model-value="item.achievementsHtml ?? ''"
             placeholder="请输入项目成就，用换行分隔多个要点"
             @update:model-value="updateRichText(item, 'achievements', $event)"
           />
@@ -181,24 +181,39 @@ import { useSectionSync } from '@/composables/useSectionSync'
 import AiWriterButton from './AiWriterButton.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import { plainTextToRichHtml, richTextToPlainText } from '@/utils/richText'
+import type { ProjectItem, Section } from '@/types/resume'
+
+type ProjectItemDraft = ProjectItem & {
+  dateRange?: string[]
+  techStackText?: string
+  descriptionText?: string
+  achievementsText?: string
+}
 
 interface Props {
-  sections: any[]
+  sections: Section[]
   resumeId?: string
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits(['update'])
+const emit = defineEmits<{
+  (e: 'update', sections: Section[]): void
+}>()
 
-const projectList = ref<any[]>([])
+const projectList = ref<ProjectItemDraft[]>([])
+
+function nextProjectId() {
+  return `proj_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+}
 
 // 从sections中提取项目经历
 function extractProjects() {
   if (props.sections) {
-    const projectSection = props.sections.find((s: any) => s.type === 'project')
-    if (projectSection && projectSection.data) {
-      projectList.value = projectSection.data.map((item: any) => ({
+    const projectSection = props.sections.find((s) => s.type === 'project')
+    if (projectSection && Array.isArray(projectSection.data)) {
+      projectList.value = (projectSection.data as ProjectItem[]).map((item) => ({
         ...item,
+        id: item.id || nextProjectId(),
         dateRange: item.startDate && item.endDate ? [item.startDate, item.endDate] : [],
         techStackText: item.techStack ? item.techStack.join(', ') : '',
         descriptionText: item.description ? item.description.join('\n') : '',
@@ -208,7 +223,7 @@ function extractProjects() {
       }))
     }
   }
-  
+
   // 如果没有项目经历，添加一个默认的
   if (projectList.value.length === 0) {
     addProject()
@@ -217,6 +232,7 @@ function extractProjects() {
 
 function addProject() {
   projectList.value.push({
+    id: nextProjectId(),
     name: '',
     role: '',
     type: '',
@@ -242,7 +258,7 @@ function removeProject(index: number) {
   projectList.value.splice(index, 1)
 }
 
-function handleDateRangeChange(item: any) {
+function handleDateRangeChange(item: ProjectItemDraft) {
   if (item.dateRange && item.dateRange.length === 2) {
     item.startDate = item.dateRange[0]
     item.endDate = item.dateRange[1]
@@ -252,12 +268,12 @@ function handleDateRangeChange(item: any) {
   }
 }
 
-function updateRichText(item: any, field: 'description' | 'achievements', html: string) {
+function updateRichText(item: ProjectItemDraft, field: 'description' | 'achievements', html: string) {
   item[`${field}Html`] = html
   item[`${field}Text`] = richTextToPlainText(html)
 }
 
-function applyAiContent(item: any, content: string) {
+function applyAiContent(item: ProjectItemDraft, content: string) {
   item.descriptionText = content
   item.descriptionHtml = plainTextToRichHtml(content)
 }
@@ -271,14 +287,14 @@ useSectionSync(
   () => props.sections,
   extractProjects,
   () => {
-    const projectData = projectList.value.map((item: any) => ({
+    const projectData: ProjectItem[] = projectList.value.map((item) => ({
       ...item,
-      techStack: item.techStackText ? item.techStackText.split(',').map((t: string) => t.trim()).filter((t: string) => t) : [],
-      description: item.descriptionText ? item.descriptionText.split('\n').map((d: string) => d.trim()).filter((d: string) => d) : [],
-      achievements: item.achievementsText ? item.achievementsText.split('\n').map((a: string) => a.trim()).filter((a: string) => a) : []
+      techStack: item.techStackText ? item.techStackText.split(',').map((t) => t.trim()).filter((t) => t) : [],
+      description: item.descriptionText ? item.descriptionText.split('\n').map((d) => d.trim()).filter((d) => d) : [],
+      achievements: item.achievementsText ? item.achievementsText.split('\n').map((a) => a.trim()).filter((a) => a) : []
     }))
 
-    emit('update', props.sections.map((section: any) => {
+    emit('update', props.sections.map((section) => {
       if (section.type === 'project') {
         return {
           ...section,
@@ -287,7 +303,8 @@ useSectionSync(
       }
       return section
     }))
-  }
+  },
+  () => props.sections?.find((s) => s.type === 'project')?.data
 )
 </script>
 

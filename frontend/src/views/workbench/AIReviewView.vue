@@ -561,11 +561,12 @@ async function handleOptimize() {
     }
   } catch (e: any) {
     optimizeResult.value = null
-    const msg = e?.message || ''
-    if (msg.includes('6004') || msg.includes('并发')) {
+    // 业务码 6004 = AI_CONCURRENT_LIMIT_EXCEEDED（api-spec §13 + ResultCode.java）
+    // 直接读 e.code，避免「message 文本里含 '6004'」之类的脆弱匹配。
+    if (e?.code === 6004) {
       ElMessage.warning('你已有多个优化任务在进行中，请稍后再试')
     } else {
-      ElMessage.error(msg || '暂时无法生成优化分析；你的简历内容不会丢失。')
+      ElMessage.error(e?.message || '暂时无法生成优化分析；你的简历内容不会丢失。')
     }
   } finally {
     if (token === optimizePollToken) {

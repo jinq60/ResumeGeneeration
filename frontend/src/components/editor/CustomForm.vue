@@ -77,22 +77,37 @@
 import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { useSectionSync } from '@/composables/useSectionSync'
+import type { Section } from '@/types/resume'
+
+type CustomDraft = {
+  id: string
+  title: string
+  order: number
+  visible: boolean
+  content: string
+}
 
 interface Props {
-  sections: any[]
+  sections: Section[]
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits(['update'])
+const emit = defineEmits<{
+  (e: 'update', sections: Section[]): void
+}>()
 
-const customSections = ref<any[]>([])
+const customSections = ref<CustomDraft[]>([])
+
+function nextCustomId() {
+  return `custom_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+}
 
 // 从sections中提取自定义模块
 function extractCustomSections() {
   if (props.sections) {
-    const customSectionsList = props.sections.filter((s: any) => s.type === 'custom')
+    const customSectionsList = props.sections.filter((s) => s.type === 'custom')
     if (customSectionsList.length > 0) {
-      customSections.value = customSectionsList.map((section: any) => ({
+      customSections.value = customSectionsList.map((section) => ({
         id: section.id,
         title: section.title,
         order: section.order,
@@ -101,7 +116,7 @@ function extractCustomSections() {
       }))
     }
   }
-  
+
   // 如果没有自定义模块，添加一个默认的
   if (customSections.value.length === 0) {
     addCustomSection()
@@ -109,12 +124,12 @@ function extractCustomSections() {
 }
 
 function addCustomSection() {
-  const maxOrder = customSections.value.length > 0 
-    ? Math.max(...customSections.value.map(s => s.order || 0))
+  const maxOrder = customSections.value.length > 0
+    ? Math.max(...customSections.value.map((s) => s.order || 0))
     : 0
-  
+
   customSections.value.push({
-    id: `custom_${Date.now()}`,
+    id: nextCustomId(),
     title: '',
     order: maxOrder + 1,
     visible: true,
@@ -136,23 +151,19 @@ useSectionSync(
   extractCustomSections,
   () => {
     // 先移除所有自定义section
-    let updatedSections = props.sections.filter((s: any) => s.type !== 'custom')
+    const nonCustom = props.sections.filter((s) => s.type !== 'custom')
 
     // 添加新的自定义sections
-    const customSectionData = customSections.value.map(item => ({
+    const customSectionData: Section[] = customSections.value.map((item) => ({
       id: item.id,
       type: 'custom',
       title: item.title,
       order: item.order,
       visible: item.visible,
-      data: {
-        content: item.content
-      }
+      data: { content: item.content }
     }))
 
-    updatedSections = [...updatedSections, ...customSectionData]
-
-    emit('update', updatedSections)
+    emit('update', [...nonCustom, ...customSectionData])
   }
 )
 </script>

@@ -35,6 +35,7 @@ export interface EducationItem {
 }
 
 export interface WorkItem {
+  id?: string
   company: string; position: string; department?: string; type?: string; city?: string
   startDate: string; endDate?: string; description: string[]; achievements?: string[]
   descriptionHtml?: string; achievementsHtml?: string
@@ -43,6 +44,7 @@ export interface WorkItem {
 }
 
 export interface ProjectItem {
+  id?: string
   name: string; role?: string; type?: string; startDate?: string; endDate?: string
   techStack?: string[]; background?: string; responsibility?: string
   achievements?: string[]; description: string[]; link?: string; github?: string
@@ -51,6 +53,7 @@ export interface ProjectItem {
 }
 
 export interface SkillItem {
+  id?: string
   category: string
   items: Array<{ name: string; level?: string; highlight?: boolean }>
 }
@@ -66,10 +69,16 @@ export type CustomSection = BaseSection<'custom', { content: string }>
 export type Section = ProfileSection | EducationSection | WorkSection | ProjectSection | SkillSection | IntroductionSection | CustomSection
 
 export interface Resume {
-  id: string; userId: string; title: string; scene: string; targetPosition?: string
+  id: string; userId: string; title: string; scene: Scene; targetPosition?: string
+  targetIndustry?: string
   templateId: string; sections: Section[]; renderSettings?: RenderSettings | null
   createdAt: string; updatedAt: string
   exportCount?: number; lastEditedAt?: string
+  /**
+   * 乐观锁版本号（api-changelog v2.2 / V13 迁移）。
+   * 更新/重命名请求需回传；并发编辑冲突返回 RESUME_VERSION_CONFLICT(2012)。
+   */
+  version?: number
 }
 
 export interface Profile {

@@ -1,9 +1,9 @@
 <template>
-  <div class="flex flex-col min-h-screen bg-surface-container-low">
-    <header class="px-margin-page py-stack-lg pb-stack-md flex justify-between items-center">
-      <div class="flex items-center gap-3">
+  <div class="flex flex-col min-h-screen bg-[#F7F7F5]">
+    <header class="max-w-[1280px] w-full mx-auto px-6 lg:px-8 pt-8 pb-6 flex justify-between items-center">
+      <div class="flex items-center gap-4">
         <button
-          class="w-8 h-8 bg-surface-container-lowest border border-outline-variant rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+          class="w-9 h-9 bg-white border border-black/10 rounded-xl flex items-center justify-center text-[#666] hover:text-[#171717] hover:bg-black/[0.04] transition-all"
           title="返回"
           @click="router.back()"
         >
@@ -11,20 +11,23 @@
             <ArrowLeft />
           </el-icon>
         </button>
-        <h1 class="text-headline-md font-headline-md text-on-surface">
-          头像上传与一寸照优化
-        </h1>
+        <div>
+          <h1 class="text-[28px] font-semibold tracking-tight text-[#171717] leading-none">
+            头像上传与一寸照优化
+          </h1>
+          <p class="text-[13px] text-[#666] mt-1.5">AI 证件照 · 专业背景 · 保持身份特征</p>
+        </div>
       </div>
     </header>
 
-    <div class="workbench-page flex-1 w-full px-margin-page pb-margin-page grid grid-cols-1 lg:grid-cols-2 gap-gutter">
-      <!-- 上传 + 设置 -->
-      <section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col">
-        <h2 class="text-title-lg font-title-lg text-on-surface">
+    <div class="flex-1 w-full max-w-[1280px] mx-auto px-6 lg:px-8 pb-12 grid grid-cols-1 lg:grid-cols-[480px_1fr] gap-6 lg:gap-8">
+      <!-- 上传 + 设置 — AI Enhancement Panel -->
+      <section class="bg-white border border-black/10 rounded-[16px] p-6 lg:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
+        <h2 class="text-[18px] font-semibold tracking-tight text-[#171717]">
           上传自拍照
         </h2>
-        <p class="mt-1 text-sm text-on-surface-variant">
-          JPG / PNG / WEBP，≤ 10 MB
+        <p class="mt-1 text-[13px] text-[#666]">
+          JPG / PNG / WEBP · ≤ 10 MB · 建议 300×300 以上
         </p>
 
         <el-upload
@@ -194,11 +197,25 @@
         </button>
       </section>
 
-      <!-- 结果卡 -->
+      <!-- 预览 / 结果 — 始终可见，避免大面积空白 -->
       <section
-        v-if="optimizeTask"
-        class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col"
+        class="bg-white border border-black/10 rounded-[16px] p-6 lg:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col min-h-[480px]"
       >
+        <h2 class="text-[18px] font-semibold tracking-tight text-[#171717] flex items-center gap-2">
+          <span class="w-1.5 h-5 rounded-full bg-[#1D4ED8] inline-block" />头像预览
+        </h2>
+        <div
+          v-if="!optimizeTask"
+          class="flex-1 mt-6 rounded-[12px] border border-dashed border-black/10 bg-[#F7F7F5] flex flex-col items-center justify-center gap-3 p-8 text-center"
+        >
+          <div class="w-20 h-28 rounded-[10px] bg-white border border-black/5 shadow-sm flex items-center justify-center">
+            <el-icon size="28" class="text-black/20"><Picture /></el-icon>
+          </div>
+          <p class="text-[13px] text-[#666]">上传后在此实时预览一寸照效果</p>
+          <p class="text-[12px] text-[#999]">支持白底 / 蓝底 / 红底 · 3:4 证件比例</p>
+        </div>
+        <template v-if="optimizeTask">
+          <div class="-mt-6"></div>
         <h2 class="text-title-lg font-title-lg text-on-surface">
           优化结果
         </h2>
@@ -305,6 +322,7 @@
             重试
           </button>
         </div>
+        </template>
       </section>
     </div>
 
@@ -349,7 +367,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { VueCropper } from 'vue-cropper'
 import 'vue-cropper/dist/index.css'
-import { ArrowLeft, UploadFilled, MagicStick, Loading, Check } from '@element-plus/icons-vue'
+import { ArrowLeft, UploadFilled, MagicStick, Loading, Check, Picture } from '@element-plus/icons-vue'
 import { avatarApi } from '@/api/avatar'
 import type { OptimizeAvatarRequest, AvatarTask } from '@/api/avatar'
 import { addAvatarTask, updateAvatarTask } from '@/utils/download'
@@ -563,14 +581,18 @@ onUnmounted(() => {
 <style scoped>
 .avatar-uploader :deep(.el-upload-dragger) {
   width: 100%;
-  padding: 32px 16px;
-  background: #f2f4f7;
-  border: 2px dashed #c1c6d7;
-  border-radius: 1rem;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 40px 24px;
+  background: #FFFFFF;
+  border: 2px dashed rgba(0, 0, 0, 0.12);
+  border-radius: 16px;
+  transition: border-color 200ms ease, background 200ms ease, transform 200ms ease;
 }
 .avatar-uploader :deep(.el-upload-dragger:hover) {
-  border-color: #0057c2;
-  background: #d9e2ff;
+  border-color: #1D4ED8;
+  background: rgba(29, 78, 216, 0.04);
+  transform: translateY(-1px);
+}
+.avatar-uploader :deep(.el-upload-dragger:active) {
+  transform: translateY(0);
 }
 </style>

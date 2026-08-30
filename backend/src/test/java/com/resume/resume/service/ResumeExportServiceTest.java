@@ -32,7 +32,7 @@ class ResumeExportServiceTest {
 
     @BeforeEach
     void setUp() {
-        exportService = new ResumeExportService(resumeService, new ResumeSectionValidator());
+        exportService = new ResumeExportService(resumeService, new ResumeSectionValidator(new com.fasterxml.jackson.databind.ObjectMapper()));
     }
 
     private Resume buildResume() {

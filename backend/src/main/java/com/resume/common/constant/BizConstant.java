@@ -48,11 +48,11 @@ public final class BizConstant {
     public static final String GENDER_FEMALE = "female";
     public static final String GENDER_OTHER = "other";
 
-    public static final String[] GENDERS = {
+    public static final java.util.Set<String> GENDERS = java.util.Set.of(
             GENDER_MALE,
             GENDER_FEMALE,
             GENDER_OTHER
-    };
+    );
 
     /**
      * 简历使用场景。
@@ -64,14 +64,14 @@ public final class BizConstant {
     public static final String SCENE_PROJECT_APPLICATION = "project_application";
     public static final String SCENE_CUSTOM = "custom";
 
-    public static final String[] SCENES = {
+    public static final java.util.Set<String> SCENES = java.util.Set.of(
             SCENE_CAMPUS_RECRUITMENT,
             SCENE_INTERNSHIP,
             SCENE_SOCIAL_RECRUITMENT,
             SCENE_POSTGRADUATE_REEXAM,
             SCENE_PROJECT_APPLICATION,
             SCENE_CUSTOM
-    };
+    );
 
     /**
      * Section 类型。
@@ -84,7 +84,7 @@ public final class BizConstant {
     public static final String SECTION_TYPE_INTRODUCTION = "introduction";
     public static final String SECTION_TYPE_CUSTOM = "custom";
 
-    public static final String[] SECTION_TYPES = {
+    public static final java.util.Set<String> SECTION_TYPES = java.util.Set.of(
             SECTION_TYPE_PROFILE,
             SECTION_TYPE_EDUCATION,
             SECTION_TYPE_PROJECT,
@@ -92,7 +92,7 @@ public final class BizConstant {
             SECTION_TYPE_SKILL,
             SECTION_TYPE_INTRODUCTION,
             SECTION_TYPE_CUSTOM
-    };
+    );
 
     /**
      * 工作类型。
@@ -104,14 +104,14 @@ public final class BizConstant {
     public static final String WORK_TYPE_RESEARCH_ASSISTANT = "research_assistant";
     public static final String WORK_TYPE_VOLUNTEER = "volunteer";
 
-    public static final String[] WORK_TYPES = {
+    public static final java.util.Set<String> WORK_TYPES = java.util.Set.of(
             WORK_TYPE_FULL_TIME,
             WORK_TYPE_INTERNSHIP,
             WORK_TYPE_PART_TIME,
             WORK_TYPE_CAMPUS_JOB,
             WORK_TYPE_RESEARCH_ASSISTANT,
             WORK_TYPE_VOLUNTEER
-    };
+    );
 
     /**
      * 项目类型。
@@ -124,7 +124,7 @@ public final class BizConstant {
     public static final String PROJECT_TYPE_PERSONAL = "personal";
     public static final String PROJECT_TYPE_OTHER = "other";
 
-    public static final String[] PROJECT_TYPES = {
+    public static final java.util.Set<String> PROJECT_TYPES = java.util.Set.of(
             PROJECT_TYPE_RESEARCH,
             PROJECT_TYPE_COURSE,
             PROJECT_TYPE_ENTERPRISE,
@@ -132,7 +132,7 @@ public final class BizConstant {
             PROJECT_TYPE_OPEN_SOURCE,
             PROJECT_TYPE_PERSONAL,
             PROJECT_TYPE_OTHER
-    };
+    );
 
     /**
      * 技能分类。
@@ -148,7 +148,7 @@ public final class BizConstant {
     public static final String SKILL_CATEGORY_PROFESSIONAL_TOOL = "professional_tool";
     public static final String SKILL_CATEGORY_OTHER = "other";
 
-    public static final String[] SKILL_CATEGORIES = {
+    public static final java.util.Set<String> SKILL_CATEGORIES = java.util.Set.of(
             SKILL_CATEGORY_PROGRAMMING_LANGUAGE,
             SKILL_CATEGORY_FRONTEND,
             SKILL_CATEGORY_BACKEND,
@@ -159,7 +159,7 @@ public final class BizConstant {
             SKILL_CATEGORY_LANGUAGE,
             SKILL_CATEGORY_PROFESSIONAL_TOOL,
             SKILL_CATEGORY_OTHER
-    };
+    );
 
     /**
      * 技能熟练程度。
@@ -169,12 +169,12 @@ public final class BizConstant {
     public static final String SKILL_LEVEL_PROFICIENT = "proficient";
     public static final String SKILL_LEVEL_EXPERT = "expert";
 
-    public static final String[] SKILL_LEVELS = {
+    public static final java.util.Set<String> SKILL_LEVELS = java.util.Set.of(
             SKILL_LEVEL_BEGINNER,
             SKILL_LEVEL_FAMILIAR,
             SKILL_LEVEL_PROFICIENT,
             SKILL_LEVEL_EXPERT
-    };
+    );
 
     /**
      * 自我介绍风格。
@@ -186,14 +186,14 @@ public final class BizConstant {
     public static final String INTRODUCTION_STYLE_POSTGRADUATE = "postgraduate";
     public static final String INTRODUCTION_STYLE_PROJECT = "project";
 
-    public static final String[] INTRODUCTION_STYLES = {
+    public static final java.util.Set<String> INTRODUCTION_STYLES = java.util.Set.of(
             INTRODUCTION_STYLE_CONCISE_FORMAL,
             INTRODUCTION_STYLE_TECH_ORIENTED,
             INTRODUCTION_STYLE_STUDENT,
             INTRODUCTION_STYLE_SENIOR,
             INTRODUCTION_STYLE_POSTGRADUATE,
             INTRODUCTION_STYLE_PROJECT
-    };
+    );
 
     /**
      * 头像背景类型：P0 仅支持白/蓝/红，transparent 为 P2 预留。
@@ -203,18 +203,18 @@ public final class BizConstant {
     public static final String AVATAR_BACKGROUND_RED = "red";
     public static final String AVATAR_BACKGROUND_TRANSPARENT = "transparent";
 
-    public static final String[] AVATAR_BACKGROUND_TYPES_P0 = {
+    public static final java.util.Set<String> AVATAR_BACKGROUND_TYPES_P0 = java.util.Set.of(
             AVATAR_BACKGROUND_WHITE,
             AVATAR_BACKGROUND_BLUE,
             AVATAR_BACKGROUND_RED
-    };
+    );
 
-    public static final String[] AVATAR_BACKGROUND_TYPES_ALL = {
+    public static final java.util.Set<String> AVATAR_BACKGROUND_TYPES_ALL = java.util.Set.of(
             AVATAR_BACKGROUND_WHITE,
             AVATAR_BACKGROUND_BLUE,
             AVATAR_BACKGROUND_RED,
             AVATAR_BACKGROUND_TRANSPARENT
-    };
+    );
 
     /**
      * 头像风格。
@@ -223,11 +223,11 @@ public final class BizConstant {
     public static final String AVATAR_STYLE_NATURAL = "natural";
     public static final String AVATAR_STYLE_PROFESSIONAL = "professional";
 
-    public static final String[] AVATAR_STYLES = {
+    public static final java.util.Set<String> AVATAR_STYLES = java.util.Set.of(
             AVATAR_STYLE_FORMAL,
             AVATAR_STYLE_NATURAL,
             AVATAR_STYLE_PROFESSIONAL
-    };
+    );
 
     /**
      * 渲染引擎。

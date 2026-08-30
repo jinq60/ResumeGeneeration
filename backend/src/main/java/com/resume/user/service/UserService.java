@@ -269,9 +269,22 @@ public class UserService {
 
     private void recordRotationGrace(String tokenHash, AuthResponse response) {
         long expiresAt = System.currentTimeMillis() + ROTATION_GRACE_MILLIS;
-        // 顺带清理过期条目，避免长期驻留
-        rotationGraceCache.entrySet().removeIf(e -> e.getValue().expiresAt <= System.currentTimeMillis());
+        // 顺带清理过期条目，避免长期驻留；集群多实例场景短 TTL 5s，定期清理足够
+        // 额外防御：恶意随机 tokenHash 可能撑大 Map，超限时强制清理
+        if (rotationGraceCache.size() > 5000) {
+            rotationGraceCache.entrySet().removeIf(e -> e.getValue().expiresAt <= System.currentTimeMillis());
+            if (rotationGraceCache.size() > 5000) {
+                log.warn("rotationGraceCache size exceeded 5000, clearing oldest entries");
+                rotationGraceCache.clear();
+            }
+        } else {
+            rotationGraceCache.entrySet().removeIf(e -> e.getValue().expiresAt <= System.currentTimeMillis());
+        }
         rotationGraceCache.put(tokenHash, new RotationGrace(expiresAt, response));
+        if (rotationLocks.size() > 5000) {
+            log.warn("rotationLocks size exceeded 5000, clearing");
+            rotationLocks.clear();
+        }
     }
 
     /** 已消费 refresh token 的宽限缓存条目（包级可见以便单元测试构造）。 */

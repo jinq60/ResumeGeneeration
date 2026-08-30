@@ -2,6 +2,7 @@ package com.resume.user.auth.provider;
 
 import com.resume.user.auth.AuthMethod;
 import com.resume.user.auth.AuthProvider;
+import com.resume.user.auth.SmsCodeService;
 import com.resume.user.auth.UserAuthService;
 import com.resume.user.dto.AuthResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import java.util.Map;
 public class SmsCodeAuthProvider implements AuthProvider {
 
     private final UserAuthService userAuthService;
+    private final SmsCodeService smsCodeService;
 
     @Override
     public String method() {
@@ -26,5 +28,10 @@ public class SmsCodeAuthProvider implements AuthProvider {
     @Override
     public AuthResponse authenticate(Map<String, String> params) {
         return userAuthService.authenticateBySmsCode(params.get("phone"), params.get("code"));
+    }
+
+    @Override
+    public boolean isConfigured() {
+        return smsCodeService.isConfigured();
     }
 }

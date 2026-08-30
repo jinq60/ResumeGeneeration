@@ -52,7 +52,7 @@
             </div>
 
             <form
-              v-if="availableMethods.length > 0"
+              v-if="!methodsLoading"
               class="flex flex-col gap-4"
               @submit.prevent="handleLogin"
             >
@@ -311,16 +311,14 @@ const countdown = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 const methodsLoading = ref(true)
+const ALL_LOGIN_METHODS: LoginMethod[] = ['password', 'email_code', 'sms_code']
+const ALL_OAUTH_PROVIDERS: OAuthProvider[] = ['github', 'google', 'qq']
+
 const availableMethods = ref<LoginMethod[]>([])
 const configuredOAuthProviders = ref<OAuthProvider[]>([])
 
-const displayMethods = computed<LoginMethod[]>(() => {
-  return availableMethods.value
-})
-
-const displayOAuthProviders = computed<OAuthProvider[]>(() => {
-  return configuredOAuthProviders.value
-})
+const displayMethods = computed<LoginMethod[]>(() => ALL_LOGIN_METHODS)
+const displayOAuthProviders = computed<OAuthProvider[]>(() => ALL_OAUTH_PROVIDERS)
 
 function isMethodImplemented(method: LoginMethod): boolean {
   return availableMethods.value.includes(method)
@@ -422,7 +420,11 @@ async function handleLogin() {
   try {
     if (loginMode.value === 'password') {
       const loginType = loginForm.account.includes('@') ? 'email' : 'phone'
-      const res = await authApi.login({ account: loginForm.account, password: loginForm.password, loginType } as any)
+      const res = await authApi.login({
+        account: loginForm.account,
+        password: loginForm.password,
+        loginType
+      })
       applyAuth(res)
     } else if (loginMode.value === 'email_code') {
       const res = await authApi.emailCodeLogin({ email: emailCodeForm.email, code: emailCodeForm.code })

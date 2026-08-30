@@ -27,6 +27,11 @@ public class PasswordAuthProvider implements AuthProvider {
 
     @Override
     public AuthResponse authenticate(Map<String, String> params) {
+        return authenticate(params, null);
+    }
+
+    @Override
+    public AuthResponse authenticate(Map<String, String> params, String clientIp) {
         LoginRequest request = new LoginRequest();
         request.setAccount(params.get("account"));
         request.setPassword(params.get("password"));
@@ -35,6 +40,11 @@ public class PasswordAuthProvider implements AuthProvider {
             throw new BusinessException(com.resume.common.constant.ResultCode.PARAM_INVALID,
                     "请填写账号和密码。");
         }
-        return userService.login(request);
+        // 保留空白校验由 @Valid 完成；此处补 isBlank 防止绕过 Bean Validation 的手工 Map 入参
+        if (request.getAccount().isBlank() || request.getPassword().isBlank()) {
+            throw new BusinessException(com.resume.common.constant.ResultCode.PARAM_INVALID,
+                    "请填写账号和密码。");
+        }
+        return userService.login(request, clientIp);
     }
 }

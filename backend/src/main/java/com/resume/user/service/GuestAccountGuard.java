@@ -52,9 +52,9 @@ public class GuestAccountGuard {
                 LocalDate today = LocalDate.now();
                 String key = REDIS_KEY_PREFIX + ip + ":" + today.format(DateTimeFormatter.BASIC_ISO_DATE);
                 Long count = redis.opsForValue().increment(key);
-                if (count != null && count == 1L) {
-                    // 首次计数设置 TTL 到当天结束，跨日自动失效
+                if (count != null) {
                     Duration ttl = Duration.between(LocalDateTime.now(), today.plusDays(1).atStartOfDay());
+                    // 每次重设 TTL，避免首次 expire 失败导致 key 永久有效
                     redis.expire(key, ttl);
                 }
                 boolean allowed = count != null && count <= maxPerIpPerDay;

@@ -220,7 +220,13 @@ const shareEnabled = computed({
 
 const shareExpiryLabel = computed(() => {
   if (!shareInfo.value?.expiresAt) return '永久有效'
-  const days = Math.max(0, Math.ceil((new Date(shareInfo.value.expiresAt).getTime() - Date.now()) / 86400000))
+  // 使用本地日期差异，避免 UTC 跨日导致 Math.ceil 多算 1 天。
+  const now = new Date()
+  const exp = new Date(shareInfo.value.expiresAt)
+  const days = Math.max(
+    0,
+    Math.round((exp.getTime() - now.getTime()) / 86_400_000)
+  )
   return `${days} 天后过期`
 })
 
@@ -232,7 +238,12 @@ const shareUrl = computed(() => {
 function resolveExpiresAt(option: 'forever' | '7d' | '30d'): string | undefined {
   if (option === 'forever') return undefined
   const days = option === '7d' ? 7 : 30
-  return new Date(Date.now() + days * 86400000).toISOString()
+  // 选「本地正午」避免 UTC 时区偏移把过期时间提前/推后 1 天。
+  // 后端按 ISO datetime 解析，校验「晚于当前时间」即可。
+  const exp = new Date()
+  exp.setDate(exp.getDate() + days)
+  exp.setHours(12, 0, 0, 0)
+  return exp.toISOString()
 }
 
 async function openShareDialog() {

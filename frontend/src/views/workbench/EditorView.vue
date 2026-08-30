@@ -340,65 +340,6 @@
     </template>
   </el-dialog>
 
-  <!-- 模块管理：排序 + 显隐 + 标题 -->
-  <el-dialog
-    v-model="sectionsDialogVisible"
-    title="模块管理"
-    width="520px"
-    align-center
-  >
-    <div
-      v-for="(sec, idx) in resume?.sections || []"
-      :key="sec.id"
-      class="flex items-center gap-2 py-2 border-b border-border/30"
-    >
-      <span class="text-xs text-muted w-5 text-center font-mono">{{ idx + 1 }}</span>
-      <el-input
-        :model-value="sec.title"
-        size="small"
-        style="flex: 1"
-        @update:model-value="updateSectionTitle(sec.id, $event)"
-      />
-      <span class="text-xs text-muted w-16">
-        {{ typeLabel(sec.type) }}
-      </span>
-      <el-button
-        size="small"
-        :disabled="idx === 0"
-        title="上移"
-        @click="moveSection(idx, -1)"
-      >
-        <el-icon><ArrowUp /></el-icon>
-      </el-button>
-      <el-button
-        size="small"
-        :disabled="idx === (resume?.sections?.length || 1) - 1"
-        title="下移"
-        @click="moveSection(idx, 1)"
-      >
-        <el-icon><ArrowDown /></el-icon>
-      </el-button>
-      <el-switch
-        :model-value="sec.visible"
-        size="small"
-        title="显示/隐藏"
-        @update:model-value="updateSectionVisibility(sec.id, $event)"
-      />
-    </div>
-    <el-button
-      type="primary"
-      plain
-      class="mt-3"
-      @click="addCustomSection"
-    >
-      <el-icon><Plus /></el-icon>
-      添加自定义模块
-    </el-button>
-    <p class="text-xs text-muted mt-3">
-      隐藏的模块不会出现在预览与导出 PDF 中；个人信息模块不可隐藏。
-    </p>
-  </el-dialog>
-
   <!-- 模板切换 -->
   <el-dialog
     v-model="templateDialogVisible"
@@ -800,7 +741,6 @@ const aiAssessment = ref<{
 const aiAssessmentLoading = ref(false)
 const renameVisible = ref(false)
 const renameTitle = ref('')
-const sectionsDialogVisible = ref(false)
 const templateDialogVisible = ref(false)
 const aiDrawerVisible = ref(false)
 const settingsDialogVisible = ref(false)
@@ -1129,15 +1069,20 @@ function triggerAutoSave() {
       saveError.value = ''
       const snapshot = cloneResumeState(resume.value!)
       try {
-        await resumeApi.update(snapshot.id, {
+        const result = await resumeApi.update(snapshot.id, {
           title: snapshot.title,
           targetPosition: snapshot.targetPosition,
           templateId: snapshot.templateId,
           sections: snapshot.sections,
           renderSettings: snapshot.renderSettings || undefined,
           // 期望版本号：后端 V13 乐观锁校验，冲突返回业务码 2012/HTTP 409
-          version: (snapshot as unknown as { version?: number }).version
-        })
+          version: snapshot.version
+        }) as { version?: number; updatedAt?: string }
+        // 成功后同步后端返回的 version，避免二次保存必冲突
+        if (result && typeof result.version === 'number' && resume.value) {
+          resume.value.version = result.version
+          if (result.updatedAt) resume.value.updatedAt = result.updatedAt
+        }
         if (resume.value && JSON.stringify(resume.value) === JSON.stringify(snapshot)) {
           draftStorage.clear(snapshot.id)
         }
@@ -1302,7 +1247,6 @@ function addCustomSection() {
   handleSectionsUpdate([...resume.value.sections, section])
   activeTab.value = 'custom'
   activeSectionId.value = section.id
-  sectionsDialogVisible.value = false
 }
 
 function undoEdit() {
@@ -1434,17 +1378,19 @@ onBeforeUnmount(() => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  height: calc(100vh - 2 * var(--spacing-margin-page));
-  background: #f6f6f4;
+  height: calc(100vh - 64px - 32px);
+  background: #F7F7F5;
   overflow: hidden;
-  margin: calc(-1 * var(--spacing-margin-page));
+  margin: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .editor-secondary-header {
   height: 64px;
   flex-shrink: 0;
-  background: #fff;
-  border-bottom: 1px solid #e7e7e4;
+  background: #FFFFFF;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   padding: 0 24px;
   display: flex;
   align-items: center;
@@ -1500,8 +1446,8 @@ onBeforeUnmount(() => {
   display: flex;
   overflow: hidden;
   overflow-x: hidden;
-  margin-top: 16px;
-  border-top: 1px solid #e4e4e1;
+  gap: 0;
+  background: #F7F7F5;
 }
 
 .editor-tabs {
@@ -1556,16 +1502,19 @@ onBeforeUnmount(() => {
 }
 
 .editor-form-panel {
-  width: clamp(390px, 31vw, 520px);
-  border-right: 1px solid var(--color-border);
-  background: #fffdf9;
+  width: 440px;
+  min-width: 440px;
+  max-width: 500px;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  background: #FFFFFF;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: width 180ms ease, opacity 180ms ease;
+  transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease;
 
   &.is-collapsed {
     width: 0;
+    min-width: 0;
     opacity: 0;
     overflow: hidden;
     border-right: 0;
@@ -1607,7 +1556,7 @@ onBeforeUnmount(() => {
 
 .editor-canvas {
   flex: 1;
-  background: #f0f1f0;
+  background: #F3F3F1;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -1618,7 +1567,7 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 32px 40px;
+  padding: 40px 32px;
   display: flex;
   justify-content: center;
 }

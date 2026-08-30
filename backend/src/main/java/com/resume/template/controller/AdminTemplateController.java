@@ -82,8 +82,10 @@ public class AdminTemplateController {
             throw new com.resume.common.exception.BusinessException(com.resume.common.constant.ResultCode.PARAM_INVALID, "缩略图大小不能超过 5MB。");
         }
         String format;
-        try (java.io.InputStream in = file.getInputStream()) {
-            format = ImageMagicUtil.detectFormat(in);
+        try {
+            byte[] bytes = file.getBytes();
+            byte[] header = bytes.length >= 12 ? java.util.Arrays.copyOf(bytes, 12) : bytes;
+            format = ImageMagicUtil.detectFormat(header);
         } catch (java.io.IOException e) {
             throw new com.resume.common.exception.BusinessException(com.resume.common.constant.ResultCode.PARAM_INVALID, "图片内容校验失败。");
         }

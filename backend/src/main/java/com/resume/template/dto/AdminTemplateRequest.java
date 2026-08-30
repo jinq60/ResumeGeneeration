@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.Map;
+
 /**
  * 后台模板创建/更新请求。
  */
@@ -29,8 +31,12 @@ public class AdminTemplateRequest {
     @Size(max = 512, message = "模板描述过长。")
     private String description;
 
+    /**
+     * 模板配置：data-model-and-ddl.md §4.4 推荐 Map<String, Object> + JacksonTypeHandler。
+     * 这里使用强类型 Map，前后端字段命名以 Spec 为准。
+     */
     @NotNull(message = "模板配置为必填项。")
-    private Object config;
+    private Map<String, Object> config;
 
     @NotBlank(message = "HTML 模板为必填项。")
     @Size(max = 128, message = "HTML 模板名称过长。")

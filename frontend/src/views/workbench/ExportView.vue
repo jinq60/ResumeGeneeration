@@ -304,11 +304,36 @@ async function handleExport() {
     ElMessage.warning('请选择模板')
     return
   }
+  if (!validateForExport(resume.value)) {
+    return
+  }
   if (exportFormat.value === 'pdf') {
     await exportPdf()
   } else {
     await exportDirect()
   }
+}
+
+/**
+ * 导出预检：与后端 ResumeSectionValidator.validateForExport 保持一致，
+ * 错误文案对齐 api-spec §11.1 / validation-rules.md §10：
+ *   - PDF_EXPORT_NAME_REQUIRED：姓名为必填
+ *   - PDF_EXPORT_CONTACT_REQUIRED：手机/邮箱至少一个
+ * 仅给提示，不阻止用户继续；后端仍会兜底校验。
+ */
+function validateForExport(target: Resume | null): boolean {
+  if (!target) return true
+  const profileSection = target.sections?.find((s) => s.type === 'profile')
+  const data = (profileSection?.data ?? {}) as { name?: string; phone?: string; email?: string }
+  if (!data.name?.trim()) {
+    ElMessage.warning('建议填写姓名，便于生成正式简历。')
+    return false
+  }
+  if (!data.phone?.trim() && !data.email?.trim()) {
+    ElMessage.warning('简历中至少需要填写手机号或邮箱。')
+    return false
+  }
+  return true
 }
 
 async function exportDirect() {

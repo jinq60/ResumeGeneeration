@@ -61,7 +61,7 @@ class PdfServiceTest {
 
     @BeforeEach
     void setUp() {
-        resumeSectionValidator = new ResumeSectionValidator();
+        resumeSectionValidator = new ResumeSectionValidator(new com.fasterxml.jackson.databind.ObjectMapper());
         Executor executor = (command) -> command.run();
         pdfService = new PdfService(pdfTaskMapper, resumeService, templateService,
                 resumeRenderService, minioStorageService, resumeSectionValidator, auditLogService,

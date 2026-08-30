@@ -4,26 +4,27 @@
    ========================================================================== */
 
 :root {
-  /* —— Magic Resume core palette —— */
-  --st-background: #F9F9F7;
-  --st-foreground: #1B1B18;
+  /* —— AI Resume Pro — Minimal Premium Editorial (2026) —— */
+  /* 背景 #F7F7F5 暖白，内容 #FFFFFF，文字 #171717 / #666 / #999，边框 rgba(0,0,0,0.08) */
+  --st-background: #F7F7F5;
+  --st-foreground: #171717;
   --st-card: #FFFFFF;
-  --st-card-foreground: #1B1B18;
+  --st-card-foreground: #171717;
   --st-popover: #FFFFFF;
-  --st-popover-foreground: #1B1B18;
-  --st-primary: #1B1B18;
-  --st-primary-foreground: #F9F9F7;
-  --st-secondary: #F2F0E9;
-  --st-secondary-foreground: #1B1B18;
-  --st-muted: #91918E;
-  --st-muted-foreground: #6B6B67;
-  --st-accent: #F2F0E9;
-  --st-accent-foreground: #1B1B18;
+  --st-popover-foreground: #171717;
+  --st-primary: #1D4ED8;
+  --st-primary-foreground: #FFFFFF;
+  --st-secondary: #EFEFEC;
+  --st-secondary-foreground: #171717;
+  --st-muted: #999999;
+  --st-muted-foreground: #666666;
+  --st-accent: #1D4ED8;
+  --st-accent-foreground: #FFFFFF;
   --st-destructive: #D92D20;
   --st-destructive-foreground: #FFFFFF;
-  --st-border: #E6E6E3;
-  --st-input: #E6E6E3;
-  --st-ring: #1B1B18;
+  --st-border: rgba(0, 0, 0, 0.08);
+  --st-input: rgba(0, 0, 0, 0.08);
+  --st-ring: #1D4ED8;
 
   /* —— Legacy surface aliases —— */
   --st-surface: var(--st-background);
@@ -53,29 +54,37 @@
   --st-tertiary: var(--st-foreground);
   --st-tertiary-container: var(--st-secondary);
 
-  /* —— 字体 —— */
-  --st-font-sans: "Inter", -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  /* —— 字体： editorial hierarchy —— */
+  --st-font-sans: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
   --st-font-serif: "Newsreader", "Noto Serif SC", Georgia, 'Times New Roman', serif;
-  --st-font-headline: var(--st-font-serif);
+  --st-font-display: "Instrument Serif", "Newsreader", Georgia, serif;
+  --st-font-headline: var(--st-font-sans);
   --st-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
 
-  --st-headline-lg: 500 40px/48px var(--st-font-headline);
-  --st-headline-md: 500 32px/40px var(--st-font-headline);
+  --st-display: 600 40px/44px var(--st-font-sans);
+  --st-headline-lg: 600 32px/38px var(--st-font-sans);
+  --st-headline-md: 500 24px/32px var(--st-font-sans);
   --st-title-lg: 500 20px/28px var(--st-font-sans);
   --st-title-md: 500 16px/24px var(--st-font-sans);
   --st-body-lg: 400 16px/26px var(--st-font-sans);
   --st-body-md: 400 14px/22px var(--st-font-sans);
-  --st-label-md: 500 12px/18px var(--st-font-sans);
+  --st-body-sm: 400 13px/20px var(--st-font-sans);
+  --st-label-md: 500 12px/16px var(--st-font-sans);
+  --st-caption: 400 12px/16px var(--st-font-sans);
 
-  /* —— 间距 —— */
-  --st-sidebar-width: 220px;
+  /* —— 间距： spatial, editorial —— */
+  --st-sidebar-width: 240px;
+  --st-sidebar-collapsed-width: 72px;
   --st-drawer-width: 400px;
-  --st-gutter: 20px;
-  --st-margin-page: 24px;
+  --st-gutter: 24px;
+  --st-margin-page: 32px;
+  --st-section-gap: 64px;
+  --st-content-max: 1440px;
   --st-stack-sm: 8px;
   --st-stack-md: 16px;
   --st-stack-lg: 24px;
   --st-stack-xl: 40px;
+  --st-stack-2xl: 64px;
 
   /* —— 圆角 —— */
   --st-radius-sm: 0.5rem;

@@ -42,11 +42,33 @@ class ShareServiceTest {
     @Mock
     private TemplateService templateService;
 
+    @Mock
+    private com.resume.resume.service.ResumeService resumeService;
+
     private ShareService shareService;
+
+    @org.junit.jupiter.api.BeforeAll
+    static void initTableInfo() {
+        com.baomidou.mybatisplus.core.MybatisConfiguration cfg = new com.baomidou.mybatisplus.core.MybatisConfiguration();
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                new org.apache.ibatis.builder.MapperBuilderAssistant(cfg, ""), com.resume.resume.share.entity.ResumeShare.class);
+    }
 
     @BeforeEach
     void setUp() {
-        shareService = new ShareService(resumeShareMapper, resumeMapper, resumeRenderService, templateService);
+        shareService = new ShareService(resumeShareMapper, resumeMapper, resumeRenderService, templateService, resumeService);
+        // ShareService.createShare 内部 via resumeService.getResumeEntity 校验归属，mock其行为
+        org.mockito.Mockito.lenient().when(resumeService.getResumeEntity(any(), any())).thenAnswer(inv -> {
+            String uid = inv.getArgument(0);
+            String rid = inv.getArgument(1);
+            com.resume.resume.entity.Resume r = new com.resume.resume.entity.Resume();
+            r.setId(rid);
+            r.setUserId(uid);
+            r.setDeleted(BizConstant.NOT_DELETED);
+            return r;
+        });
+        // 对于跨用户场景，测试用例会自行 stub resumeMapper.selectById 覆盖；ShareService 现在不再直接读 resumeMapper for 校验
+        // 但 renderSharePage 仍直接用 resumeMapper，需保留原 stub
     }
 
     private Resume buildResume(String userId, String resumeId) {
@@ -76,7 +98,8 @@ class ShareServiceTest {
 
     @Test
     void createShare_shouldRejectForeignResume() {
-        when(resumeMapper.selectById("resume_1")).thenReturn(buildResume("user_2", "resume_1"));
+        when(resumeService.getResumeEntity("user_1", "resume_1"))
+                .thenThrow(new BusinessException(ResultCode.ACCESS_DENIED, "无权访问该资源。"));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> shareService.createShare("user_1", "resume_1", false, null));
@@ -85,7 +108,8 @@ class ShareServiceTest {
 
     @Test
     void createShare_shouldRejectMissingResume() {
-        when(resumeMapper.selectById("resume_missing")).thenReturn(null);
+        when(resumeService.getResumeEntity("user_1", "resume_missing"))
+                .thenThrow(new BusinessException(ResultCode.RESUME_NOT_FOUND, "简历不存在。"));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> shareService.createShare("user_1", "resume_missing", false, null));

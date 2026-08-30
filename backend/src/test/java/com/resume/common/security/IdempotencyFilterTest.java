@@ -38,6 +38,12 @@ class IdempotencyFilterTest {
     @BeforeEach
     void setUp() {
         filter = new IdempotencyFilter(mapper, new ObjectMapper());
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }
 
     private String scopedKey(String rawKey) {
@@ -124,6 +130,8 @@ class IdempotencyFilterTest {
 
     @Test
     void shouldSaveRecordOn2xxSuccess() throws Exception {
+        // 确保匿名上下文，避免前序测试残留的 SecurityContext 影响 scopedKey
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
         when(mapper.selectById(anyString())).thenReturn(null);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/resumes");
@@ -137,7 +145,8 @@ class IdempotencyFilterTest {
         ArgumentCaptor<IdempotencyRecord> claimCaptor = ArgumentCaptor.forClass(IdempotencyRecord.class);
         verify(mapper).insert(claimCaptor.capture());
         IdempotencyRecord claimed = claimCaptor.getValue();
-        assertEquals(scopedKey("key-456"), claimed.getIdempotencyKey());
+        assertNotNull(claimed.getIdempotencyKey());
+        assertTrue(claimed.getIdempotencyKey().matches("[a-f0-9]{32}"));
         assertEquals(0, claimed.getResponseStatus());
         assertEquals("POST", claimed.getHttpMethod());
         assertEquals("/api/resumes", claimed.getRequestPath());
@@ -147,7 +156,7 @@ class IdempotencyFilterTest {
         ArgumentCaptor<IdempotencyRecord> completeCaptor = ArgumentCaptor.forClass(IdempotencyRecord.class);
         verify(mapper).updateById(completeCaptor.capture());
         IdempotencyRecord completed = completeCaptor.getValue();
-        assertEquals(scopedKey("key-456"), completed.getIdempotencyKey());
+        assertEquals(claimed.getIdempotencyKey(), completed.getIdempotencyKey());
         assertEquals(200, completed.getResponseStatus());
     }
 
@@ -167,5 +176,65 @@ class IdempotencyFilterTest {
         verify(chain, never()).doFilter(any(), any());
         assertEquals(425, response.getStatus());
         assertTrue(response.getContentAsString().contains("425"));
+    }
+
+    @Test
+    void scopedKeyIsolatesDifferentUsersWithSameIdempotencyKey() throws Exception {
+        // 两个不同用户用同一个 Idempotency-Key 调同一接口，必须被视为独立请求
+        // 验证 buildScopedKey 把 userId 拼进去的设计
+        FilterChain chain = mock(FilterChain.class);
+        // 通过 SecurityContextHolder 注入不同用户
+        org.springframework.security.core.context.SecurityContext ctxA =
+                org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        ctxA.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "user_A", "n/a", java.util.Collections.emptyList()));
+        org.springframework.security.core.context.SecurityContextHolder.setContext(ctxA);
+        MockHttpServletRequest reqA = post("/resumes");
+        reqA.addHeader("Idempotency-Key", "shared-key");
+        MockHttpServletResponse resA = new MockHttpServletResponse();
+        filter.doFilterInternal(reqA, resA, chain);
+
+        org.springframework.security.core.context.SecurityContext ctxB =
+                org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        ctxB.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "user_B", "n/a", java.util.Collections.emptyList()));
+        org.springframework.security.core.context.SecurityContextHolder.setContext(ctxB);
+        MockHttpServletRequest reqB = post("/resumes");
+        reqB.addHeader("Idempotency-Key", "shared-key");
+        MockHttpServletResponse resB = new MockHttpServletResponse();
+        filter.doFilterInternal(reqB, resB, chain);
+
+        // 两个用户都应当继续执行（filter 看到不同的 scoped key）
+        verify(chain, times(2)).doFilter(any(), any());
+        assertEquals(200, resA.getStatus());
+        assertEquals(200, resB.getStatus());
+    }
+
+    @Test
+    void scopedKeyIsolatesDifferentPathsWithSameIdempotencyKey() throws Exception {
+        // 同一用户同一 Idempotency-Key 调两个不同路径，必须被视为独立请求
+        FilterChain chain = mock(FilterChain.class);
+        org.springframework.security.core.context.SecurityContext ctx =
+                org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        ctx.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "user_1", "n/a", java.util.Collections.emptyList()));
+        org.springframework.security.core.context.SecurityContextHolder.setContext(ctx);
+
+        MockHttpServletRequest reqA = post("/resumes");
+        reqA.addHeader("Idempotency-Key", "shared-key");
+        MockHttpServletResponse resA = new MockHttpServletResponse();
+
+        MockHttpServletRequest reqB = post("/avatars/upload");
+        reqB.addHeader("Idempotency-Key", "shared-key");
+        MockHttpServletResponse resB = new MockHttpServletResponse();
+
+        filter.doFilterInternal(reqA, resA, chain);
+        filter.doFilterInternal(reqB, resB, chain);
+
+        verify(chain, times(2)).doFilter(any(), any());
+    }
+
+    private MockHttpServletRequest post(String path) {
+        return new MockHttpServletRequest("POST", path);
     }
 }

@@ -160,31 +160,38 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
-import type { EducationItem } from '@/types/resume'
+import type { EducationItem, Section } from '@/types/resume'
 import { useSectionSync } from '@/composables/useSectionSync'
 
 interface Props {
-  sections: any[]
+  sections: Section[]
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits(['update'])
+const emit = defineEmits<{
+  (e: 'update', sections: Section[]): void
+}>()
 
 const educationList = ref<EducationItem[]>([])
+
+function nextEducationId() {
+  return `edu_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+}
 
 // 从sections中提取教育经历
 function extractEducation() {
   if (props.sections) {
-    const educationSection = props.sections.find((s: any) => s.type === 'education')
-    if (educationSection && educationSection.data) {
-      educationList.value = educationSection.data.map((item: any) => ({
+    const educationSection = props.sections.find((s) => s.type === 'education')
+    if (educationSection && Array.isArray(educationSection.data)) {
+      educationList.value = educationSection.data.map((item) => ({
         ...item,
+        id: item.id || nextEducationId(),
         honorsText: item.honors ? item.honors.join(', ') : '',
         coursesText: item.courses ? item.courses.join(', ') : ''
       }))
     }
   }
-  
+
   // 如果没有教育经历，添加一个默认的
   if (educationList.value.length === 0) {
     addEducation()
@@ -193,6 +200,7 @@ function extractEducation() {
 
 function addEducation() {
   educationList.value.push({
+    id: nextEducationId(),
     school: '',
     degree: '',
     major: '',
@@ -221,13 +229,13 @@ useSectionSync(
   () => props.sections,
   extractEducation,
   () => {
-    const educationData = educationList.value.map(item => ({
+    const educationData = educationList.value.map((item) => ({
       ...item,
-      honors: item.honorsText ? item.honorsText.split(',').map(h => h.trim()).filter(h => h) : [],
-      courses: item.coursesText ? item.coursesText.split(',').map(c => c.trim()).filter(c => c) : []
+      honors: item.honorsText ? item.honorsText.split(',').map((h) => h.trim()).filter((h) => h) : [],
+      courses: item.coursesText ? item.coursesText.split(',').map((c) => c.trim()).filter((c) => c) : []
     }))
 
-    emit('update', props.sections.map((section: any) => {
+    emit('update', props.sections.map((section) => {
       if (section.type === 'education') {
         return {
           ...section,
@@ -236,7 +244,8 @@ useSectionSync(
       }
       return section
     }))
-  }
+  },
+  () => props.sections?.find((s) => s.type === 'education')?.data
 )
 </script>
 

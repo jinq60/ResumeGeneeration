@@ -39,7 +39,7 @@ public class PdfTaskRecoveryJob implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         // 启动恢复不设时间下限：所有遗留非终态任务都由本次进程接管前清理
-        int recovered = failStaleTasks(LocalDateTime.MAX);
+        int recovered = failAllStaleTasks();
         if (recovered > 0) {
             log.warn("PDF task recovery on startup: marked {} leftover non-terminal tasks as failed", recovered);
         }
@@ -69,6 +69,22 @@ public class PdfTaskRecoveryJob implements ApplicationRunner {
         wrapper.in(PdfTask::getStatus,
                         List.of(BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING))
                 .lt(PdfTask::getUpdatedAt, cutoff)
+                .set(PdfTask::getStatus, BizConstant.TASK_STATUS_FAILED)
+                .set(PdfTask::getErrorMsg, "服务中断导致导出任务未完成，请重新发起导出。")
+                .set(PdfTask::getUpdatedAt, LocalDateTime.now());
+        Integer affected = pdfTaskMapper.update(null, wrapper);
+        return affected == null ? 0 : affected;
+    }
+
+    /**
+     * 启动时一次性把全部非终态遗留任务置为 failed。
+     * 不传 LocalDateTime.MAX 给 SQL 是为了规避 MySQL Connector/J 8.3 在写入极大时间时
+     * 由于 serverTimezone 调整发生 Year 1000000000 异常。这里直接省掉时间条件。
+     */
+    public int failAllStaleTasks() {
+        LambdaUpdateWrapper<PdfTask> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(PdfTask::getStatus,
+                        List.of(BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING))
                 .set(PdfTask::getStatus, BizConstant.TASK_STATUS_FAILED)
                 .set(PdfTask::getErrorMsg, "服务中断导致导出任务未完成，请重新发起导出。")
                 .set(PdfTask::getUpdatedAt, LocalDateTime.now());
