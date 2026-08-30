@@ -433,7 +433,12 @@ useSectionSync(
 }
 .magic-field-row .field-control.el-date-editor,
 .magic-field-row .el-date-editor,
-.magic-field-row .el-date-editor.el-input__wrapper { width: 100% !important; min-width: 0; max-width: 100%; }
+.magic-field-row .el-date-editor.el-input__wrapper {
+  width: 100% !important; min-width: 0 !important; max-width: 100% !important;
+  box-sizing: border-box;
+}
+.magic-field-row > .field-control { max-width: 100%; min-width: 0; overflow: hidden; }
+.magic-field-row { column-gap: 8px; }
 .magic-field-row:hover {
   border-color: hsl(var(--st-foreground) / 0.14);
   box-shadow: var(--st-shadow-md);
