@@ -48,7 +48,7 @@ function toggleSidebar() {
 .workbench-layout {
   --st-sidebar-current-width: var(--st-sidebar-width, 240px);
   min-height: 100vh;
-  background: #F7F7F5;
+  background: hsl(48 20% 97%);
 }
 
 .workbench-main {
@@ -57,7 +57,7 @@ function toggleSidebar() {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #F7F7F5;
+  background: hsl(48 20% 97%);
 }
 
 .workbench-content {

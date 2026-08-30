@@ -1378,20 +1378,23 @@ onBeforeUnmount(() => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  height: calc(100vh - 64px - 32px);
-  background: #F7F7F5;
+  height: calc(100vh - 64px - 16px);
+  background: hsl(48 20% 97%);
   overflow: hidden;
-  margin: 0;
+  margin: 8px;
   border-radius: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 1px solid hsl(48 10% 89%);
+  box-shadow: 0 1px 3px rgba(27,27,24,0.05);
 }
 
 .editor-secondary-header {
-  height: 64px;
+  height: 56px;
   flex-shrink: 0;
-  background: #FFFFFF;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 0 24px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid hsl(48 10% 89%);
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1502,11 +1505,11 @@ onBeforeUnmount(() => {
 }
 
 .editor-form-panel {
-  width: 440px;
-  min-width: 440px;
-  max-width: 500px;
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
-  background: #FFFFFF;
+  width: 380px;
+  min-width: 380px;
+  max-width: 420px;
+  border-right: 1px solid hsl(48 10% 89%);
+  background: white;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -1526,12 +1529,16 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 64px;
-  padding: 0 24px;
-  border-bottom: 1px solid #e8e7e2;
-  background: #fff;
-  color: #22211d;
-  font-size: 16px;
+  min-height: 56px;
+  margin: 12px 16px 0;
+  padding: 0 16px;
+  border: 1px solid hsl(48 10% 89%);
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(27,27,24,0.04);
+  color: hsl(60 5% 10%);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .editor-form-panel > .flex-1 {
@@ -1556,7 +1563,7 @@ onBeforeUnmount(() => {
 
 .editor-canvas {
   flex: 1;
-  background: #F3F3F1;
+  background: hsl(48 20% 97%);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -1567,9 +1574,10 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 40px 32px;
+  padding: 32px 24px;
   display: flex;
   justify-content: center;
+  background: hsl(48 20% 97%);
 }
 
 .a4-page-shell {

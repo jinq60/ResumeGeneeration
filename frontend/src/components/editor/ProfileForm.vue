@@ -1,69 +1,120 @@
 <template>
-  <el-form ref="formRef" :model="formData" :rules="fieldRules" class="profile-form" label-position="top">
-    <section class="profile-fields">
-      <el-form-item v-if="isFieldVisible('name')" prop="name" class="profile-field-row">
-        <el-icon><User /></el-icon><span class="field-label">姓名</span>
-        <el-input v-model="formData.name" class="field-control" placeholder="请输入姓名" />
-        <el-icon class="field-action" @click="toggleField('name')"><View /></el-icon>
-      </el-form-item>
-      <el-form-item v-if="isFieldVisible('targetPosition')" prop="targetPosition" class="profile-field-row">
-        <el-icon><Briefcase /></el-icon><span class="field-label">职位</span>
-        <el-input v-model="formData.targetPosition" class="field-control" placeholder="请输入目标岗位" maxlength="128" show-word-limit />
-        <el-icon class="field-action" @click="toggleField('targetPosition')"><View /></el-icon>
-      </el-form-item>
-      <el-form-item v-if="isFieldVisible('availability')" prop="availability" class="profile-field-row">
-        <el-icon><Briefcase /></el-icon><span class="field-label">状态</span>
-        <el-input v-model="formData.availability" class="field-control" placeholder="请输入到岗时间" maxlength="64" />
-        <el-icon class="field-action" @click="toggleField('availability')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('availability')"><Delete /></el-icon>
-      </el-form-item>
-      <el-form-item v-if="isFieldVisible('birthDate')" prop="birthDate" class="profile-field-row">
-        <el-icon><Calendar /></el-icon><span class="field-label">生日</span>
-        <el-date-picker v-model="formData.birthDate" class="field-control" type="month" placeholder="选择出生年月" format="YYYY-MM" value-format="YYYY-MM" />
-        <el-icon class="field-action" @click="toggleField('birthDate')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('birthDate')"><Delete /></el-icon>
-      </el-form-item>
-      <el-form-item v-if="isFieldVisible('email')" prop="email" class="profile-field-row">
-        <el-icon><Message /></el-icon><span class="field-label">邮箱</span>
-        <el-input v-model="formData.email" class="field-control" placeholder="请输入邮箱" maxlength="128" />
-        <el-icon class="field-action" @click="toggleField('email')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('email')"><Delete /></el-icon>
-      </el-form-item>
-      <el-form-item v-if="isFieldVisible('phone')" prop="phone" class="profile-field-row">
-        <el-icon><Phone /></el-icon><span class="field-label">电话</span>
-        <el-input v-model="formData.phone" class="field-control" placeholder="请输入手机号" maxlength="11" />
-        <el-icon class="field-action" @click="toggleField('phone')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('phone')"><Delete /></el-icon>
-      </el-form-item>
-      <el-form-item v-if="isFieldVisible('city')" prop="city" class="profile-field-row">
-        <el-icon><Location /></el-icon><span class="field-label">地址</span>
-        <el-input v-model="formData.city" class="field-control" placeholder="请输入所在城市" maxlength="50" />
-        <el-icon class="field-action" @click="toggleField('city')"><View /></el-icon><el-icon class="field-delete" @click="removeProfileField('city')"><Delete /></el-icon>
-      </el-form-item>
+  <el-form ref="formRef" :model="formData" :rules="fieldRules" class="profile-form magic-form" label-position="top">
+    <!-- 基础字段：对齐 BasicPanel renderBasicField — drag handle 16px / icon 14px / label 80px / input flex1 h-9 / eye 22px / delete 22px -->
+    <section class="magic-section">
+      <div class="magic-section-head">
+        <h3 class="magic-heading">基本信息</h3>
+        <span class="magic-heading-sub">拖拽可排序 · 眼睛控制显示</span>
+      </div>
+      <div class="profile-fields magic-field-list">
+        <el-form-item v-if="isFieldVisible('name')" prop="name" class="profile-field-row magic-field-row group">
+          <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
+          <span class="magic-icon"><el-icon :size="14"><User /></el-icon></span>
+          <span class="field-label magic-label">姓名</span>
+          <el-input v-model="formData.name" class="field-control magic-input" placeholder="请输入姓名" />
+          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('name')"><el-icon :size="14"><View v-if="isFieldVisible('name')" /><Hide v-else /></el-icon></button>
+          <span class="magic-delete-placeholder" />
+        </el-form-item>
+        <el-form-item v-if="isFieldVisible('targetPosition')" prop="targetPosition" class="profile-field-row magic-field-row group">
+          <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
+          <span class="magic-icon"><el-icon :size="14"><Briefcase /></el-icon></span>
+          <span class="field-label magic-label">职位</span>
+          <el-input v-model="formData.targetPosition" class="field-control magic-input" placeholder="请输入目标岗位" maxlength="128" show-word-limit />
+          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('targetPosition')"><el-icon :size="14"><View v-if="isFieldVisible('targetPosition')" /><Hide v-else /></el-icon></button>
+          <span class="magic-delete-placeholder" />
+        </el-form-item>
+        <el-form-item v-if="isFieldVisible('availability')" prop="availability" class="profile-field-row magic-field-row group">
+          <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
+          <span class="magic-icon"><el-icon :size="14"><Briefcase /></el-icon></span>
+          <span class="field-label magic-label">状态</span>
+          <el-input v-model="formData.availability" class="field-control magic-input" placeholder="请输入到岗时间" maxlength="64" />
+          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('availability')"><el-icon :size="14"><View /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('availability')"><el-icon :size="14"><Delete /></el-icon></button>
+        </el-form-item>
+        <el-form-item v-if="isFieldVisible('birthDate')" prop="birthDate" class="profile-field-row magic-field-row group">
+          <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
+          <span class="magic-icon"><el-icon :size="14"><Calendar /></el-icon></span>
+          <span class="field-label magic-label">生日</span>
+          <el-date-picker v-model="formData.birthDate" class="field-control magic-input" type="month" placeholder="选择出生年月" format="YYYY-MM" value-format="YYYY-MM" />
+          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('birthDate')"><el-icon :size="14"><View /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('birthDate')"><el-icon :size="14"><Delete /></el-icon></button>
+        </el-form-item>
+        <el-form-item v-if="isFieldVisible('email')" prop="email" class="profile-field-row magic-field-row group">
+          <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
+          <span class="magic-icon"><el-icon :size="14"><Message /></el-icon></span>
+          <span class="field-label magic-label">邮箱</span>
+          <el-input v-model="formData.email" class="field-control magic-input" placeholder="请输入邮箱" maxlength="128" />
+          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('email')"><el-icon :size="14"><View /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('email')"><el-icon :size="14"><Delete /></el-icon></button>
+        </el-form-item>
+        <el-form-item v-if="isFieldVisible('phone')" prop="phone" class="profile-field-row magic-field-row group">
+          <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
+          <span class="magic-icon"><el-icon :size="14"><Phone /></el-icon></span>
+          <span class="field-label magic-label">电话</span>
+          <el-input v-model="formData.phone" class="field-control magic-input" placeholder="请输入手机号" maxlength="11" />
+          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('phone')"><el-icon :size="14"><View /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('phone')"><el-icon :size="14"><Delete /></el-icon></button>
+        </el-form-item>
+        <el-form-item v-if="isFieldVisible('city')" prop="city" class="profile-field-row magic-field-row group">
+          <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
+          <span class="magic-icon"><el-icon :size="14"><Location /></el-icon></span>
+          <span class="field-label magic-label">地址</span>
+          <el-input v-model="formData.city" class="field-control magic-input" placeholder="请输入所在城市" maxlength="50" />
+          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('city')"><el-icon :size="14"><View /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('city')"><el-icon :size="14"><Delete /></el-icon></button>
+        </el-form-item>
+      </div>
     </section>
 
-    <h3 class="custom-heading">自定义字段</h3>
-<template v-for="field in formData.customFields || []" :key="field.id">
-      <div v-if="isFieldVisible(field.id)" class="custom-field-row">
-        <el-icon><Link /></el-icon>
-        <el-input v-model="field.label" class="custom-label" placeholder="字段名称" maxlength="32" />
-        <el-input v-model="field.value" class="custom-value" placeholder="字段内容" maxlength="200" />
-        <span class="show-label"><el-switch v-model="field.showLabel" size="small" /> 显示标签</span>
-        <el-icon class="field-action" @click="toggleField(field.id)"><View /></el-icon><el-icon class="field-delete" @click="removeCustomField(field.id)"><Delete /></el-icon>
+    <section class="magic-section">
+      <div class="magic-section-head">
+        <h3 class="magic-heading">自定义字段</h3>
+        <span class="magic-heading-sub">对齐 CustomField 样式 · label/value 两栏</span>
       </div>
-    </template>
-    <div v-if="addingCustomField" class="custom-add-form">
-      <el-input v-model="newFieldLabel" autofocus placeholder="请输入字段名称" @keyup.enter="confirmAddCustomField" />
-      <el-button type="primary" @click="confirmAddCustomField">确定</el-button>
-      <el-button @click="cancelAddCustomField">取消</el-button>
-    </div>
-    <button v-else class="add-custom-button" type="button" @click="startAddCustomField"><el-icon><Plus /></el-icon> 添加自定义字段</button>
+      <div class="magic-field-list">
+        <template v-for="field in formData.customFields || []" :key="field.id">
+          <div v-if="isFieldVisible(field.id)" class="custom-field-row magic-custom-row group">
+            <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
+            <span class="magic-icon"><el-icon :size="14"><Link /></el-icon></span>
+            <el-input v-model="field.label" class="custom-label magic-input" placeholder="字段名称" maxlength="32" />
+            <el-input v-model="field.value" class="custom-value magic-input" placeholder="字段内容" maxlength="200" />
+            <span class="show-label"><el-switch v-model="field.showLabel" size="small" /> <span class="show-label-text">显示标签</span></span>
+            <button type="button" class="magic-action" @click="toggleField(field.id)"><el-icon :size="14"><View /></el-icon></button>
+            <button type="button" class="magic-delete" @click="removeCustomField(field.id)"><el-icon :size="14"><Delete /></el-icon></button>
+          </div>
+        </template>
+        <div v-if="addingCustomField" class="custom-add-form magic-card">
+          <el-input v-model="newFieldLabel" autofocus placeholder="请输入字段名称" @keyup.enter="confirmAddCustomField" class="magic-input" />
+          <el-button type="primary" class="magic-primary-btn" round @click="confirmAddCustomField">确定</el-button>
+          <el-button round @click="cancelAddCustomField">取消</el-button>
+        </div>
+        <button v-else class="add-custom-button magic-primary-btn" type="button" @click="startAddCustomField"><el-icon><Plus /></el-icon> 添加自定义字段</button>
+      </div>
+    </section>
 
-    <div class="avatar-card">
-      <div class="avatar-title">头像</div>
-      <img v-if="formData.avatarUrl" class="avatar-preview" :src="formData.avatarUrl" alt="头像预览">
-      <el-upload :show-file-list="false" :auto-upload="false" accept="image/jpeg,image/png,image/webp" :on-change="handleAvatarChange">
-        <el-button :loading="avatarUploading">{{ avatarUploading ? '上传中…' : '选择图片' }}</el-button>
-      </el-upload>
-      <span class="avatar-upload-hint">JPG、PNG 或 WEBP，最大 10MB</span>
-    </div>
-    <div class="extra-settings"><el-button type="primary" plain @click="goAvatarUpload">上传并优化一寸照</el-button><el-divider>展示设置</el-divider><span>显示头像</span><el-switch v-model="formData.showAvatar" /><span>显示性别</span><el-switch v-model="formData.showGender" /><span>显示年龄</span><el-switch v-model="formData.showAge" /><span>显示薪资</span><el-switch v-model="formData.showSalary" /></div>
+    <section class="magic-section">
+      <div class="avatar-card magic-card">
+        <div class="avatar-title">头像</div>
+        <div class="avatar-body">
+          <img v-if="formData.avatarUrl" class="avatar-preview" :src="formData.avatarUrl" alt="头像预览">
+          <div v-else class="avatar-placeholder">暂无头像</div>
+          <el-upload :show-file-list="false" :auto-upload="false" accept="image/jpeg,image/png,image/webp" :on-change="handleAvatarChange">
+            <el-button round :loading="avatarUploading">{{ avatarUploading ? '上传中…' : '选择图片' }}</el-button>
+          </el-upload>
+        </div>
+        <span class="avatar-upload-hint">JPG、PNG 或 WEBP，最大 10MB · 将用于简历头像与一寸照优化</span>
+      </div>
+      <div class="extra-settings magic-card">
+        <el-button type="primary" round class="magic-primary-btn" @click="goAvatarUpload">上传并优化一寸照</el-button>
+        <el-divider class="magic-divider">展示设置</el-divider>
+        <div class="setting-grid">
+          <label class="setting-row"><span>显示头像</span><el-switch v-model="formData.showAvatar" /></label>
+          <label class="setting-row"><span>显示性别</span><el-switch v-model="formData.showGender" /></label>
+          <label class="setting-row"><span>显示年龄</span><el-switch v-model="formData.showAge" /></label>
+          <label class="setting-row"><span>显示薪资</span><el-switch v-model="formData.showSalary" /></label>
+        </div>
+      </div>
+    </section>
   </el-form>
 </template>
 
@@ -72,7 +123,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import type { UploadFile } from 'element-plus'
-import { Briefcase, Calendar, Delete, Link, Location, Message, Phone, Plus, User, View } from '@element-plus/icons-vue'
+import { Briefcase, Calendar, Delete, Hide, Link, Location, Message, Phone, Plus, Rank, User, View } from '@element-plus/icons-vue'
 import type { Profile, Resume, Section } from '@/types/resume'
 import { useSectionSync } from '@/composables/useSectionSync'
 import { avatarApi } from '@/api/avatar'
@@ -321,163 +372,314 @@ useSectionSync(
 </script>
 
 <style scoped lang="scss">
-.profile-form {
-  padding: 24px 34px 48px;
-  color: #171717;
-  font-family: Georgia, 'Times New Roman', 'Microsoft YaHei', serif;
+/* 对齐 magic-resume globals.css： hsl(48 20% 97%) parchment + 0.75rem 卡片 + ring 输入框 + 细边框阴影 */
+.profile-form.magic-form {
+  padding: 4px 0 28px;
+  color: hsl(var(--st-foreground));
+  font-family: var(--st-font-sans);
+  background: transparent;
 }
 
-.profile-fields {
+/* 全局 magic 令牌复用 — 与 tailwind.css / design-system.scss 同源 */
+.magic-section {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
+  margin-bottom: 20px;
 }
+.magic-section:last-child { margin-bottom: 0; }
 
-.profile-field-row {
-  display: grid;
-  grid-template-columns: 22px 70px minmax(120px, 1fr) 28px 28px;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-}
-
-.field-label {
-  white-space: nowrap;
-  font-size: 15px;
-}
-
-.field-control {
-  width: min(100%, 360px);
-}
-
-.field-control :deep(.el-input__wrapper),
-.field-control :deep(.el-date-editor) {
-  min-height: 36px;
-  border-radius: 11px;
-}
-
-.field-action,
-.field-delete {
-  cursor: pointer;
-  justify-self: center;
-}
-
-.field-delete {
-  color: #ff4d4f;
-}
-
-.custom-heading {
-  margin: 28px 0 16px 6px;
-  font-size: 17px;
-  font-weight: 400;
-}
-
-.custom-field-row {
-  display: grid;
-  grid-template-columns: 24px 22px 110px minmax(120px, 1fr) 92px 28px 28px;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid #e2e2e2;
-  border-radius: 13px;
-  margin-bottom: 16px;
-}
-
-.custom-field-row :deep(.el-input__wrapper) {
-  min-height: 36px;
-  border-radius: 10px;
-}
-
-.show-label {
+.magic-section-head {
   display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+}
+.magic-heading {
+  margin: 0;
+  font-family: var(--st-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: hsl(var(--st-foreground));
+}
+.magic-heading-sub {
+  font-size: 11px;
+  color: hsl(var(--st-muted));
+  white-space: nowrap;
+}
+
+.magic-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 单行：左侧 6px drag 占位(实际 16px 含 padding) + 14px 图标 + 80px label + flex1 input + 22px eye + 22px delete */
+.magic-field-row {
+  display: grid;
+  grid-template-columns: 16px 22px 80px minmax(0, 1fr) 28px 28px;
   align-items: center;
-  gap: 5px;
-  color: #666;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px 8px 8px;
+  background: hsl(var(--st-card));
+  border: 1px solid hsl(var(--st-border));
+  border-radius: var(--st-radius-lg); /* 0.75rem 对齐 magic --radius */
+  box-shadow: var(--st-shadow-sm);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+.magic-field-row:hover {
+  border-color: hsl(var(--st-foreground) / 0.14);
+  box-shadow: var(--st-shadow-md);
+}
+.magic-field-row :deep(.el-form-item__content) {
+  display: contents;
+}
+.magic-field-row :deep(.el-form-item__error) {
+  grid-column: 4;
+  position: static;
+  padding-top: 4px;
+  font-size: 11px;
+}
+
+.magic-drag {
+  width: 16px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(var(--st-muted));
+  opacity: 0.55;
+  cursor: grab;
+  transition: opacity 160ms ease, color 160ms ease;
+}
+.magic-field-row:hover .magic-drag { opacity: 1; color: hsl(var(--st-foreground) / 0.6); }
+.magic-drag-icon { font-size: 14px; }
+
+.magic-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(var(--st-muted-foreground));
+  background: hsl(var(--st-secondary) / 0.7);
+  border: 1px solid hsl(var(--st-border));
+  border-radius: 6px;
+}
+
+.magic-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: hsl(var(--st-foreground));
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.field-control.magic-input { width: 100%; min-width: 0; }
+.magic-input :deep(.el-input__wrapper),
+.magic-input :deep(.el-date-editor.el-input__wrapper),
+:deep(.custom-field-row .el-input__wrapper) {
+  min-height: 36px;
+  height: 36px;
+  padding: 1px 10px;
+  background: hsl(var(--st-background));
+  border-radius: 0.5rem; /* 输入框 rounded-lg h-9 语义，视觉上 10px 与 magic ring 1 呼应 */
+  box-shadow: 0 0 0 1px hsl(var(--st-input)) inset, var(--st-shadow-xs);
+  transition: box-shadow 160ms ease, background 160ms ease;
+}
+.magic-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px hsl(var(--st-foreground) / 0.12) inset, var(--st-shadow-xs);
+}
+.magic-input :deep(.el-input__wrapper.is-focus) {
+  background: hsl(var(--st-card));
+  box-shadow: 0 0 0 2px hsl(var(--st-ring)) inset, var(--st-shadow-sm);
+}
+.magic-input :deep(.el-input__inner) {
+  font-size: 13.5px;
+  color: hsl(var(--st-foreground));
+}
+.magic-input :deep(.el-input__inner::placeholder) { color: hsl(var(--st-muted)); }
+.magic-input :deep(.el-input__count) { font-size: 11px; }
+
+/* 右侧 22px eye/delete，hover 显现 — 对齐 Field 行尾 */
+.magic-action,
+.magic-delete {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: hsl(var(--st-muted-foreground));
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+.magic-action:hover {
+  background: hsl(var(--st-secondary));
+  color: hsl(var(--st-foreground));
+  border-color: hsl(var(--st-border));
+}
+.magic-action:active { transform: scale(0.96); }
+.magic-delete {
+  color: hsl(var(--st-muted-foreground));
+}
+.magic-delete:hover {
+  background: hsl(0 84% 97%);
+  color: #dc2626;
+  border-color: hsl(0 84% 88%);
+}
+.magic-delete-placeholder { width: 28px; height: 28px; }
+
+.custom-field-row.magic-custom-row {
+  display: grid;
+  grid-template-columns: 16px 22px minmax(110px, 1fr) minmax(140px, 1.5fr) auto 28px 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px 12px 8px;
+  background: hsl(var(--st-card));
+  border: 1px solid hsl(var(--st-border));
+  border-radius: var(--st-radius-lg);
+  box-shadow: var(--st-shadow-sm);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.custom-field-row.magic-custom-row:hover {
+  border-color: hsl(var(--st-foreground) / 0.14);
+  box-shadow: var(--st-shadow-md);
+}
+.show-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: hsl(var(--st-muted-foreground));
   font-size: 12px;
   white-space: nowrap;
 }
+.show-label-text { font-size: 12px; }
+.show-label :deep(.el-switch) { --el-switch-on-color: hsl(var(--st-foreground)); }
 
-.add-custom-button {
+.add-custom-button.magic-primary-btn,
+.magic-primary-btn {
   width: 100%;
-  height: 42px;
+  height: 40px;
   border: 0;
-  border-radius: 9px;
-  background: #1b1b18;
-  color: white;
-  font-size: 15px;
+  border-radius: 9999px; /* magic button rounded-full */
+  background: hsl(var(--st-primary));
+  color: hsl(var(--st-primary-foreground));
+  font-size: 13.5px;
+  font-weight: 500;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  box-shadow: var(--st-shadow-sm);
+  transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
+.add-custom-button.magic-primary-btn:hover { opacity: 0.92; box-shadow: var(--st-shadow-md); }
+.add-custom-button.magic-primary-btn:active { transform: scale(0.99); }
 
-.custom-add-form {
+.custom-add-form.magic-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 2px;
+  gap: 10px;
+  padding: 10px;
+  background: hsl(var(--st-card));
+  border: 1px solid hsl(var(--st-border));
+  border-radius: var(--st-radius-lg);
+  box-shadow: var(--st-shadow-sm);
 }
+.custom-add-form .el-input { flex: 1; min-width: 0; }
 
-.custom-add-form .el-input {
-  flex: 1;
-}
-
-.avatar-card {
-  margin-top: 28px;
-  padding-top: 18px;
-  border-top: 1px solid #e7e7e7;
+/* 头像卡片带边框阴影 — 对齐 BasicPanel PhotoUpload rounded-xl border */
+.avatar-card.magic-card {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
-  flex-wrap: wrap;
+  padding: 16px;
+  background: hsl(var(--st-card));
+  border: 1px solid hsl(var(--st-border));
+  border-radius: var(--st-radius-lg);
+  box-shadow: var(--st-shadow-sm);
 }
-
 .avatar-title {
-  width: 100%;
-  font-size: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--st-foreground));
 }
-
-.avatar-preview {
-  width: 52px;
-  height: 52px;
-  object-fit: cover;
-  border-radius: 7px;
-  border: 1px solid #ddd;
-}
-
-.avatar-upload-hint {
-  width: 100%;
-  color: #777;
-  font-size: 12px;
-}
-
-.extra-settings {
+.avatar-body {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  margin-top: 24px;
-  color: #555;
-  font-size: 13px;
+}
+.avatar-preview {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid hsl(var(--st-border));
+  box-shadow: var(--st-shadow-xs);
+  background: hsl(var(--st-background));
+}
+.avatar-placeholder {
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed hsl(var(--st-border));
+  border-radius: 10px;
+  color: hsl(var(--st-muted));
+  font-size: 11px;
+  background: hsl(var(--st-secondary) / 0.6);
+}
+.avatar-upload-hint {
+  color: hsl(var(--st-muted-foreground));
+  font-size: 11px;
+  line-height: 1.5;
 }
 
-.extra-settings :deep(.el-divider) {
-  width: 100%;
-  margin: 0;
+.extra-settings.magic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: hsl(var(--st-card));
+  border: 1px solid hsl(var(--st-border));
+  border-radius: var(--st-radius-lg);
+  box-shadow: var(--st-shadow-sm);
 }
+.extra-settings.magic-card :deep(.el-divider__text) {
+  font-size: 12px;
+  color: hsl(var(--st-muted-foreground));
+  background: hsl(var(--st-card));
+}
+.magic-divider { margin: 2px 0; }
+.setting-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 18px;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: hsl(var(--st-muted-foreground));
+}
+.setting-row :deep(.el-switch.is-checked .el-switch__core) { background-color: hsl(var(--st-foreground)); border-color: hsl(var(--st-foreground)); }
 
 @media (max-width: 900px) {
-  .profile-form {
-    padding: 20px 18px 40px;
-  }
-
-  .custom-field-row {
-    grid-template-columns: 20px 20px 1fr 1fr 28px 28px;
-  }
-
-  .show-label {
-    grid-column: 3 / 5;
-  }
+  .magic-field-row { grid-template-columns: 14px 20px 64px minmax(0, 1fr) 28px 28px; gap: 6px; padding: 8px 8px 8px 6px; }
+  .magic-label { font-size: 12.5px; }
+  .custom-field-row.magic-custom-row { grid-template-columns: 14px 20px 1fr 1fr 28px 28px; }
+  .show-label { grid-column: 3 / 5; }
+  .setting-grid { grid-template-columns: 1fr; }
 }
 </style>

@@ -175,12 +175,12 @@ async function handleLogout() {
   position: fixed;
   left: 0;
   top: 0;
-  background: #FFFFFF;
-  color: var(--st-on-surface);
+  background: hsl(48 20% 97%);
+  color: hsl(60 5% 10%);
   display: flex;
   flex-direction: column;
   z-index: 40;
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-right: 1px solid hsl(48 10% 89%);
   transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 200ms ease;
 }
 
@@ -243,24 +243,26 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 42px;
+  height: 40px;
   padding: 0 12px;
   border-radius: 10px;
   font-size: 14px;
-  font-weight: 450;
-  color: #666666;
-  transition: background 180ms ease, color 180ms ease;
+  font-weight: 500;
+  color: hsl(60 2% 40%);
+  transition: all 160ms ease;
   text-decoration: none;
 
   &:hover {
-    color: #171717;
-    background: rgba(0, 0, 0, 0.04);
+    color: hsl(60 5% 10%);
+    background: hsl(48 10% 92%);
   }
 
   &.is-active {
-    color: #171717;
-    background: rgba(0, 0, 0, 0.06);
-    font-weight: 500;
+    color: hsl(60 5% 10%);
+    background: white;
+    border: 1px solid hsl(48 10% 89%);
+    box-shadow: 0 1px 2px rgba(27,27,24,0.05);
+    font-weight: 600;
   }
 }
 

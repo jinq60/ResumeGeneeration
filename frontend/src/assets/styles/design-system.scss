@@ -4,27 +4,32 @@
    ========================================================================== */
 
 :root {
-  /* —— AI Resume Pro — Minimal Premium Editorial (2026) —— */
-  /* 背景 #F7F7F5 暖白，内容 #FFFFFF，文字 #171717 / #666 / #999，边框 rgba(0,0,0,0.08) */
-  --st-background: #F7F7F5;
-  --st-foreground: #171717;
-  --st-card: #FFFFFF;
-  --st-card-foreground: #171717;
-  --st-popover: #FFFFFF;
-  --st-popover-foreground: #171717;
-  --st-primary: #1D4ED8;
-  --st-primary-foreground: #FFFFFF;
-  --st-secondary: #EFEFEC;
-  --st-secondary-foreground: #171717;
-  --st-muted: #999999;
-  --st-muted-foreground: #666666;
-  --st-accent: #1D4ED8;
-  --st-accent-foreground: #FFFFFF;
-  --st-destructive: #D92D20;
-  --st-destructive-foreground: #FFFFFF;
-  --st-border: rgba(0, 0, 0, 0.08);
-  --st-input: rgba(0, 0, 0, 0.08);
-  --st-ring: #1D4ED8;
+  /* —— Magic Resume 精确令牌 1:1 对齐 D:\Temp\magic-resume\src\app\globals.css —— */
+  /* 背景 #F9F9F7 暖纸、前景 #1B1B18 深炭、次级 #F2F0E9、边框 #E6E6E3、半径 0.75rem */
+  --st-background: 48 20% 97%; /* #F9F9F7 */
+  --st-background-hex: #F9F9F7;
+  --st-foreground: 60 5% 10%; /* #1B1B18 */
+  --st-foreground-hex: #1B1B18;
+  --st-card: 48 20% 97%;
+  --st-card-foreground: 60 5% 10%;
+  --st-popover: 48 20% 97%;
+  --st-popover-foreground: 60 5% 10%;
+  --st-primary: 60 5% 10%;
+  --st-primary-hex: #1B1B18;
+  --st-primary-foreground: 48 20% 97%;
+  --st-secondary: 48 18% 90%; /* #F2F0E9 */
+  --st-secondary-foreground: 60 5% 10%;
+  --st-muted: 60 2% 56%; /* #91918E */
+  --st-muted-foreground: 60 2% 40%;
+  --st-accent: 48 10% 92%;
+  --st-accent-foreground: 60 5% 10%;
+  --st-destructive: 0 84.2% 60.2%;
+  --st-destructive-foreground: 210 20% 98%;
+  --st-border: 48 10% 89%; /* #E6E6E3 */
+  --st-border-hex: #E6E6E3;
+  --st-input: 48 10% 89%;
+  --st-ring: 60 5% 10%;
+  --st-radius: 0.75rem;
 
   /* —— Legacy surface aliases —— */
   --st-surface: var(--st-background);

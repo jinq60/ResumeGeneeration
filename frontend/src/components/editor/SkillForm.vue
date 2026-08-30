@@ -1,92 +1,52 @@
 <template>
-  <div class="skill-form">
-    <div
-      v-for="(category, index) in skillCategories"
-      :key="category.id || index"
-      class="skill-category"
-    >
-      <div class="category-header">
-        <h4>{{ getCategoryLabel(category.category) }}</h4>
-        <el-button
-          type="primary"
-          size="small"
-          text
-          @click="addSkillItem(category)"
-        >
-          <el-icon><Plus /></el-icon>
-          添加技能
-        </el-button>
+  <div class="skill-form magic-form">
+    <div v-for="(category, index) in skillCategories" :key="category.id || index" class="skill-category magic-item group">
+      <div class="magic-drag-col" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></div>
+      <div class="magic-item-main">
+        <div class="category-header magic-header">
+          <div class="magic-header-title">
+            <h4>{{ getCategoryLabel(category.category) }}</h4>
+            <span class="magic-header-sub">{{ category.items.length }} 项</span>
+          </div>
+          <button type="button" class="magic-ghost-btn" @click="addSkillItem(category)">
+            <el-icon><Plus /></el-icon>
+            添加技能
+          </button>
+        </div>
+        <div class="magic-divider" />
+        <div class="magic-skill-list">
+          <div v-for="(skill, skillIndex) in category.items" :key="skill.id || skillIndex" class="skill-item magic-skill-row group/row">
+            <span class="magic-drag-sm" aria-hidden="true"><el-icon :size="12"><Rank /></el-icon></span>
+            <el-input v-model="skill.name" placeholder="技能名称" maxlength="64" class="magic-input magic-input-name" />
+            <el-select v-model="skill.level" placeholder="熟练度" class="magic-input magic-input-level">
+              <el-option label="入门" value="beginner" />
+              <el-option label="熟悉" value="familiar" />
+              <el-option label="熟练" value="proficient" />
+              <el-option label="精通" value="expert" />
+            </el-select>
+            <label class="magic-switch">
+              <el-switch v-model="skill.highlight" size="small" />
+              <span>高亮</span>
+            </label>
+            <button type="button" class="magic-delete-sm" @click="removeSkillItem(category, skillIndex)">
+              <el-icon :size="14"><Delete /></el-icon>
+            </button>
+          </div>
+          <el-empty v-if="category.items.length === 0" description="暂无技能" :image-size="48" class="magic-empty" />
+        </div>
       </div>
-
-      <div
-        v-for="(skill, skillIndex) in category.items"
-        :key="skill.id || skillIndex"
-        class="skill-item"
-      >
-        <el-input
-          v-model="skill.name"
-          placeholder="技能名称"
-          style="width: 200px"
-          maxlength="64"
-        />
-        <el-select
-          v-model="skill.level"
-          placeholder="熟练度"
-          style="width: 120px"
-        >
-          <el-option
-            label="入门"
-            value="beginner"
-          />
-          <el-option
-            label="熟悉"
-            value="familiar"
-          />
-          <el-option
-            label="熟练"
-            value="proficient"
-          />
-          <el-option
-            label="精通"
-            value="expert"
-          />
-        </el-select>
-        <el-switch
-          v-model="skill.highlight"
-          active-text="高亮"
-        />
-        <el-button
-          type="danger"
-          size="small"
-          text
-          @click="removeSkillItem(category, skillIndex)"
-        >
-          删除
-        </el-button>
-      </div>
-
-      <el-empty
-        v-if="category.items.length === 0"
-        description="暂无技能"
-        :image-size="60"
-      />
     </div>
 
-    <el-button
-      type="primary"
-      plain
-      style="width: 100%; margin-top: 16px"
-      @click="addCategory()"
-    >
+    <button type="button" class="magic-add-btn" @click="addCategory()">
       <el-icon><Plus /></el-icon>
       添加技能分类
-    </el-button>
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Plus } from '@element-plus/icons-vue'
+import { Delete, Plus, Rank, View } from '@element-plus/icons-vue'
 import type { Section, SkillItem } from '@/types/resume'
 import { useSectionSync } from '@/composables/useSectionSync'
 
@@ -212,43 +172,36 @@ useSectionSync(
 </script>
 
 <style scoped lang="scss">
-.skill-form {
-  padding: 16px 0;
-}
-
-.skill-category {
-  background: #f9fafc;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
-.category-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-
-  h4 {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 500;
-    color: #303133;
-  }
-}
-
-.skill-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
+.skill-form.magic-form { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; }
+.skill-category.magic-item { display: flex; overflow: hidden; background: hsl(var(--st-card)); border: 1px solid hsl(var(--st-border)); border-radius: var(--st-radius-lg); box-shadow: var(--st-shadow-sm); transition: border-color 160ms ease, box-shadow 160ms ease; }
+.skill-category.magic-item:hover { border-color: hsl(var(--st-foreground) / 0.14); box-shadow: var(--st-shadow-md); }
+.magic-drag-col { width: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-right: 1px solid hsl(var(--st-border)); cursor: grab; color: hsl(var(--st-muted)); }
+.skill-category:hover .magic-drag-col { background: hsl(var(--st-secondary) / 0.5); color: hsl(var(--st-foreground) / 0.7); }
+.magic-drag-icon { font-size: 14px; }
+.magic-item-main { flex: 1; min-width: 0; }
+.magic-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
+.magic-header-title { display: flex; align-items: baseline; gap: 8px; }
+.magic-header-title h4 { margin: 0; font-size: 13.5px; font-weight: 600; color: hsl(var(--st-foreground)); }
+.magic-header-sub { font-size: 11px; color: hsl(var(--st-muted-foreground)); background: hsl(var(--st-secondary)); padding: 2px 6px; border-radius: 9999px; }
+.magic-ghost-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; background: transparent; border: 1px solid hsl(var(--st-border)); border-radius: 9999px; font-size: 12px; font-weight: 500; color: hsl(var(--st-foreground)); cursor: pointer; transition: background 160ms ease; }
+.magic-ghost-btn:hover { background: hsl(var(--st-secondary)); }
+.magic-divider { height: 1px; background: hsl(var(--st-border)); margin: 0 16px; }
+.magic-skill-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.magic-skill-row { display: grid; grid-template-columns: 16px minmax(0, 1.4fr) 120px auto 28px; align-items: center; gap: 10px; padding: 8px 10px 8px 6px; background: hsl(var(--st-background) / 0.6); border: 1px solid hsl(var(--st-border) / 0.6); border-radius: 0.625rem; transition: border-color 160ms ease, background 160ms ease; }
+.magic-skill-row:hover { background: hsl(var(--st-card)); border-color: hsl(var(--st-border)); box-shadow: var(--st-shadow-xs); }
+.magic-drag-sm { width: 16px; height: 22px; display: inline-flex; align-items: center; justify-content: center; color: hsl(var(--st-muted)); opacity: 0.6; cursor: grab; }
+.magic-skill-row:hover .magic-drag-sm { opacity: 1; }
+.magic-input :deep(.el-input__wrapper), .magic-input :deep(.el-select .el-input__wrapper) { min-height: 36px; height: 36px; background: hsl(var(--st-background)); border-radius: 0.5rem; box-shadow: 0 0 0 1px hsl(var(--st-input)) inset, var(--st-shadow-xs); }
+.magic-input :deep(.el-input__wrapper.is-focus) { box-shadow: 0 0 0 2px hsl(var(--st-ring)) inset; background: hsl(var(--st-card)); }
+.magic-input :deep(.el-input__inner)::placeholder { color: hsl(var(--st-muted)); }
+.magic-input-name { min-width: 0; }
+.magic-input-level { width: 120px; }
+.magic-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: hsl(var(--st-muted-foreground)); white-space: nowrap; }
+.magic-switch :deep(.el-switch.is-checked .el-switch__core) { background-color: hsl(var(--st-foreground)); border-color: hsl(var(--st-foreground)); }
+.magic-delete-sm { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; border: 1px solid transparent; background: transparent; color: hsl(var(--st-muted-foreground)); cursor: pointer; transition: all 160ms ease; }
+.magic-delete-sm:hover { background: hsl(0 84% 97%); color: #dc2626; border-color: hsl(0 84% 88%); }
+.magic-empty :deep(.el-empty__description) p { font-size: 12px; color: hsl(var(--st-muted-foreground)); }
+.magic-add-btn { width: 100%; height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: hsl(var(--st-primary)); color: hsl(var(--st-primary-foreground)); border: 0; border-radius: 9999px; font-size: 13.5px; font-weight: 500; cursor: pointer; box-shadow: var(--st-shadow-sm); }
+.magic-add-btn:hover { opacity: 0.92; }
+@media (max-width: 640px) { .magic-skill-row { grid-template-columns: 16px 1fr auto 28px; } .magic-input-level { width: 100%; } .magic-switch { grid-column: 2 / 4; } }
 </style>
