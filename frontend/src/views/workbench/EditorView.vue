@@ -202,6 +202,28 @@
         class="editor-canvas"
         :class="{ 'is-panel-collapsed': editPanelCollapsed }"
       >
+        <!-- 恢复草稿横幅：替代原 ElMessageBox 阻塞弹窗，采用 parchment 圆角卡片 + 柔和阴影 -->
+        <transition name="draft-banner">
+          <div
+            v-if="draftBannerVisible"
+            class="draft-banner"
+            role="status"
+            aria-live="polite"
+          >
+            <div class="draft-banner-icon">
+              <el-icon :size="16"><WarningFilled /></el-icon>
+            </div>
+            <div class="draft-banner-text">
+              <strong>发现本地草稿</strong>
+              <span>检测到一份尚未同步到服务器的本地草稿，可恢复或继续使用服务器版本。</span>
+            </div>
+            <div class="draft-banner-actions">
+              <button class="draft-btn draft-btn-ghost" @click="discardDraft">使用服务器版本</button>
+              <button class="draft-btn draft-btn-primary" @click="applyDraft">恢复草稿</button>
+              <button class="draft-btn-icon" aria-label="关闭" @click="dismissDraftBanner"><el-icon><Close /></el-icon></button>
+            </div>
+          </div>
+        </transition>
         <div
           ref="canvasScrollRef"
           class="canvas-scroll"
@@ -224,13 +246,12 @@
                 v-else
                 class="a4-placeholder"
               >
-                <el-icon
-                  size="28"
-                  class="text-muted"
-                >
-                  <Document />
-                </el-icon>
-                <p>左侧编辑的内容会实时出现在这里</p>
+                <div class="a4-placeholder-icon">
+                  <el-icon :size="36"><Document /></el-icon>
+                </div>
+                <h3>开始创建你的专业简历</h3>
+                <p>在左侧填写个人信息、教育与项目经历，右侧将实时预览最终效果</p>
+                <div class="a4-placeholder-hint">支持一键切换模板与主题色</div>
               </div>
             </div>
           </div>
@@ -692,7 +713,8 @@ import {
   MagicStick,
   Loading,
   Setting,
-  Delete
+  Delete,
+  Close
 } from '@element-plus/icons-vue'
 import { resumeApi, type GrammarCheckResponse, type GrammarIssue } from '@/api/resume'
 import { templateApi } from '@/api/template'
@@ -825,6 +847,10 @@ function applyResumeChange(
   if (shouldSave) triggerAutoSave()
 }
 
+const draftBannerVisible = ref(false)
+const pendingDraft = ref<Resume | null>(null)
+const pendingDraftServerSnapshot = ref<Resume | null>(null)
+
 async function restoreDraftIfAvailable(serverResume: Resume) {
   const draft = draftStorage.load(serverResume.id)
   if (!draft) return
@@ -839,24 +865,34 @@ async function restoreDraftIfAvailable(serverResume: Resume) {
     return
   }
 
-  try {
-    await ElMessageBox.confirm(
-      '检测到一份尚未同步到服务器的本地草稿，是否恢复？',
-      '恢复本地草稿',
-      {
-        confirmButtonText: '恢复草稿',
-        cancelButtonText: '使用服务器版本',
-        type: 'warning'
-      }
-    )
-    resume.value = cloneResumeState(draft.data)
-    resetActiveSection(resume.value)
-    resetHistory()
-    record(serverResume, 'draft-restore')
-    triggerAutoSave()
-  } catch {
-    draftStorage.clear(serverResume.id)
+  // 改为顶部横幅而非阻塞弹窗，视觉与 parchment 设计系统一致
+  pendingDraft.value = cloneResumeState(draft.data as Resume)
+  pendingDraftServerSnapshot.value = cloneResumeState(serverResume)
+  draftBannerVisible.value = true
+}
+
+function applyDraft() {
+  if (!pendingDraft.value || !pendingDraftServerSnapshot.value) return
+  resume.value = cloneResumeState(pendingDraft.value)
+  resetActiveSection(resume.value!)
+  resetHistory()
+  record(pendingDraftServerSnapshot.value, 'draft-restore')
+  triggerAutoSave()
+  if (pendingDraft.value) draftBannerVisible.value = false
+  ElMessage.success('已恢复本地草稿')
+}
+
+function discardDraft() {
+  if (pendingDraft.value) {
+    draftStorage.clear(pendingDraft.value.id)
   }
+  draftBannerVisible.value = false
+  pendingDraft.value = null
+  pendingDraftServerSnapshot.value = null
+}
+
+function dismissDraftBanner() {
+  discardDraft()
 }
 
 async function loadResume() {
@@ -1574,19 +1610,139 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.draft-banner {
+  margin: 12px 16px 0;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: hsl(var(--st-card));
+  border: 1px solid hsl(var(--st-border));
+  border-radius: 12px;
+  box-shadow: var(--st-shadow-sm);
+  animation: draftBannerIn 220ms ease;
+}
+
+.draft-banner-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(38 92% 92%);
+  color: hsl(25 85% 35%);
+  flex-shrink: 0;
+}
+
+.draft-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.draft-banner-text strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--st-foreground));
+  letter-spacing: -0.01em;
+}
+
+.draft-banner-text span {
+  font-size: 12px;
+  color: hsl(var(--st-muted-foreground));
+  line-height: 1.4;
+}
+
+.draft-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.draft-btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.draft-btn-ghost {
+  background: hsl(var(--st-background));
+  border-color: hsl(var(--st-border));
+  color: hsl(var(--st-foreground));
+}
+
+.draft-btn-ghost:hover {
+  background: hsl(var(--st-secondary));
+  border-color: hsl(var(--st-border));
+}
+
+.draft-btn-primary {
+  background: hsl(var(--st-foreground));
+  color: hsl(var(--st-background));
+  box-shadow: var(--st-shadow-xs);
+}
+
+.draft-btn-primary:hover {
+  opacity: 0.92;
+}
+
+.draft-btn-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: hsl(var(--st-muted-foreground));
+  cursor: pointer;
+}
+
+.draft-btn-icon:hover {
+  background: hsl(var(--st-secondary));
+  color: hsl(var(--st-foreground));
+}
+
+@keyframes draftBannerIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.draft-banner-enter-active, .draft-banner-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.draft-banner-enter-from, .draft-banner-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
 .canvas-scroll {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 32px 24px;
+  padding: 28px 20px 96px;
   display: flex;
   justify-content: center;
   background: hsl(48 20% 97%);
+  background-image: radial-gradient(hsl(var(--st-border) / 0.35) 1px, transparent 1px);
+  background-size: 18px 18px;
 }
 
 .a4-page-shell {
   flex: 0 0 auto;
   transition: width 160ms ease, min-height 160ms ease;
+  filter: drop-shadow(0 10px 30px rgba(27,27,24,0.08));
 }
 
 .a4-page {
@@ -1595,7 +1751,10 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   padding: 0;
   background: white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid hsl(var(--st-border) / 0.7);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 16px rgba(27,27,24,0.06);
   transform-origin: top center;
   transition: transform 160ms ease;
 }
@@ -1714,30 +1873,87 @@ onBeforeUnmount(() => {
 
 .a4-placeholder {
   width: 100%;
-  min-height: 600px;
+  min-height: 520px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-stack-md);
-  color: var(--color-muted);
+  gap: 12px;
+  padding: 40px 32px;
+  text-align: center;
+  color: hsl(var(--st-muted-foreground));
+}
+
+.a4-placeholder-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--st-secondary));
+  border: 1px solid hsl(var(--st-border));
+  color: hsl(var(--st-muted-foreground));
+  margin-bottom: 4px;
+}
+
+.a4-placeholder h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: hsl(var(--st-foreground));
+  letter-spacing: -0.01em;
+}
+
+.a4-placeholder p {
+  margin: 0;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: hsl(var(--st-muted-foreground));
+}
+
+.a4-placeholder-hint {
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  background: hsl(var(--st-secondary) / 0.7);
+  border: 1px solid hsl(var(--st-border));
+  font-size: 11px;
+  color: hsl(var(--st-muted-foreground));
 }
 
 .floating-toolbar {
   position: absolute;
-  bottom: 24px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  backdrop-filter: blur(8px);
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid var(--color-border);
-  padding: 12px 24px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: hsl(var(--st-card) / 0.92);
+  border: 1px solid hsl(var(--st-border) / 0.9);
+  padding: 8px 14px;
   border-radius: 9999px;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 24px rgba(27,27,24,0.08), 0 2px 8px rgba(27,27,24,0.06);
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
   z-index: 40;
+  font-size: 12px;
+}
+
+.floating-toolbar .flex.items-center.gap-3 {
+  gap: 10px !important;
+  padding-right: 14px !important;
+}
+
+.floating-toolbar button {
+  font-size: 12px;
+}
+
+.floating-toolbar .page-button {
+  width: 26px;
+  height: 26px;
 }
 
 .is-spin {

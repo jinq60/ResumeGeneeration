@@ -233,16 +233,17 @@ public class ResumeRenderService {
                 : getString(config, "moduleSpacing", "16px");
 
         StringBuilder css = new StringBuilder();
+        // 基础重置与排版，提升可读性与专业感
         css.append("    * { box-sizing: border-box; margin: 0; padding: 0; }\n")
            .append("    @page { size: A4; margin: 0; }\n")
-           .append("    html, body { margin: 0; padding: 0; }\n")
-           .append("    body { font-family: ").append(fontFamily).append("; line-height: ").append(lineHeight).append("; }\n")
+           .append("    html, body { margin: 0; padding: 0; background: #f8f7f4; }\n")
+           .append("    body { font-family: ").append(fontFamily).append("; line-height: ").append(lineHeight).append("; -webkit-font-smoothing: antialiased; }\n")
            .append("    .resume-page { width: ").append(pageWidth).append(";\n")
            .append("      min-height: ").append(pageHeight).append(";\n")
            .append("      padding: ").append(pageMargin).append(";\n")
            .append("      margin: 0 auto;\n")
            .append("      background: ").append(getString(color, "background", "#ffffff")).append(";\n")
-           .append("      color: ").append(getString(color, "primary", "#333333")).append(";\n")
+           .append("      color: ").append(getString(color, "primary", "#1a1a1a")).append(";\n")
            .append("      font-size: ").append(mainFontSize).append("; }\n")
            .append("    .resume-page[data-auto-one-page=\"true\"] {\n")
            .append("      --resume-fit-scale: 1;\n")
@@ -251,26 +252,34 @@ public class ResumeRenderService {
            .append("      transform: scale(var(--resume-fit-scale));\n")
            .append("      transform-origin: top left;\n")
            .append("    }\n")
+           // 区块与标题：更精致的分割线与字距
            .append("    .section { margin-bottom: ").append(sectionSpacing).append("; }\n")
-           .append("    .section-title { font-size: 14pt; font-weight: bold;\n")
+           .append("    .section-title { font-size: 11pt; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;\n")
            .append("      color: ").append(accentColor).append(";\n")
-           .append("      border-bottom: 1px solid ").append(accentColor).append(";\n")
-           .append("      padding-bottom: 4px; margin-bottom: 8px; }\n")
-           .append("    .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }\n")
-           .append("    .profile-avatar { width: 25mm; height: 25mm; object-fit: cover; border-radius: 4px; flex-shrink: 0; }\n")
-           .append("    .profile-info { flex: 1; }\n")
-           .append("    .profile-name { font-size: 18pt; font-weight: bold; margin-bottom: 8px; }\n")
-           .append("    .profile-meta { color: ").append(getString(color, "secondary", "#666666")).append("; margin-bottom: 4px; }\n")
-           .append("    .item { margin-bottom: 12px; }\n")
-           .append("    .item-header { display: flex; justify-content: space-between; font-weight: bold; }\n")
-           .append("    .item-sub { color: ").append(getString(color, "secondary", "#666666")).append("; margin-bottom: 4px; }\n")
-           .append("    .rich-text p { margin: 0 0 6px; }\n")
-           .append("    .rich-text ul, .rich-text ol { padding-left: 20px; margin: 4px 0; }\n")
-           .append("    .rich-text a { color: ").append(accentColor).append("; }\n")
-           .append("    ul { padding-left: 20px; }\n")
-           .append("    li { margin-bottom: 2px; }\n")
-           .append("    .skill-tag { display: inline-block; margin-right: 8px; margin-bottom: 4px;\n")
-           .append("      padding: 2px 8px; background: #f0f0f0; border-radius: 4px; }\n");
+           .append("      border-bottom: 1.2px solid ").append(accentColor).append(";\n")
+           .append("      padding-bottom: 5px; margin-bottom: 10px; }\n")
+           // 个人信息头部：更紧凑且层次分明
+           .append("    .profile-header { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #eee; }\n")
+           .append("    .profile-avatar { width: 22mm; height: 22mm; object-fit: cover; border-radius: 6px; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }\n")
+           .append("    .profile-info { flex: 1; min-width: 0; }\n")
+           .append("    .profile-name { font-size: 20pt; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 6px; color: #111; }\n")
+           .append("    .profile-meta { color: ").append(getString(color, "secondary", "#5a5a5a")).append("; font-size: 8.5pt; margin-bottom: 3px; line-height: 1.4; }\n")
+           .append("    .profile-meta a { color: ").append(accentColor).append("; text-decoration: none; border-bottom: 1px dotted ").append(accentColor).append("; }\n")
+           // 条目：卡片感与时间线
+           .append("    .item { margin-bottom: 13px; padding-left: 0; }\n")
+           .append("    .item-header { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 10pt; margin-bottom: 2px; }\n")
+           .append("    .item-header span:last-child { font-weight: 400; color: ").append(getString(color, "secondary", "#6b7280")).append("; font-size: 8.5pt; white-space: nowrap; margin-left: 12px; }\n")
+           .append("    .item-sub { color: ").append(getString(color, "secondary", "#4b5563")).append("; font-size: 8.5pt; margin-bottom: 4px; font-style: italic; }\n")
+           .append("    .rich-text { font-size: 9pt; color: #2a2a2a; }\n")
+           .append("    .rich-text p { margin: 0 0 5px; }\n")
+           .append("    .rich-text ul, .rich-text ol { padding-left: 18px; margin: 3px 0; }\n")
+           .append("    .rich-text li { margin-bottom: 2px; }\n")
+           .append("    .rich-text a { color: ").append(accentColor).append("; text-decoration: underline; text-underline-offset: 2px; }\n")
+           .append("    ul { padding-left: 18px; }\n")
+           .append("    li { margin-bottom: 2px; font-size: 9pt; }\n")
+           .append("    .skill-tag { display: inline-block; margin-right: 6px; margin-bottom: 5px;\n")
+           .append("      padding: 3px 8px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 9999px; font-size: 8pt; font-weight: 500; color: #374151; }\n")
+           .append("    .section-empty { padding: 14px 12px; border: 1px dashed #e5e7eb; border-radius: 8px; background: #f9fafb; color: #9ca3af; font-size: 8.5pt; text-align: center; letter-spacing: 0.02em; }\n");
         return css.toString();
     }
 
@@ -363,22 +372,36 @@ public class ResumeRenderService {
     }
 
     private String renderSection(SectionDTO section, RenderOptions options) {
+        // 空数据时展示柔和占位，避免大面积留白显得“差劲”（与 magic-resume 空状态一致）
+        boolean isEmpty = isSectionEmpty(section);
         StringBuilder sb = new StringBuilder();
         sb.append("    <div class=\"section\">\n")
           .append("      <div class=\"section-title\">").append(escapeHtml(section.getTitle())).append("</div>\n");
 
-        switch (section.getType()) {
-            case BizConstant.SECTION_TYPE_PROFILE -> sb.append(renderProfile(section.dataAsMap(), options));
-            case BizConstant.SECTION_TYPE_EDUCATION -> sb.append(renderEducation(section.dataAsItems()));
-            case BizConstant.SECTION_TYPE_WORK -> sb.append(renderWork(section.dataAsItems()));
-            case BizConstant.SECTION_TYPE_PROJECT -> sb.append(renderProject(section.dataAsItems()));
-            case BizConstant.SECTION_TYPE_SKILL -> sb.append(renderSkill(section.dataAsItems()));
-            case BizConstant.SECTION_TYPE_INTRODUCTION -> sb.append(renderIntroduction(section.dataAsMap()));
-            default -> sb.append("");
+        if (isEmpty) {
+            sb.append("      <div class=\"section-empty\">暂无内容 — 在左侧添加</div>\n");
+        } else {
+            switch (section.getType()) {
+                case BizConstant.SECTION_TYPE_PROFILE -> sb.append(renderProfile(section.dataAsMap(), options));
+                case BizConstant.SECTION_TYPE_EDUCATION -> sb.append(renderEducation(section.dataAsItems()));
+                case BizConstant.SECTION_TYPE_WORK -> sb.append(renderWork(section.dataAsItems()));
+                case BizConstant.SECTION_TYPE_PROJECT -> sb.append(renderProject(section.dataAsItems()));
+                case BizConstant.SECTION_TYPE_SKILL -> sb.append(renderSkill(section.dataAsItems()));
+                case BizConstant.SECTION_TYPE_INTRODUCTION -> sb.append(renderIntroduction(section.dataAsMap()));
+                default -> sb.append("");
+            }
         }
 
         sb.append("    </div>\n");
         return sb.toString();
+    }
+
+    private boolean isSectionEmpty(SectionDTO section) {
+        Object data = section.getData();
+        if (data == null) return true;
+        if (data instanceof Map<?,?> m) return m.isEmpty() || m.values().stream().allMatch(v -> v == null || v.toString().isBlank() || (v instanceof java.util.Collection<?> c && c.isEmpty()));
+        if (data instanceof java.util.Collection<?> c) return c.isEmpty();
+        return false;
     }
 
     private String renderProfile(Map<String, Object> profile, RenderOptions options) {
