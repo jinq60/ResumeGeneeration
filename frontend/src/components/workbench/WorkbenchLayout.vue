@@ -19,7 +19,7 @@
       @toggle-collapse="toggleSidebar"
     />
     <main class="workbench-main">
-      <div class="workbench-content">
+      <div class="workbench-content" :class="{ 'is-editor': isEditor }">
         <router-view />
       </div>
     </main>
@@ -27,10 +27,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { Menu } from '@element-plus/icons-vue'
 import WorkbenchSidebar from './WorkbenchSidebar.vue'
 
+const route = useRoute()
+const isEditor = computed(() => route.path.startsWith('/workbench/editor'))
 const sidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
 
@@ -67,6 +70,13 @@ function toggleSidebar() {
   min-width: 0;
   margin: 0 auto;
   padding: 32px clamp(24px, 3vw, 48px) 48px;
+}
+
+.workbench-content.is-editor {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: hsl(48 20% 97%);
 }
 
 .workbench-layout.is-sidebar-collapsed {
