@@ -174,8 +174,8 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 24px;
-  background: #f5f7fa;
+  padding: 0;
+  background: transparent;
   min-height: 100%;
 }
 
@@ -197,9 +197,10 @@ onUnmounted(() => {
 .resume-preview {
   width: 210mm;
   min-height: 297mm;
-  background: #fff;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: transparent;
+  box-shadow: none;
   display: block;
   border: none;
+  overflow: hidden;
 }
 </style>

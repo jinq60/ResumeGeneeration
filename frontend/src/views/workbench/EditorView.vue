@@ -1742,7 +1742,8 @@ onBeforeUnmount(() => {
 .a4-page-shell {
   flex: 0 0 auto;
   transition: width 160ms ease, min-height 160ms ease;
-  filter: drop-shadow(0 10px 30px rgba(27,27,24,0.08));
+  /* 单层纸张阴影由 iframe 内的 .resume-page 承载，外层仅作缩放容器，避免双重盒子 */
+  filter: none;
 }
 
 .a4-page {
@@ -1750,11 +1751,11 @@ onBeforeUnmount(() => {
   min-height: 297mm;
   box-sizing: border-box;
   padding: 0;
-  background: white;
-  border: 1px solid hsl(var(--st-border) / 0.7);
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 2px 16px rgba(27,27,24,0.06);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
   transform-origin: top center;
   transition: transform 160ms ease;
 }

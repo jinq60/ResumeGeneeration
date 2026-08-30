@@ -233,11 +233,11 @@ public class ResumeRenderService {
                 : getString(config, "moduleSpacing", "16px");
 
         StringBuilder css = new StringBuilder();
-        // 基础重置与排版，提升可读性与专业感
+        // 基础重置与排版，提升可读性与专业感；iframe 背景透明，外层 canvas 点阵透出，单层纸张由 .resume-page 承载
         css.append("    * { box-sizing: border-box; margin: 0; padding: 0; }\n")
            .append("    @page { size: A4; margin: 0; }\n")
-           .append("    html, body { margin: 0; padding: 0; background: #f8f7f4; }\n")
-           .append("    body { font-family: ").append(fontFamily).append("; line-height: ").append(lineHeight).append("; -webkit-font-smoothing: antialiased; }\n")
+           .append("    html, body { margin: 0; padding: 0; background: transparent; }\n")
+           .append("    body { font-family: ").append(fontFamily).append("; line-height: ").append(lineHeight).append("; -webkit-font-smoothing: antialiased; background: transparent; }\n")
            .append("    .resume-page { width: ").append(pageWidth).append(";\n")
            .append("      min-height: ").append(pageHeight).append(";\n")
            .append("      padding: ").append(pageMargin).append(";\n")
@@ -245,6 +245,7 @@ public class ResumeRenderService {
            .append("      background: ").append(getString(color, "background", "#ffffff")).append(";\n")
            .append("      color: ").append(getString(color, "primary", "#1a1a1a")).append(";\n")
            .append("      font-size: ").append(mainFontSize).append("; }\n")
+           .append("    .resume-page { border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; box-shadow: 0 10px 30px rgba(27,27,24,0.08), 0 2px 8px rgba(27,27,24,0.06); }\n")
            .append("    .resume-page[data-auto-one-page=\"true\"] {\n")
            .append("      --resume-fit-scale: 1;\n")
            .append("      width: calc(").append(pageWidth).append(" / var(--resume-fit-scale));\n")
