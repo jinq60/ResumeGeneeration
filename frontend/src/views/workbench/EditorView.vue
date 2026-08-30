@@ -395,6 +395,8 @@
     title="排版设置"
     width="460px"
     align-center
+    class="render-settings-dialog"
+    :modal-class="'render-settings-modal'"
   >
     <el-form
       :model="renderSettingsDraft"
@@ -1810,6 +1812,47 @@ onBeforeUnmount(() => {
   color: var(--color-muted-foreground);
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* 排版弹窗：提亮遮罩、增强卡片对比，避免“看不清” */
+:global(.el-overlay) {
+  background: rgba(27, 27, 24, 0.32) !important;
+  backdrop-filter: blur(2px);
+}
+
+:global(.el-dialog.render-settings-dialog) {
+  --el-dialog-bg-color: hsl(var(--st-card));
+  --el-dialog-border-radius: 16px;
+  background: hsl(var(--st-card));
+  border: 1px solid hsl(var(--st-border));
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(27,27,24,0.18), 0 8px 24px rgba(27,27,24,0.12);
+  overflow: hidden;
+}
+
+:global(.el-dialog.render-settings-dialog .el-dialog__header) {
+  padding: 18px 20px 14px;
+  margin: 0;
+  border-bottom: 1px solid hsl(var(--st-border));
+  background: hsl(var(--st-card));
+}
+
+:global(.el-dialog.render-settings-dialog .el-dialog__title) {
+  font-size: 15px;
+  font-weight: 600;
+  color: hsl(var(--st-foreground));
+  letter-spacing: -0.01em;
+}
+
+:global(.el-dialog.render-settings-dialog .el-dialog__body) {
+  padding: 18px 20px;
+  background: hsl(var(--st-card));
+}
+
+:global(.el-dialog.render-settings-dialog .el-dialog__footer) {
+  padding: 14px 20px;
+  border-top: 1px solid hsl(var(--st-border));
+  background: hsl(var(--st-card));
 }
 
 .grammar-summary {
