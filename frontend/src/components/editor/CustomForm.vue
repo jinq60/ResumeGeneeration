@@ -164,7 +164,8 @@ useSectionSync(
     }))
 
     emit('update', [...nonCustom, ...customSectionData])
-  }
+  },
+  () => props.sections.filter(s => s.type === 'custom').map(s => ({ id: s.id, title: s.title, order: s.order, visible: s.visible, content: (s.data as any)?.content }))
 )
 </script>
 
