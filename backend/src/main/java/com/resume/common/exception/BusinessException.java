@@ -19,4 +19,17 @@ public class BusinessException extends RuntimeException {
         super(message, cause);
         this.errorCode = errorCode;
     }
+
+    public static BusinessException of(int errorCode, String message) {
+        return new BusinessException(errorCode, message);
+    }
+
+    /**
+     * 高频校验类异常可重写以避免填栈开销，业务侧按需使用匿名子类重写 fillInStackTrace。
+     * 示例：throw new BusinessException(...){ @Override public synchronized Throwable fillInStackTrace(){return this;}};
+     */
+    @Override
+    public synchronized Throwable fillInStackTrace() {
+        return super.fillInStackTrace();
+    }
 }

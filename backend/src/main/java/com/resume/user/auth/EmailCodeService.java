@@ -36,7 +36,9 @@ public class EmailCodeService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final String REDIS_KEY_PREFIX = "email-code:";
+    private static final String DAILY_KEY_PREFIX = "email-daily:";
     private static final int MAX_ATTEMPTS = 5;
+    private static final int DAILY_LIMIT_PER_EMAIL = 10;
 
     private final AuthProperties authProperties;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
@@ -44,6 +46,7 @@ public class EmailCodeService {
     private final ObjectProvider<Environment> environmentProvider;
 
     private final Map<String, Entry> codes = new ConcurrentHashMap<>();
+    private final Map<String, Integer> dailyCounts = new ConcurrentHashMap<>();
 
     /**
      * 发送验证码到邮箱（带重发间隔限制）。
@@ -57,10 +60,45 @@ public class EmailCodeService {
             throw new BusinessException(ResultCode.AUTH_EMAIL_CODE_TOO_FREQUENT,
                     "发送过于频繁，请稍后再试。");
         }
+        checkDailyLimit(key);
 
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         sendMail(email, code);
         store(key, code);
+    }
+
+    private void checkDailyLimit(String key) {
+        String day = java.time.LocalDate.now().toString();
+        RedisTemplate<String, String> redis = redis();
+        if (redis != null) {
+            try {
+                String redisKey = DAILY_KEY_PREFIX + key + ":" + day;
+                Long count = redis.opsForValue().increment(redisKey);
+                if (count != null) {
+                    redis.expire(redisKey, Duration.ofDays(1));
+                }
+                if (count != null && count > DAILY_LIMIT_PER_EMAIL) {
+                    throw new BusinessException(ResultCode.RATE_LIMITED, "今日验证码发送次数已达上限，请明日再试。");
+                }
+                return;
+            } catch (BusinessException e) {
+                throw e;
+            } catch (Exception e) {
+                log.warn("Redis check email daily limit failed, fallback to memory: {}", e.getMessage());
+            }
+        }
+        String memKey = key + "|" + day;
+        if (dailyCounts.size() > 10000 && !dailyCounts.containsKey(memKey)) {
+            dailyCounts.entrySet().removeIf(e -> !e.getKey().endsWith("|" + day));
+            if (dailyCounts.size() > 10000) {
+                throw new BusinessException(ResultCode.RATE_LIMITED, "今日验证码发送次数已达上限，请明日再试。");
+            }
+        }
+        int count = dailyCounts.compute(memKey, (k, v) -> v == null ? 1 : v + 1);
+        dailyCounts.keySet().removeIf(k -> !k.endsWith("|" + day));
+        if (count > DAILY_LIMIT_PER_EMAIL) {
+            throw new BusinessException(ResultCode.RATE_LIMITED, "今日验证码发送次数已达上限，请明日再试。");
+        }
     }
 
     /**

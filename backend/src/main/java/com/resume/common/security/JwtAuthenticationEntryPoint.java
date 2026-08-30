@@ -28,11 +28,13 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
     public void commence(HttpServletRequest request,
                          HttpServletResponse response,
                          AuthenticationException authException) throws IOException {
-        log.warn("Unauthorized request: {}", request.getRequestURI());
+        log.warn("Unauthorized request: {} error={}", request.getRequestURI(), authException.getMessage());
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\", error_description=\"请先登录后再访问\"");
+        response.setHeader("X-Content-Type-Options", "nosniff");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        R<Void> body = R.error(401, "请先登录后再访问。");
+        R<Void> body = R.error(com.resume.common.constant.ResultCode.UNAUTHORIZED, "请先登录后再访问。");
         objectMapper.writeValue(response.getWriter(), body);
     }
 }

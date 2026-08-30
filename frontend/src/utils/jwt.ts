@@ -34,3 +34,12 @@ export function getJwtRole(token: string): string | null {
   const role = getJwtClaim(token, 'role')
   return typeof role === 'string' ? role : null
 }
+
+/** 判断 token 是否已过期（exp 为秒级时间戳）；过期或无 exp 返回 true。 */
+export function isJwtExpired(token: string): boolean {
+  const payload = parseJwtPayload(token)
+  if (!payload) return true
+  const exp = payload.exp
+  if (typeof exp !== 'number') return true
+  return exp * 1000 < Date.now()
+}

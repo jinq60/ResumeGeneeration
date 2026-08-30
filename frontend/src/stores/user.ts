@@ -5,6 +5,7 @@ import {
   writeStoredAuth,
   clearStoredAuth
 } from '@/utils/authStorage'
+import { isJwtExpired } from '@/utils/jwt'
 
 export interface UserInfo {
   userId: string
@@ -23,7 +24,7 @@ export const useUserStore = defineStore('user', () => {
   const accessToken = ref('')
   const refreshToken = ref('')
 
-  const isLoggedIn = computed(() => !!accessToken.value)
+  const isLoggedIn = computed(() => !!accessToken.value && !isJwtExpired(accessToken.value))
 
   function setUser(info: UserInfo) {
     userId.value = info.userId
@@ -55,6 +56,10 @@ export const useUserStore = defineStore('user', () => {
   function restoreFromStorage() {
     const info = readStoredAuth()
     if (info) {
+      if (info.accessToken && isJwtExpired(info.accessToken)) {
+        clearStoredAuth()
+        return
+      }
       userId.value = info.userId
       nickname.value = info.nickname || ''
       avatar.value = info.avatar || ''

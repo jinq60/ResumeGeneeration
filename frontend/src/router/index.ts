@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useAuthModalStore } from '@/stores/authModal'
-import { getAccessToken } from '@/utils/authStorage'
-import { getJwtRole } from '@/utils/jwt'
+import { clearStoredAuth, getAccessToken } from '@/utils/authStorage'
+import { getJwtRole, isJwtExpired } from '@/utils/jwt'
 import adminRoutes from './admin'
 import websiteRoutes from './website'
 import workbenchRoutes from './workbench'
@@ -30,7 +30,12 @@ router.beforeEach((to, _from, next) => {
 
   // Admin routes use separate token
   if (to.path.startsWith('/admin')) {
-    const adminToken = localStorage.getItem('admin_token')
+    let adminToken = localStorage.getItem('admin_token')
+    if (adminToken && isJwtExpired(adminToken)) {
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_refresh_token')
+      adminToken = null
+    }
     // 除检查 token 存在外，还需解析 JWT role claim：防止把普通用户 JWT
     // 手工放入 admin_token 后渲染后台页面壳（真正鉴权仍以后端为准）
     const isAdmin = !!adminToken && getJwtRole(adminToken) === 'ADMIN'
@@ -49,7 +54,11 @@ router.beforeEach((to, _from, next) => {
     return
   }
 
-  const token = getAccessToken()
+  let token: string | null = getAccessToken()
+  if (token && isJwtExpired(token)) {
+    clearStoredAuth()
+    token = null
+  }
 
   // /login 用于 OAuth 回调；已登录用户访问则直接进工作台
   if (to.name === 'Login') {

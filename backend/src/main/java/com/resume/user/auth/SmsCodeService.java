@@ -77,11 +77,11 @@ public class SmsCodeService {
             throw new BusinessException(ResultCode.AUTH_SMS_CODE_NOT_AVAILABLE,
                     "短信服务暂不可用，请使用其他登录方式。");
         }
-        checkDailyLimit(phone);
         if (isInCooldown(phone)) {
             throw new BusinessException(ResultCode.AUTH_SMS_CODE_TOO_FREQUENT,
                     "发送过于频繁，请稍后再试。");
         }
+        checkDailyLimit(phone);
 
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         store(phone, code);
