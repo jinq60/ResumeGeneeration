@@ -17,6 +17,7 @@ public class R<T> implements Serializable {
     private Integer code;
     private String message;
     private T data;
+    private Long timestamp = System.currentTimeMillis();
 
     public static <T> R<T> success() {
         return success(null);

@@ -59,9 +59,11 @@ class JwtAuthenticationFilterTest {
     }
 
     private void mockToken(String userId, String role) {
-        lenient().when(jwtTokenProvider.validateAccessToken("token")).thenReturn(true);
-        lenient().when(jwtTokenProvider.getUserId("token")).thenReturn(userId);
-        lenient().when(jwtTokenProvider.getRole("token")).thenReturn(role);
+        io.jsonwebtoken.Claims claims = io.jsonwebtoken.Jwts.claims()
+                .subject(userId)
+                .add(JwtTokenProvider.CLAIM_ROLE, role)
+                .build();
+        lenient().when(jwtTokenProvider.parseAccessClaims("token")).thenReturn(claims);
     }
 
     private MockHttpServletRequest request() {

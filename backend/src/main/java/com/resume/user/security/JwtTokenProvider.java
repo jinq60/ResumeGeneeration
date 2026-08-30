@@ -263,4 +263,16 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload();
     }
+
+    /**
+     * 解析并校验 access token，返回 claims；非 access 或无效时抛 JwtException。
+     */
+    public Claims parseAccessClaims(String token) {
+        Claims claims = parseClaims(token);
+        String type = claims.get(CLAIM_TYPE, String.class);
+        if (!TOKEN_TYPE_ACCESS.equals(type)) {
+            throw new io.jsonwebtoken.JwtException("Token type is not access: " + type);
+        }
+        return claims;
+    }
 }

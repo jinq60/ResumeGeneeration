@@ -85,12 +85,37 @@ public class MinioStorageService {
     }
 
     /**
-     * 从指定 Bucket 下载文件。
+     * 事务回滚后清理本次上传的新文件，避免事务回滚后 MinIO 孤儿文件。
      */
+    public void removeOnRollback(String bucket, String objectName) {
+        if (objectName == null || objectName.isBlank()) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                        remove(bucket, objectName);
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * 从指定 Bucket 下载文件（全量内存）。
+     * @deprecated 大文件请使用 {@link #downloadStream(String, String)} 流式下载，避免 OOM
+     */
+    @Deprecated
     public byte[] download(String bucket, String objectName) {
         try (InputStream inputStream = minioClient.getObject(
                 GetObjectArgs.builder().bucket(bucket).object(objectName).build())) {
-            return inputStream.readAllBytes();
+            byte[] bytes = inputStream.readAllBytes();
+            if (bytes.length > 5 * 1024 * 1024) {
+                log.warn("Large file download via byte[]: bucket={}, object={}, size={} - consider stream", bucket, objectName, bytes.length);
+            }
+            return bytes;
         } catch (Exception e) {
             log.error("Download file from MinIO failed: bucket={}, object={}", bucket, objectName, e);
             throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件下载失败，请稍后重试。", e);

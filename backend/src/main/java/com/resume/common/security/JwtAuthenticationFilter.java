@@ -37,24 +37,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String token = resolveToken(request);
-        if (StringUtils.hasText(token) && jwtTokenProvider.validateAccessToken(token)) {
-            String userId = jwtTokenProvider.getUserId(token);
-            // 账号被禁用/删除后旧 token 尽快失效；provider 为 null 仅发生在单测 slice（无 user 模块），此时放行以便测试
-            UserAccountStatusProvider provider = statusProvider.getIfAvailable();
-            if (provider != null && !provider.isEnabled(userId)) {
-                filterChain.doFilter(request, response);
-                return;
+        if (StringUtils.hasText(token)) {
+            try {
+                io.jsonwebtoken.Claims claims = jwtTokenProvider.parseAccessClaims(token);
+                String userId = claims.getSubject();
+                String claimedRole = claims.get(com.resume.user.security.JwtTokenProvider.CLAIM_ROLE, String.class);
+                // 账号被禁用/删除后旧 token 尽快失效；provider 为 null 仅发生在单测 slice（无 user 模块），此时放行以便测试
+                UserAccountStatusProvider provider = statusProvider.getIfAvailable();
+                if (provider != null && !provider.isEnabled(userId)) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                String role = resolveEffectiveRole(provider, userId, claimedRole);
+                if (role == null) {
+                    // 用户不存在或已被删除（ADMIN token 降级时实际角色为 null），视为未认证
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                List<GrantedAuthority> authorities = buildAuthorities(role);
+                // credentials 置空，避免 token 通过 SecurityContext 序列化/日志泄露
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
+                // 无效 token 静默放行，由 EntryPoint 处理 401
             }
-            String role = resolveEffectiveRole(provider, userId, jwtTokenProvider.getRole(token));
-            if (role == null) {
-                // 用户不存在或已被删除（ADMIN token 降级时实际角色为 null），视为未认证
-                filterChain.doFilter(request, response);
-                return;
-            }
-            List<GrantedAuthority> authorities = buildAuthorities(role);
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(userId, token, authorities);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
         }
         filterChain.doFilter(request, response);
     }
