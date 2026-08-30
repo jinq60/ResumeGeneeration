@@ -35,7 +35,7 @@
           <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
           <span class="magic-icon"><el-icon :size="14"><Calendar /></el-icon></span>
           <span class="field-label magic-label">生日</span>
-          <el-date-picker v-model="formData.birthDate" class="field-control magic-input" type="month" placeholder="选择出生年月" format="YYYY-MM" value-format="YYYY-MM" />
+          <el-date-picker v-model="formData.birthDate" class="field-control magic-input is-birth" type="month" placeholder="选择出生年月" format="YYYY-MM" value-format="YYYY-MM" />
           <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('birthDate')"><el-icon :size="14"><View /></el-icon></button>
           <button type="button" class="magic-delete" title="移除" @click="removeProfileField('birthDate')"><el-icon :size="14"><Delete /></el-icon></button>
         </el-form-item>
@@ -431,14 +431,19 @@ useSectionSync(
   overflow: hidden;
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
-.magic-field-row .field-control.el-date-editor,
-.magic-field-row .el-date-editor,
-.magic-field-row .el-date-editor.el-input__wrapper {
+.magic-field-row :deep(.field-control.el-date-editor),
+.magic-field-row :deep(.el-date-editor),
+.magic-field-row :deep(.el-date-editor.el-input__wrapper) {
   width: 100% !important; min-width: 0 !important; max-width: 100% !important;
   box-sizing: border-box;
 }
 .magic-field-row > .field-control { max-width: 100%; min-width: 0; overflow: hidden; }
 .magic-field-row { column-gap: 8px; }
+.magic-field-row :deep(.field-control.is-birth) {
+  --el-date-editor-width: 143px !important;
+  max-width: 143px !important;
+  width: 143px !important;
+}
 .magic-field-row:hover {
   border-color: hsl(var(--st-foreground) / 0.14);
   box-shadow: var(--st-shadow-md);
