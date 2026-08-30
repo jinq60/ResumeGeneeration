@@ -431,8 +431,9 @@ useSectionSync(
   overflow: hidden;
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
+.magic-field-row .field-control.el-date-editor,
 .magic-field-row .el-date-editor,
-.magic-field-row .el-date-editor.el-input__wrapper { width: 100%; min-width: 0; }
+.magic-field-row .el-date-editor.el-input__wrapper { width: 100% !important; min-width: 0; max-width: 100%; }
 .magic-field-row:hover {
   border-color: hsl(var(--st-foreground) / 0.14);
   box-shadow: var(--st-shadow-md);
