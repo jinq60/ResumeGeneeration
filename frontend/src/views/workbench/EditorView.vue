@@ -798,8 +798,12 @@ const saveStatusLabel = computed(() => {
 })
 
 function cloneResumeState(value: Resume): Resume {
-  if (typeof structuredClone === 'function') {
-    return structuredClone(value)
+  try {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(value)
+    }
+  } catch {
+    // structuredClone 对 Vue Proxy 或含 Window 引用时抛 DataCloneError，回退到 JSON 克隆
   }
   return JSON.parse(JSON.stringify(value)) as Resume
 }

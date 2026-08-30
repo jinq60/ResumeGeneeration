@@ -382,23 +382,39 @@ public class ResumeRenderService {
     }
 
     private String renderProfile(Map<String, Object> profile, RenderOptions options) {
+        // hiddenFields：眼睛显隐（非删除），行保留但简历不渲染对应字段；未知 key 忽略
+        java.util.Set<String> hidden = toHiddenSet(profile.get("hiddenFields"));
         boolean showAvatar = getBoolean(profile, "showAvatar", true);
-        String avatarUrl = getString(profile, "avatarUrl", "");
-        String name = getString(profile, "name", "");
-        String phone = getString(profile, "phone", "");
-        String email = getString(profile, "email", "");
-        String city = getString(profile, "city", "");
-        String targetPosition = getString(profile, "targetPosition", "");
+        String avatarUrl = hidden.contains("avatarUrl") || hidden.contains("avatar") ? "" : getString(profile, "avatarUrl", "");
+        if (hidden.contains("avatar")) {
+            showAvatar = false;
+        }
+        String name = hidden.contains("name") ? "" : getString(profile, "name", "");
+        String phone = hidden.contains("phone") ? "" : getString(profile, "phone", "");
+        String email = hidden.contains("email") ? "" : getString(profile, "email", "");
+        String city = hidden.contains("city") ? "" : getString(profile, "city", "");
+        String targetPosition = hidden.contains("targetPosition") ? "" : getString(profile, "targetPosition", "");
         boolean showGender = getBoolean(profile, "showGender", false);
+        if (hidden.contains("gender")) {
+            showGender = false;
+        }
         String gender = getString(profile, "gender", "");
         boolean showAge = getBoolean(profile, "showAge", false);
+        if (hidden.contains("age")) {
+            showAge = false;
+        }
         String age = getString(profile, "age", "");
         boolean showSalary = getBoolean(profile, "showSalary", false);
+        if (hidden.contains("expectedSalary") || hidden.contains("salary")) {
+            showSalary = false;
+        }
         String expectedSalary = getString(profile, "expectedSalary", "");
-        String availability = getString(profile, "availability", "");
-        String personalWebsite = getString(profile, "personalWebsite", "");
-        String github = getString(profile, "github", "");
-        String portfolio = getString(profile, "portfolio", "");
+        String availability = hidden.contains("availability") ? "" : getString(profile, "availability", "");
+        String personalWebsite = hidden.contains("personalWebsite") ? "" : getString(profile, "personalWebsite", "");
+        String github = hidden.contains("github") ? "" : getString(profile, "github", "");
+        String portfolio = hidden.contains("portfolio") ? "" : getString(profile, "portfolio", "");
+        // birthDate 在当前内置模板未在 header 单独渲染，但预留显隐能力（清空后模板若引用则不显示）
+        String birthDate = hidden.contains("birthDate") ? "" : getString(profile, "birthDate", "");
 
         // 分享页隐私：隐藏联系方式（手机/邮箱/个人链接）
         if (options != null && options.hideContact()) {
@@ -674,5 +690,19 @@ public class ResumeRenderService {
             return b;
         }
         return defaultValue;
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Set<String> toHiddenSet(Object value) {
+        if (!(value instanceof List<?> raw)) {
+            return java.util.Set.of();
+        }
+        java.util.Set<String> set = new java.util.HashSet<>();
+        for (Object item : raw) {
+            if (item instanceof String s && !s.isBlank()) {
+                set.add(s.trim());
+            }
+        }
+        return set;
     }
 }

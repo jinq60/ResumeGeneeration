@@ -7,61 +7,62 @@
         <span class="magic-heading-sub">拖拽可排序 · 眼睛控制显示</span>
       </div>
       <div class="profile-fields magic-field-list">
-        <el-form-item v-if="isFieldVisible('name')" prop="name" class="profile-field-row magic-field-row group">
+        <!-- 眼睛=简历显隐（行保留、仅简历不渲染），垃圾桶=移除该行（表单不显示） -->
+        <el-form-item prop="name" class="profile-field-row magic-field-row group" :class="{ 'is-hidden': isHidden('name') }">
           <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
           <span class="magic-icon"><el-icon :size="14"><User /></el-icon></span>
           <span class="field-label magic-label">姓名</span>
           <el-input v-model="formData.name" class="field-control magic-input" placeholder="请输入姓名" />
-          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('name')"><el-icon :size="14"><View v-if="isFieldVisible('name')" /><Hide v-else /></el-icon></button>
+          <button type="button" class="magic-action" :title="isHidden('name') ? '在简历中已隐藏，点击显示' : '在简历中隐藏该项'" @click="toggleHidden('name')"><el-icon :size="14"><Hide v-if="isHidden('name')" /><View v-else /></el-icon></button>
           <span class="magic-delete-placeholder" />
         </el-form-item>
-        <el-form-item v-if="isFieldVisible('targetPosition')" prop="targetPosition" class="profile-field-row magic-field-row group">
+        <el-form-item prop="targetPosition" class="profile-field-row magic-field-row group" :class="{ 'is-hidden': isHidden('targetPosition') }">
           <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
           <span class="magic-icon"><el-icon :size="14"><Briefcase /></el-icon></span>
           <span class="field-label magic-label">职位</span>
           <el-input v-model="formData.targetPosition" class="field-control magic-input" placeholder="请输入目标岗位" maxlength="128" show-word-limit />
-          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('targetPosition')"><el-icon :size="14"><View v-if="isFieldVisible('targetPosition')" /><Hide v-else /></el-icon></button>
+          <button type="button" class="magic-action" :title="isHidden('targetPosition') ? '在简历中已隐藏，点击显示' : '在简历中隐藏该项'" @click="toggleHidden('targetPosition')"><el-icon :size="14"><Hide v-if="isHidden('targetPosition')" /><View v-else /></el-icon></button>
           <span class="magic-delete-placeholder" />
         </el-form-item>
-        <el-form-item v-if="isFieldVisible('availability')" prop="availability" class="profile-field-row magic-field-row group">
+        <el-form-item v-if="!isRemoved('availability')" prop="availability" class="profile-field-row magic-field-row group" :class="{ 'is-hidden': isHidden('availability') }">
           <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
           <span class="magic-icon"><el-icon :size="14"><Briefcase /></el-icon></span>
           <span class="field-label magic-label">状态</span>
           <el-input v-model="formData.availability" class="field-control magic-input" placeholder="请输入到岗时间" maxlength="64" />
-          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('availability')"><el-icon :size="14"><View /></el-icon></button>
-          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('availability')"><el-icon :size="14"><Delete /></el-icon></button>
+          <button type="button" class="magic-action" :title="isHidden('availability') ? '在简历中已隐藏，点击显示' : '在简历中隐藏该项'" @click="toggleHidden('availability')"><el-icon :size="14"><Hide v-if="isHidden('availability')" /><View v-else /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除该行" @click="removeProfileField('availability')"><el-icon :size="14"><Delete /></el-icon></button>
         </el-form-item>
-        <el-form-item v-if="isFieldVisible('birthDate')" prop="birthDate" class="profile-field-row magic-field-row group">
+        <el-form-item v-if="!isRemoved('birthDate')" prop="birthDate" class="profile-field-row magic-field-row group" :class="{ 'is-hidden': isHidden('birthDate') }">
           <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
           <span class="magic-icon"><el-icon :size="14"><Calendar /></el-icon></span>
           <span class="field-label magic-label">生日</span>
           <el-date-picker v-model="formData.birthDate" class="field-control magic-input is-birth" type="month" placeholder="选择出生年月" format="YYYY-MM" value-format="YYYY-MM" />
-          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('birthDate')"><el-icon :size="14"><View /></el-icon></button>
-          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('birthDate')"><el-icon :size="14"><Delete /></el-icon></button>
+          <button type="button" class="magic-action" :title="isHidden('birthDate') ? '在简历中已隐藏，点击显示' : '在简历中隐藏该项'" @click="toggleHidden('birthDate')"><el-icon :size="14"><Hide v-if="isHidden('birthDate')" /><View v-else /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除该行" @click="removeProfileField('birthDate')"><el-icon :size="14"><Delete /></el-icon></button>
         </el-form-item>
-        <el-form-item v-if="isFieldVisible('email')" prop="email" class="profile-field-row magic-field-row group">
+        <el-form-item v-if="!isRemoved('email')" prop="email" class="profile-field-row magic-field-row group" :class="{ 'is-hidden': isHidden('email') }">
           <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
           <span class="magic-icon"><el-icon :size="14"><Message /></el-icon></span>
           <span class="field-label magic-label">邮箱</span>
           <el-input v-model="formData.email" class="field-control magic-input" placeholder="请输入邮箱" maxlength="128" />
-          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('email')"><el-icon :size="14"><View /></el-icon></button>
-          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('email')"><el-icon :size="14"><Delete /></el-icon></button>
+          <button type="button" class="magic-action" :title="isHidden('email') ? '在简历中已隐藏，点击显示' : '在简历中隐藏该项'" @click="toggleHidden('email')"><el-icon :size="14"><Hide v-if="isHidden('email')" /><View v-else /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除该行" @click="removeProfileField('email')"><el-icon :size="14"><Delete /></el-icon></button>
         </el-form-item>
-        <el-form-item v-if="isFieldVisible('phone')" prop="phone" class="profile-field-row magic-field-row group">
+        <el-form-item v-if="!isRemoved('phone')" prop="phone" class="profile-field-row magic-field-row group" :class="{ 'is-hidden': isHidden('phone') }">
           <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
           <span class="magic-icon"><el-icon :size="14"><Phone /></el-icon></span>
           <span class="field-label magic-label">电话</span>
           <el-input v-model="formData.phone" class="field-control magic-input" placeholder="请输入手机号" maxlength="11" />
-          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('phone')"><el-icon :size="14"><View /></el-icon></button>
-          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('phone')"><el-icon :size="14"><Delete /></el-icon></button>
+          <button type="button" class="magic-action" :title="isHidden('phone') ? '在简历中已隐藏，点击显示' : '在简历中隐藏该项'" @click="toggleHidden('phone')"><el-icon :size="14"><Hide v-if="isHidden('phone')" /><View v-else /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除该行" @click="removeProfileField('phone')"><el-icon :size="14"><Delete /></el-icon></button>
         </el-form-item>
-        <el-form-item v-if="isFieldVisible('city')" prop="city" class="profile-field-row magic-field-row group">
+        <el-form-item v-if="!isRemoved('city')" prop="city" class="profile-field-row magic-field-row group" :class="{ 'is-hidden': isHidden('city') }">
           <span class="magic-drag" aria-hidden="true"><el-icon class="magic-drag-icon"><Rank /></el-icon></span>
           <span class="magic-icon"><el-icon :size="14"><Location /></el-icon></span>
           <span class="field-label magic-label">地址</span>
           <el-input v-model="formData.city" class="field-control magic-input" placeholder="请输入所在城市" maxlength="50" />
-          <button type="button" class="magic-action" title="显示/隐藏" @click="toggleField('city')"><el-icon :size="14"><View /></el-icon></button>
-          <button type="button" class="magic-delete" title="移除" @click="removeProfileField('city')"><el-icon :size="14"><Delete /></el-icon></button>
+          <button type="button" class="magic-action" :title="isHidden('city') ? '在简历中已隐藏，点击显示' : '在简历中隐藏该项'" @click="toggleHidden('city')"><el-icon :size="14"><Hide v-if="isHidden('city')" /><View v-else /></el-icon></button>
+          <button type="button" class="magic-delete" title="移除该行" @click="removeProfileField('city')"><el-icon :size="14"><Delete /></el-icon></button>
         </el-form-item>
       </div>
     </section>
@@ -140,20 +141,38 @@ const emit = defineEmits<{
 }>()
 const formRef = ref<FormInstance>()
 const avatarUploading = ref(false)
-const hiddenFields = ref<string[]>([])
+// 眼睛显隐（hiddenFields）持久化到 profile.data.hiddenFields，行保留仅简历不渲染；垃圾桶移除（removedFields）仅隐藏表单行
+const removedFields = ref<string[]>([])
 const addingCustomField = ref(false)
 const newFieldLabel = ref('')
 
+function isHidden(key: string): boolean {
+  return (formData.value.hiddenFields || []).includes(key)
+}
+function isRemoved(key: string): boolean {
+  return removedFields.value.includes(key)
+}
+// 兼容旧模板：保留 isFieldVisible 供可能残留引用
 function isFieldVisible(key: string) {
-  return !hiddenFields.value.includes(key)
+  return !isRemoved(key)
 }
-
+function toggleHidden(key: string) {
+  const list = [...(formData.value.hiddenFields || [])]
+  const idx = list.indexOf(key)
+  if (idx >= 0) list.splice(idx, 1)
+  else list.push(key)
+  formData.value.hiddenFields = list
+}
 function removeProfileField(key: string) {
-  hiddenFields.value = [...hiddenFields.value, key]
+  if (!removedFields.value.includes(key)) {
+    removedFields.value = [...removedFields.value, key]
+  }
+  // 删除时清空值，避免空值仍占位；同时若该字段处于隐藏，保留隐藏状态由用户眼睛控制
+  ;(formData.value as any)[key] = ''
 }
-
+// 兼容旧调用
 function toggleField(key: string) {
-  hiddenFields.value = isFieldVisible(key) ? [...hiddenFields.value, key] : hiddenFields.value.filter(item => item !== key)
+  toggleHidden(key)
 }
 
 async function handleAvatarChange(file: UploadFile) {
@@ -200,7 +219,8 @@ const formData = ref<Profile>({
   showAge: false,
   showSalary: false,
   showAvatar: true,
-  customFields: []
+  customFields: [],
+  hiddenFields: []
 })
 
 // 校验规则：前后端必须一致（validation-rules.md §2-§3）
@@ -340,6 +360,9 @@ function extractProfile() {
     )
     if (profileSection && profileSection.data) {
       Object.assign(formData.value, profileSection.data)
+      if (!Array.isArray((formData.value as any).hiddenFields)) {
+        formData.value.hiddenFields = []
+      }
     }
   }
 }
@@ -447,6 +470,15 @@ useSectionSync(
 .magic-field-row:hover {
   border-color: hsl(var(--st-foreground) / 0.14);
   box-shadow: var(--st-shadow-md);
+}
+.magic-field-row.is-hidden {
+  opacity: 0.62;
+}
+.magic-field-row.is-hidden .field-control.magic-input :deep(.el-input__wrapper) {
+  background: hsl(var(--st-secondary) / 0.4);
+}
+.magic-field-row.is-hidden .magic-action {
+  color: hsl(var(--st-muted-foreground));
 }
 .magic-field-row :deep(.el-form-item__content) {
   display: contents;

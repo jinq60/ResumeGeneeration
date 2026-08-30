@@ -245,7 +245,9 @@ public class ResumeService {
         // 乐观锁 CAS：请求携带 version 时以请求值为准参与 WHERE version=? 比较
         // （OptimisticLockerInnerInterceptor 生成条件，不匹配时 updateById 返回 0 → 抛 2012 冲突）；
         // 未携带 version 时保持"读最新实体→写回"的旧行为，向后兼容旧客户端。
+        Integer oldVersion = resume.getVersion();
         if (request.getVersion() != null) {
+            oldVersion = request.getVersion();
             resume.setVersion(request.getVersion());
         }
 
@@ -256,7 +258,13 @@ public class ResumeService {
             throw new BusinessException(ResultCode.RESUME_VERSION_CONFLICT,
                     "简历已被其他编辑修改，请刷新后重试。");
         }
-        incrementVersion(resume);
+        // 兼容 Mock（单测中 updateById 不会触发拦截器自动 +1）与真实 DB（拦截器已 +1）：
+        // 若内存 version 仍等于 oldVersion，说明拦截器未生效，需手动 +1；否则已是 newVersion
+        if (resume.getVersion() != null && resume.getVersion().equals(oldVersion)) {
+            resume.setVersion(oldVersion == null ? 1 : oldVersion + 1);
+        } else if (resume.getVersion() == null && oldVersion == null) {
+            resume.setVersion(1);
+        }
 
         UpdateResumeResponse response = new UpdateResumeResponse();
         response.setId(resume.getId());
@@ -332,6 +340,7 @@ public class ResumeService {
     @Transactional(rollbackFor = Exception.class)
     public RenameResumeResponse renameResume(String userId, String resumeId, RenameResumeRequest request) {
         Resume resume = getResumeEntity(userId, resumeId);
+        Integer oldVersion = resume.getVersion();
         resume.setTitle(request.getTitle().trim());
         LocalDateTime now = LocalDateTime.now();
         resume.setLastEditedAt(now);
@@ -340,7 +349,11 @@ public class ResumeService {
             throw new BusinessException(ResultCode.RESUME_VERSION_CONFLICT,
                     "简历已被其他编辑修改，请刷新后重试。");
         }
-        incrementVersion(resume);
+        if (resume.getVersion() != null && resume.getVersion().equals(oldVersion)) {
+            resume.setVersion(oldVersion == null ? 1 : oldVersion + 1);
+        } else if (resume.getVersion() == null && oldVersion == null) {
+            resume.setVersion(1);
+        }
 
         RenameResumeResponse response = new RenameResumeResponse();
         response.setId(resume.getId());
@@ -408,6 +421,7 @@ public class ResumeService {
             }
         }
         if (updated) {
+            Integer oldVersion = resume.getVersion();
             resume.setSections(sections);
             resume.setLastEditedAt(LocalDateTime.now());
             resume.setUpdatedAt(LocalDateTime.now());
@@ -416,16 +430,21 @@ public class ResumeService {
                 log.warn("fillAvatarUrl skipped: optimistic lock conflict, userId={}, resumeId={}", userId, resumeId);
                 return;
             }
-            incrementVersion(resume);
+            if (resume.getVersion() != null && resume.getVersion().equals(oldVersion)) {
+                resume.setVersion(oldVersion == null ? 1 : oldVersion + 1);
+            } else if (resume.getVersion() == null && oldVersion == null) {
+                resume.setVersion(1);
+            }
             log.info("Avatar URL filled: userId={}, resumeId={}", userId, resumeId);
         }
     }
 
     /**
-     * 同步内存中的版本号：数据库侧由乐观锁拦截器自动 version+1，这里保持一致。
+     * @deprecated 乐观锁版本已由 MyBatis-Plus 在 updateById 后自动同步到内存，无需手动 +1；保留空实现以兼容旧调用
      */
+    @SuppressWarnings("unused")
     private void incrementVersion(Resume resume) {
-        resume.setVersion(resume.getVersion() == null ? 1 : resume.getVersion() + 1);
+        // no-op: 旧逻辑会导致 version 比 DB 多 1，引发后续保存必冲突（表现为第二次眼睛切换 409）
     }
 
     private void validateScene(String scene) {

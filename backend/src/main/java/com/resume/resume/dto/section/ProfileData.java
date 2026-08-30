@@ -64,4 +64,12 @@ public class ProfileData {
 
     @JsonProperty("showAvatar")
     private Boolean showAvatar = true;
+
+    /**
+     * 被眼睛隐藏的字段 key 列表（hiddenFields），用于简历显隐而非删除。
+     * 前端 ProfileForm 通过眼睛切换，行保留但简历预览/PDF 不渲染对应字段。
+     * 合法 key：name, targetPosition, availability, birthDate, email, phone, city,
+     * expectedSalary, personalWebsite, github, portfolio, gender 等；未知 key 忽略。
+     */
+    private List<String> hiddenFields;
 }

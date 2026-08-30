@@ -87,4 +87,6 @@ export interface Profile {
   personalWebsite?: string; github?: string; portfolio?: string; avatarUrl?: string
   customFields?: Array<{ id: string; label: string; value: string; showLabel?: boolean }>
   showGender?: boolean; showAge?: boolean; showSalary?: boolean; showAvatar?: boolean
+  /** 眼睛显隐（非删除）：被隐藏的字段 key 列表，简历预览/PDF 不渲染对应字段，行保留在表单中 */
+  hiddenFields?: string[]
 }

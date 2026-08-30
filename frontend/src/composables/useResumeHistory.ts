@@ -4,8 +4,12 @@ const DEFAULT_LIMIT = 50
 const DEFAULT_COALESCE_WINDOW_MS = 800
 
 function clone<T>(value: T): T {
-  if (typeof structuredClone === 'function') {
-    return structuredClone(value)
+  try {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(value)
+    }
+  } catch {
+    // Vue Proxy 场景下 structuredClone 抛 DataCloneError，回退 JSON
   }
   return JSON.parse(JSON.stringify(value)) as T
 }
