@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
+import com.resume.common.service.RichTextSanitizer;
 import com.resume.resume.dto.RenderSettings;
 import com.resume.resume.dto.ResumeDetailResponse;
 import com.resume.resume.dto.ResumeImportRequest;
@@ -55,6 +56,7 @@ public class ResumeImportService {
         if (sections.isEmpty()) {
             throw new BusinessException(ResultCode.RESUME_IMPORT_INVALID, "未能从导入内容中解析出任何模块。");
         }
+        sanitizeSections(sections);
         resumeSectionValidator.validateDraft(sections);
 
         String title = StringUtils.isNotBlank(request.getTitle())
@@ -97,14 +99,23 @@ public class ResumeImportService {
                 : parseJson(content);
     }
 
+    private static final int MAX_JSON_DEPTH = 20;
     private List<SectionDTO> parseJson(String content) {
         try {
+            if (content.length() > 200_000) {
+                throw new BusinessException(ResultCode.RESUME_IMPORT_INVALID, "导入内容过大。");
+            }
             Object parsed = objectMapper.readValue(content, Object.class);
+            if (exceedsDepth(parsed, 0)) {
+                throw new BusinessException(ResultCode.RESUME_IMPORT_INVALID, "JSON 嵌套过深。");
+            }
             if (parsed instanceof List<?> list) {
+                if (list.size() > 50) throw new BusinessException(ResultCode.RESUME_IMPORT_INVALID, "模块数量超出限制。");
                 return objectMapper.convertValue(list, new TypeReference<List<SectionDTO>>() {
                 });
             }
             if (parsed instanceof Map<?, ?> map && map.get("sections") instanceof List<?> sections) {
+                if (sections.size() > 50) throw new BusinessException(ResultCode.RESUME_IMPORT_INVALID, "模块数量超出限制。");
                 return objectMapper.convertValue(sections, new TypeReference<List<SectionDTO>>() {
                 });
             }
@@ -115,6 +126,24 @@ public class ResumeImportService {
             log.warn("Parse imported JSON failed: {}", e.getMessage());
             throw new BusinessException(ResultCode.RESUME_IMPORT_INVALID, "JSON 解析失败，请检查格式。");
         }
+    }
+
+    private boolean exceedsDepth(Object node, int depth) {
+        if (depth > MAX_JSON_DEPTH) return true;
+        if (node instanceof Map<?, ?> map) {
+            for (Object v : map.values()) {
+                if (v instanceof Map || v instanceof List) {
+                    if (exceedsDepth(v, depth + 1)) return true;
+                }
+            }
+        } else if (node instanceof List<?> list) {
+            for (Object v : list) {
+                if (v instanceof Map || v instanceof List) {
+                    if (exceedsDepth(v, depth + 1)) return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -154,5 +183,35 @@ public class ResumeImportService {
         response.setCreatedAt(resume.getCreatedAt());
         response.setUpdatedAt(resume.getUpdatedAt());
         return response;
+    }
+
+    private void sanitizeSections(List<SectionDTO> sections) {
+        if (sections == null) return;
+        for (SectionDTO section : sections) {
+            Object data = section.getData();
+            if (data instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> map = (Map<String, Object>) data;
+                for (Map.Entry<String, Object> e : map.entrySet()) {
+                    if (e.getKey() != null && e.getKey().endsWith("Html") && e.getValue() instanceof String html) {
+                        map.put(e.getKey(), RichTextSanitizer.sanitize(html));
+                    }
+                }
+            } else if (data instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Object> items = (List<Object>) data;
+                for (Object obj : items) {
+                    if (obj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> item = (Map<String, Object>) obj;
+                        for (Map.Entry<String, Object> e : item.entrySet()) {
+                            if (e.getKey() != null && e.getKey().endsWith("Html") && e.getValue() instanceof String html) {
+                                item.put(e.getKey(), RichTextSanitizer.sanitize(html));
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

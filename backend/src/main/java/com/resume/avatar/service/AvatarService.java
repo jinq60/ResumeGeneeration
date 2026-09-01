@@ -73,8 +73,15 @@ public class AvatarService {
         try {
             minioStorageService.upload(minioStorageService.getBucketAvatars(), objectName,
                     file.getInputStream(), file.getSize(), contentType);
+            // 注册事务回滚时清理孤儿文件：若后续 DB 插入失败导致事务回滚，MinIO 已上传对象会被清理
+            minioStorageService.removeOnRollback(minioStorageService.getBucketAvatars(), objectName);
         } catch (IOException e) {
-            // 失败时主动删除已上传对象避免孤儿文件
+            throw new BusinessException(ResultCode.AVATAR_OPTIMIZE_FAILED, "头像上传失败。");
+        } catch (BusinessException e) {
+            // MinIO 上传阶段已抛 BusinessException（内部已包装），无需重复清理（removeOnRollback 已注册）
+            throw e;
+        } catch (Exception e) {
+            // 其他未知异常：尝试即时清理避免部分写入
             minioStorageService.remove(minioStorageService.getBucketAvatars(), objectName);
             throw new BusinessException(ResultCode.AVATAR_OPTIMIZE_FAILED, "头像上传失败。");
         }
@@ -216,24 +223,28 @@ public class AvatarService {
             throw new BusinessException(ResultCode.ACCESS_DENIED, "无权访问该资源。");
         }
 
-        List<String> pendingRemoval = new ArrayList<>();
-        String sourceObjectName = extractObjectName(task.getSourceImageUrl());
-        if (StringUtils.isNotBlank(sourceObjectName) && isOwnedObject(userId, sourceObjectName)) {
-            pendingRemoval.add(sourceObjectName);
-        }
-        String resultObjectName = extractObjectName(task.getResultImageUrl());
-        if (StringUtils.isNotBlank(resultObjectName)
-                && !resultObjectName.equals(sourceObjectName)
-                && isOwnedObject(userId, resultObjectName)) {
-            pendingRemoval.add(resultObjectName);
-        }
-
         // 逻辑删除字段必须用 UpdateWrapper.set 显式写入：实体方式会被 MP 从 SET 子句排除导致静默失效
         LambdaUpdateWrapper<AvatarTask> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(AvatarTask::getUserId, userId)
                .eq(AvatarTask::getSourceImageUrl, task.getSourceImageUrl())
                .set(AvatarTask::getDeleted, BizConstant.DELETED);
         avatarTaskMapper.update(null, wrapper);
+
+        // 物理文件清理需防误删：仅当无其他活跃任务仍引用该对象时才删 MinIO 文件
+        // deleteAvatar 按 sourceImageUrl 全量删除，清理后 hasOtherActiveReference 恒为 0，但保留检查以防御未来逻辑变更
+        List<String> pendingRemoval = new ArrayList<>();
+        String sourceObjectName = extractObjectName(task.getSourceImageUrl());
+        if (StringUtils.isNotBlank(sourceObjectName) && isOwnedObject(userId, sourceObjectName)
+                && !hasOtherActiveReference(userId, task.getSourceImageUrl())) {
+            pendingRemoval.add(sourceObjectName);
+        }
+        String resultObjectName = extractObjectName(task.getResultImageUrl());
+        if (StringUtils.isNotBlank(resultObjectName)
+                && !resultObjectName.equals(sourceObjectName)
+                && isOwnedObject(userId, resultObjectName)) {
+            // result 图为单次优化产物，未共享，直接清理
+            pendingRemoval.add(resultObjectName);
+        }
 
         minioStorageService.removeAfterCommit(minioStorageService.getBucketAvatars(), pendingRemoval);
     }

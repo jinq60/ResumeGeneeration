@@ -7,9 +7,10 @@ coverage/
 .env*
 !.env.example
 .opencode/
+opencode.json
 frontend_login.html
 
-# OAuth / тф╥ЧнЯф╬╬щнд╪Чё╛р╩бивъ╩╥╬Ё╠Да©╩Р╥ЧнЯфВ╠╬╣ь╧рть
+# OAuth / О©╫ф╥О©╫О©╫О©╫ф╬О©╫О©╫О©╫д╪О©╫О©╫О©╫р╩О©╫О©╫О©╫ъ╩О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫ь╧О©╫О©╫О©╫
 *.json.key
 ops/google-auth.json
 .superpowers/

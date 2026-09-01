@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -82,6 +83,7 @@ class AiWritingServiceTest {
         when(providerRouter.getFeatureConfig(anyString())).thenReturn(featureConfig);
         when(promptTemplates.render(anyString(), any())).thenReturn("prompt");
         when(llmProvider.getProviderName()).thenReturn("qwen");
+        lenient().when(aiDailyQuotaService.consume(anyString(), anyString(), any(Integer.class))).thenReturn("20260831");
     }
 
     private Resume buildResume(String userId, String resumeId) {
@@ -240,8 +242,8 @@ class AiWritingServiceTest {
         assertThrows(BusinessException.class,
                 () -> service.write("user_1", false, "resume_1", buildRequest("polish")));
 
-        // LLM 调用失败必须退还配额，避免先扣不退
-        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiWritingService.FEATURE_KEY));
+        // LLM 调用失败必须退还配额，避免先扣不退（按消费时的 quotaDate 精准退款）
+        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiWritingService.FEATURE_KEY), eq("20260831"));
     }
 
     @Test
@@ -254,7 +256,7 @@ class AiWritingServiceTest {
         assertThrows(BusinessException.class,
                 () -> service.write("user_1", false, "resume_1", buildRequest("polish")));
 
-        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiWritingService.FEATURE_KEY));
+        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiWritingService.FEATURE_KEY), eq("20260831"));
     }
 
     @Test
@@ -282,7 +284,7 @@ class AiWritingServiceTest {
         assertThrows(RuntimeException.class,
                 () -> service.stream("user_1", false, "resume_1", buildRequest("polish")).blockLast());
 
-        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiWritingService.FEATURE_KEY));
+        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiWritingService.FEATURE_KEY), eq("20260831"));
     }
 
     @Test

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -28,35 +29,66 @@ import java.time.format.DateTimeFormatter;
 @RequiredArgsConstructor
 public class AiDailyQuotaService {
 
+    private static final ZoneId ZONE_SHANGHAI = ZoneId.of("Asia/Shanghai");
+
     private final AiDailyQuotaMapper aiDailyQuotaMapper;
+
+    private static String currentQuotaDate() {
+        return LocalDate.now(ZONE_SHANGHAI).format(DateTimeFormatter.BASIC_ISO_DATE);
+    }
 
     /**
      * 消费一次配额，超出 {@code dailyLimit} 时抛 {@code AI_DAILY_QUOTA_EXCEEDED}。
      *
      * @param dailyLimit 当日上限；小于等于 0 表示功能不可用
+     * @return 本次消费对应的 quotaDate（供失败时精准退款，避免跨天错表）
      */
-    public void consume(String userId, String featureKey, int dailyLimit) {
+    public String consume(String userId, String featureKey, int dailyLimit) {
         if (dailyLimit <= 0) {
             throw new BusinessException(ResultCode.AI_DAILY_QUOTA_EXCEEDED, "该 AI 功能今日已不可用。");
         }
-        String quotaDate = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String quotaDate = currentQuotaDate();
         AiDailyQuota quota = find(userId, featureKey, quotaDate);
         if (quota == null) {
             if (!tryInsert(userId, featureKey, quotaDate)) {
                 // 并发下另一请求已插入，走更新路径
                 incrementOrFail(userId, featureKey, quotaDate, dailyLimit);
             }
-            return;
+            return quotaDate;
         }
         incrementOrFail(userId, featureKey, quotaDate, dailyLimit);
+        return quotaDate;
     }
 
     /**
      * 退还一次配额（调用失败时使用）：used_count 减 1，下限保护为 0。
-     * <p>仅当当日已有记录且 used_count &gt; 0 时生效；无记录时不做任何操作。</p>
+     * <p>仅当已有记录且 used_count &gt; 0 时生效；无记录时不做任何操作。</p>
+     * <p>
+     * 兼容旧调用：按业务时区当日退款，若未命中（跨天场景 23:59 消费 00:01 失败）则尝试昨日，避免配额永久虚高。
+     * </p>
      */
     public void refund(String userId, String featureKey) {
-        String quotaDate = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String today = currentQuotaDate();
+        int updated = refundForDate(userId, featureKey, today);
+        if (updated == 0) {
+            // 跨天回退：消费在昨日，失败在今日
+            String yesterday = LocalDate.now(ZONE_SHANGHAI).minusDays(1).format(DateTimeFormatter.BASIC_ISO_DATE);
+            refundForDate(userId, featureKey, yesterday);
+        }
+    }
+
+    /**
+     * 按指定 quotaDate 精准退款，避免跨天错表。
+     */
+    public void refund(String userId, String featureKey, String quotaDate) {
+        if (quotaDate == null || quotaDate.isBlank()) {
+            refund(userId, featureKey);
+            return;
+        }
+        refundForDate(userId, featureKey, quotaDate);
+    }
+
+    private int refundForDate(String userId, String featureKey, String quotaDate) {
         LambdaUpdateWrapper<AiDailyQuota> update = new LambdaUpdateWrapper<>();
         update.eq(AiDailyQuota::getUserId, userId)
                 .eq(AiDailyQuota::getFeatureKey, featureKey)
@@ -66,9 +98,10 @@ public class AiDailyQuotaService {
                 .setSql("used_count = GREATEST(used_count - 1, 0)");
         int updated = aiDailyQuotaMapper.update(null, update);
         if (updated == 0) {
-            log.debug("AiDailyQuota refund skipped (no row or used_count=0): user={}, feature={}",
-                    userId, featureKey);
+            log.debug("AiDailyQuota refund skipped (no row or used_count=0): user={}, feature={}, date={}",
+                    userId, featureKey, quotaDate);
         }
+        return updated;
     }
 
     private AiDailyQuota find(String userId, String featureKey, String quotaDate) {

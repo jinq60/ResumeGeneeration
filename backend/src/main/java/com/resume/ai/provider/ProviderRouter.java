@@ -9,10 +9,13 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 功能 → 厂商 → Provider 实现的路由器。
+ * <p>
+ * 不做永久缓存：配置为外置（环境变量/配置中心）时需即时生效，避免热更新后仍命中旧供应商。
+ * 解析开销极低（遍历 2~3 个 Provider），无需缓存。
+ * </p>
  */
 @Component
 @RequiredArgsConstructor
@@ -21,25 +24,19 @@ public class ProviderRouter {
     private final AiProperties aiProperties;
     private final List<LlmProvider> providers;
 
-    private final Map<String, LlmProvider> providerCache = new ConcurrentHashMap<>();
-
     public LlmProvider resolve(String featureKey) {
-        return providerCache.computeIfAbsent(featureKey, key -> {
-            Map<String, FeatureConfig> providerConfigs = aiProperties.getProviders();
-            if (providerConfigs == null || !providerConfigs.containsKey(key)) {
-                throw new BusinessException(ResultCode.AI_PROVIDER_NOT_CONFIGURED,
-                        "未配置 AI 功能对应的厂商: " + key);
-            }
-
-            FeatureConfig config = providerConfigs.get(key);
-            String providerName = config.getProvider();
-
-            return providers.stream()
-                    .filter(p -> p.getProviderName().equalsIgnoreCase(providerName))
-                    .findFirst()
-                    .orElseThrow(() -> new BusinessException(ResultCode.AI_PROVIDER_NOT_CONFIGURED,
-                            "未找到对应的 LLM 供应商实现: " + providerName));
-        });
+        Map<String, FeatureConfig> providerConfigs = aiProperties.getProviders();
+        if (providerConfigs == null || !providerConfigs.containsKey(featureKey)) {
+            throw new BusinessException(ResultCode.AI_PROVIDER_NOT_CONFIGURED,
+                    "未配置 AI 功能对应的厂商: " + featureKey);
+        }
+        FeatureConfig config = providerConfigs.get(featureKey);
+        String providerName = config.getProvider();
+        return providers.stream()
+                .filter(p -> p.getProviderName().equalsIgnoreCase(providerName))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ResultCode.AI_PROVIDER_NOT_CONFIGURED,
+                        "未找到对应的 LLM 供应商实现: " + providerName));
     }
 
     public String resolveModel(String featureKey) {

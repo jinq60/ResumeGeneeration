@@ -22,10 +22,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /**
@@ -134,10 +138,13 @@ public class UserService {
     /** 抹平时序用的惰性随机哈希（首次生成后复用，保证每次只做一次 matches 比对）。 */
     private volatile String timingDummyHash;
 
-    /** refresh 轮换宽限缓存：token hash → 已消费令牌的最近轮换结果（短 TTL）。 */
-    private final Map<String, RotationGrace> rotationGraceCache = new ConcurrentHashMap<>();
+    /** refresh 轮换宽限缓存：token hash → 已消费令牌的最近轮换结果（短 TTL，Caffeine 自动过期避免手动 clear 丢宽限）。 */
+    private final Cache<String, RotationGrace> rotationGraceCache = Caffeine.newBuilder()
+            .expireAfterWrite(ROTATION_GRACE_MILLIS + 2000, TimeUnit.MILLISECONDS)
+            .maximumSize(5000)
+            .build();
 
-    /** 同一 token 哈希的串行化锁（仅覆盖轮换临界区，用后即清理）。 */
+    /** 同一 token 哈希的串行化锁（仅覆盖轮换临界区，用后即清理，避免移除新锁）。 */
     private final Map<String, Object> rotationLocks = new ConcurrentHashMap<>();
 
     /**
@@ -205,7 +212,8 @@ public class UserService {
                 return doRefresh(userId, claimedFamilyId, tokenHash);
             }
         } finally {
-            rotationLocks.remove(tokenHash);
+            // 仅当值仍为当前 lock 时移除，避免误删并发新创建的锁
+            rotationLocks.remove(tokenHash, lock);
         }
     }
 
@@ -217,7 +225,7 @@ public class UserService {
         if (stored == null) {
             // 记录不存在：可能是宽限窗口内的良性并发竞态（刚被另一标签页消费），
             // 也可能是失窃重放。窗口内返回最近一次轮换结果；超窗则撤销整个家族。
-            RotationGrace grace = rotationGraceCache.get(tokenHash);
+            RotationGrace grace = rotationGraceCache.getIfPresent(tokenHash);
             if (grace != null && System.currentTimeMillis() < grace.expiresAt) {
                 log.info("Refresh token replay within rotation grace window "
                         + "(benign multi-tab race): userId={}", userId);
@@ -242,7 +250,7 @@ public class UserService {
         String consumedFamilyId = stored.getFamilyId();
         int removed = refreshTokenMapper.delete(wrapper);
         if (removed == 0) {
-            RotationGrace grace = rotationGraceCache.get(tokenHash);
+            RotationGrace grace = rotationGraceCache.getIfPresent(tokenHash);
             if (grace != null && System.currentTimeMillis() < grace.expiresAt) {
                 log.info("Concurrent refresh resolved by rotation grace window: userId={}", userId);
                 return grace.response;
@@ -269,21 +277,10 @@ public class UserService {
 
     private void recordRotationGrace(String tokenHash, AuthResponse response) {
         long expiresAt = System.currentTimeMillis() + ROTATION_GRACE_MILLIS;
-        // 顺带清理过期条目，避免长期驻留；集群多实例场景短 TTL 5s，定期清理足够
-        // 额外防御：恶意随机 tokenHash 可能撑大 Map，超限时强制清理
-        if (rotationGraceCache.size() > 5000) {
-            rotationGraceCache.entrySet().removeIf(e -> e.getValue().expiresAt <= System.currentTimeMillis());
-            if (rotationGraceCache.size() > 5000) {
-                log.warn("rotationGraceCache size exceeded 5000, clearing oldest entries");
-                rotationGraceCache.clear();
-            }
-        } else {
-            rotationGraceCache.entrySet().removeIf(e -> e.getValue().expiresAt <= System.currentTimeMillis());
-        }
         rotationGraceCache.put(tokenHash, new RotationGrace(expiresAt, response));
+        // rotationLocks 的清理已在 refresh() finally 中按 key 精准移除，无需全局 clear
         if (rotationLocks.size() > 5000) {
-            log.warn("rotationLocks size exceeded 5000, clearing");
-            rotationLocks.clear();
+            log.warn("rotationLocks size exceeded 5000 (possible attack), current={}", rotationLocks.size());
         }
     }
 

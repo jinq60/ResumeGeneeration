@@ -396,11 +396,20 @@ class UserServiceTest {
         userService.refresh(request);
 
         // 手动将宽限缓存条目置为已过期，模拟超出 5 秒窗口后的重放
-        Map<String, UserService.RotationGrace> cache =
-                (Map<String, UserService.RotationGrace>) ReflectionTestUtils.getField(userService, "rotationGraceCache");
-        cache.put(com.resume.user.security.TokenHashUtil.hash("valid_stored_token"),
-                new UserService.RotationGrace(System.currentTimeMillis() - 1000,
-                        new AuthResponse()));
+        Object cacheObj = ReflectionTestUtils.getField(userService, "rotationGraceCache");
+        String hash = com.resume.user.security.TokenHashUtil.hash("valid_stored_token");
+        UserService.RotationGrace expiredGrace = new UserService.RotationGrace(System.currentTimeMillis() - 1000,
+                        new AuthResponse());
+        if (cacheObj instanceof com.github.benmanes.caffeine.cache.Cache) {
+            @SuppressWarnings("unchecked")
+            com.github.benmanes.caffeine.cache.Cache<String, UserService.RotationGrace> caffeineCache =
+                    (com.github.benmanes.caffeine.cache.Cache<String, UserService.RotationGrace>) cacheObj;
+            caffeineCache.put(hash, expiredGrace);
+        } else if (cacheObj instanceof java.util.Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, UserService.RotationGrace> mapCache = (Map<String, UserService.RotationGrace>) cacheObj;
+            mapCache.put(hash, expiredGrace);
+        }
 
         BusinessException ex = assertThrows(BusinessException.class, () -> userService.refresh(request));
         assertEquals(ResultCode.AUTH_REFRESH_TOKEN_INVALID, ex.getErrorCode());

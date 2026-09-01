@@ -231,6 +231,10 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     }
 
     private boolean claim(String scopedKey, String userId, HttpServletRequest request) {
+        // 先注册 future 再插库，消除 insert 与 put 之间的窗口，避免并发等待方 get()==null 退化为 DB 轮询
+        CompletableFuture<IdempotencyRecord> placeholder = new CompletableFuture<>();
+        CompletableFuture<IdempotencyRecord> existing = inFlight.putIfAbsent(scopedKey, placeholder);
+        boolean weOwnPlaceholder = existing == null;
         IdempotencyRecord record = new IdempotencyRecord();
         record.setIdempotencyKey(scopedKey);
         record.setUserId(userId);
@@ -243,10 +247,15 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         record.setExpiresAt(LocalDateTime.now().plusHours(TTL_HOURS));
         try {
             idempotencyRecordMapper.insert(record);
-            // 占位成功后立即注册完成信号，缩小并发等待方拿不到 future 的窗口
-            inFlight.put(scopedKey, new CompletableFuture<>());
+            // 插入成功，若我们不是 placeholder 的拥有者（极小竞态），确保 map 中为我们的 placeholder
+            if (!weOwnPlaceholder) {
+                inFlight.put(scopedKey, placeholder);
+            }
             return true;
         } catch (DuplicateKeyException e) {
+            if (weOwnPlaceholder) {
+                inFlight.remove(scopedKey, placeholder);
+            }
             return false;
         }
     }
@@ -255,8 +264,10 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         try {
             byte[] body = wrapped.getContentAsByteArray();
             if (body.length > MAX_RESPONSE_BODY_BYTES) {
-                log.warn("Idempotency response too large, truncating: key={} size={}", scopedKey, body.length);
-                body = java.util.Arrays.copyOf(body, MAX_RESPONSE_BODY_BYTES);
+                log.warn("Idempotency response too large, not caching (would truncate JSON): key={} size={}", scopedKey, body.length);
+                // 超大响应不缓存，避免重放截断后的非法 JSON；删除占位使后续重试可重新执行
+                idempotencyRecordMapper.deleteById(scopedKey);
+                return null;
             }
             IdempotencyRecord record = new IdempotencyRecord();
             record.setIdempotencyKey(scopedKey);

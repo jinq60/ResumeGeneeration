@@ -18,7 +18,7 @@ public class ResumeImportRequest {
             message = "使用场景不合法。")
     private String scene = "campus_recruitment";
 
-    @Size(max = 100, message = "目标岗位过长。")
+    @Size(max = 128, message = "目标岗位过长。")
     private String targetPosition;
 
     @NotBlank(message = "请选择模板。")

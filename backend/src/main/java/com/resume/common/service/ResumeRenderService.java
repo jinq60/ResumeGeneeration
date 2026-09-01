@@ -209,28 +209,29 @@ public class ResumeRenderService {
         Map<String, Object> font = getMap(config, "font");
         Map<String, Object> color = getMap(config, "color");
 
-        String pageWidth = getString(page, "width", "210mm");
-        String pageHeight = getString(page, "height", "297mm");
+        String pageWidth = sanitizeCssDimension(getString(page, "width", "210mm"), "210mm");
+        String pageHeight = sanitizeCssDimension(getString(page, "height", "297mm"), "297mm");
         String pageMargin = settings.getPagePadding() != null
                 ? cssNumber(settings.getPagePadding()) + "mm"
-                : getString(page, "margin", "20mm");
+                : sanitizeCssDimension(getString(page, "margin", "20mm"), "20mm");
         String rawFontFamily = settings.getFontFamily() != null
                 ? settings.getFontFamily()
                 : getString(font, "family", RenderSettings.DEFAULT_FONT_FAMILY);
         String fontFamily = sanitizeFontFamily(rawFontFamily);
         String mainFontSize = settings.getBaseFontSize() != null
                 ? cssNumber(settings.getBaseFontSize()) + "pt"
-                : getString(font, "mainSize", "10.5pt");
+                : sanitizeCssDimension(getString(font, "mainSize", "10.5pt"), "10.5pt");
         String lineHeight = settings.getLineHeight() != null
                 ? cssNumber(settings.getLineHeight())
-                : getString(font, "lineHeight", "1.5");
+                : sanitizeLineHeight(getString(font, "lineHeight", "1.5"));
         String rawAccent = settings.getAccentColor() != null
                 ? settings.getAccentColor()
                 : getString(color, "accent", "#1a5276");
         String accentColor = sanitizeHexColor(rawAccent);
+        if (accentColor == null) accentColor = "#1a5276";
         String sectionSpacing = settings.getSectionSpacing() != null
                 ? cssNumber(settings.getSectionSpacing()) + "px"
-                : getString(config, "moduleSpacing", "16px");
+                : sanitizeCssDimension(getString(config, "moduleSpacing", "16px"), "16px");
 
         StringBuilder css = new StringBuilder();
         // 基础重置与排版，提升可读性与专业感；iframe 背景透明，外层 canvas 点阵透出，单层纸张由 .resume-page 承载
@@ -242,8 +243,8 @@ public class ResumeRenderService {
            .append("      min-height: ").append(pageHeight).append(";\n")
            .append("      padding: ").append(pageMargin).append(";\n")
            .append("      margin: 0 auto;\n")
-           .append("      background: ").append(getString(color, "background", "#ffffff")).append(";\n")
-           .append("      color: ").append(getString(color, "primary", "#1a1a1a")).append(";\n")
+            .append("      background: ").append(sanitizeHexColorOrDefault(getString(color, "background", "#ffffff"), "#ffffff")).append(";\n")
+            .append("      color: ").append(sanitizeHexColorOrDefault(getString(color, "primary", "#1a1a1a"), "#1a1a1a")).append(";\n")
            .append("      font-size: ").append(mainFontSize).append("; }\n")
            .append("    .resume-page { border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; box-shadow: 0 10px 30px rgba(27,27,24,0.08), 0 2px 8px rgba(27,27,24,0.06); }\n")
            .append("    .resume-page[data-auto-one-page=\"true\"] {\n")
@@ -264,13 +265,13 @@ public class ResumeRenderService {
            .append("    .profile-avatar { width: 22mm; height: 22mm; object-fit: cover; border-radius: 6px; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }\n")
            .append("    .profile-info { flex: 1; min-width: 0; }\n")
            .append("    .profile-name { font-size: 20pt; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 6px; color: #111; }\n")
-           .append("    .profile-meta { color: ").append(getString(color, "secondary", "#5a5a5a")).append("; font-size: 8.5pt; margin-bottom: 3px; line-height: 1.4; }\n")
-           .append("    .profile-meta a { color: ").append(accentColor).append("; text-decoration: none; border-bottom: 1px dotted ").append(accentColor).append("; }\n")
-           // 条目：卡片感与时间线
-           .append("    .item { margin-bottom: 13px; padding-left: 0; }\n")
-           .append("    .item-header { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 10pt; margin-bottom: 2px; }\n")
-           .append("    .item-header span:last-child { font-weight: 400; color: ").append(getString(color, "secondary", "#6b7280")).append("; font-size: 8.5pt; white-space: nowrap; margin-left: 12px; }\n")
-           .append("    .item-sub { color: ").append(getString(color, "secondary", "#4b5563")).append("; font-size: 8.5pt; margin-bottom: 4px; font-style: italic; }\n")
+            .append("    .profile-meta { color: ").append(sanitizeHexColorOrDefault(getString(color, "secondary", "#5a5a5a"), "#5a5a5a")).append("; font-size: 8.5pt; margin-bottom: 3px; line-height: 1.4; }\n")
+            .append("    .profile-meta a { color: ").append(accentColor).append("; text-decoration: none; border-bottom: 1px dotted ").append(accentColor).append("; }\n")
+            // 条目：卡片感与时间线
+            .append("    .item { margin-bottom: 13px; padding-left: 0; }\n")
+            .append("    .item-header { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 10pt; margin-bottom: 2px; }\n")
+            .append("    .item-header span:last-child { font-weight: 400; color: ").append(sanitizeHexColorOrDefault(getString(color, "secondary", "#6b7280"), "#6b7280")).append("; font-size: 8.5pt; white-space: nowrap; margin-left: 12px; }\n")
+            .append("    .item-sub { color: ").append(sanitizeHexColorOrDefault(getString(color, "secondary", "#4b5563"), "#4b5563")).append("; font-size: 8.5pt; margin-bottom: 4px; font-style: italic; }\n")
            .append("    .rich-text { font-size: 9pt; color: #2a2a2a; }\n")
            .append("    .rich-text p { margin: 0 0 5px; }\n")
            .append("    .rich-text ul, .rich-text ol { padding-left: 18px; margin: 3px 0; }\n")
@@ -356,6 +357,33 @@ public class ResumeRenderService {
         }
         String trimmed = color.trim();
         return trimmed.matches("^#[0-9a-fA-F]{6}$") ? trimmed : null;
+    }
+
+    private static String sanitizeHexColorOrDefault(String color, String defaultValue) {
+        String sanitized = sanitizeHexColor(color);
+        return sanitized != null ? sanitized : defaultValue;
+    }
+
+    private static String sanitizeCssDimension(String value, String defaultValue) {
+        if (value == null) return defaultValue;
+        String trimmed = value.trim();
+        // 仅允许数字+单位 (mm/px/pt/%)，防御 CSS 注入如 "};@import..."
+        if (trimmed.matches("^\\d+(\\.\\d+)?(mm|px|pt|%)$")) {
+            return trimmed;
+        }
+        return defaultValue;
+    }
+
+    private static String sanitizeLineHeight(String value) {
+        if (value == null) return "1.5";
+        String trimmed = value.trim();
+        if (trimmed.matches("^\\d+(\\.\\d+)?$")) {
+            try {
+                double d = Double.parseDouble(trimmed);
+                if (d >= 0.5 && d <= 3.0) return trimmed;
+            } catch (NumberFormatException ignore) {}
+        }
+        return "1.5";
     }
 
     private static String sanitizeFontFamily(String fontFamily) {

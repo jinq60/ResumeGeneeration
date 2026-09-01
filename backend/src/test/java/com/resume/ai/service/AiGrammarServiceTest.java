@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -81,6 +82,7 @@ class AiGrammarServiceTest {
         dailyQuota.setGuest(3);
         dailyQuota.setUser(30);
         when(aiProperties.getDailyQuota()).thenReturn(dailyQuota);
+        lenient().when(aiDailyQuotaService.consume(anyString(), anyString(), any(Integer.class))).thenReturn("20260831");
     }
 
     @Test
@@ -126,8 +128,8 @@ class AiGrammarServiceTest {
                 () -> service.check("user_1", false, "resume_1"));
         assertEquals(ResultCode.AI_MODEL_CALL_FAILED, exception.getErrorCode());
 
-        // LLM 调用失败必须退还配额
-        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiGrammarService.FEATURE_KEY));
+        // LLM 调用失败必须退还配额（按 quotaDate 精准退款）
+        verify(aiDailyQuotaService).refund(eq("user_1"), eq(AiGrammarService.FEATURE_KEY), eq("20260831"));
     }
 
     @Test

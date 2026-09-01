@@ -27,6 +27,10 @@ import java.util.List;
 public class RedisRateLimiter implements RateLimiter {
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final com.github.benmanes.caffeine.cache.Cache<String, WindowCounter> fallback = com.github.benmanes.caffeine.cache.Caffeine.newBuilder()
+            .expireAfterWrite(2, java.util.concurrent.TimeUnit.MINUTES)
+            .maximumSize(50_000)
+            .build();
 
     private static final String LUA_SCRIPT = """
             local key = KEYS[1]
@@ -56,8 +60,28 @@ public class RedisRateLimiter implements RateLimiter {
                     String.valueOf(windowMs));
             return result != null && result == 1L;
         } catch (Exception e) {
-            log.warn("Redis rate limiter failed, allowing request: {}", e.getMessage());
-            return true;
+            // Redis 故障时降级到本地 Caffeine 限流，保可用性且不完全放行；攻击者无法通过打垮 Redis 绕过限流
+            log.warn("Redis rate limiter failed, falling back to memory: {}", e.getMessage());
+            return fallbackTryAcquire(key, maxRequests, windowMs);
         }
+    }
+
+    private boolean fallbackTryAcquire(String key, int maxRequests, long windowMs) {
+        long now = System.currentTimeMillis();
+        WindowCounter counter = fallback.asMap().compute(key, (k, existing) -> {
+            if (existing == null || now - existing.windowStart > windowMs) {
+                return new WindowCounter(now);
+            }
+            return existing;
+        });
+        if (counter == null) return false;
+        return counter.tryAcquire(maxRequests);
+    }
+
+    private static class WindowCounter {
+        final long windowStart;
+        final java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger(0);
+        WindowCounter(long windowStart) { this.windowStart = windowStart; }
+        boolean tryAcquire(int maxRequests) { return count.incrementAndGet() <= maxRequests; }
     }
 }

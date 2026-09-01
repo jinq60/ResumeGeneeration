@@ -5,6 +5,7 @@ import com.resume.template.entity.Template;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * 模板数据访问层。
@@ -43,4 +44,20 @@ public interface TemplateMapper extends BaseMapper<Template> {
      */
     @Select("SELECT COUNT(*) FROM resume WHERE template_id = #{templateId} AND deleted = 0")
     long countResumeReferences(@Param("templateId") String templateId);
+
+    /**
+     * 复活已逻辑删除的模板行：绕过 {@code @TableLogic} 的 {@code deleted=0} 追加条件。
+     * <p>
+     * 普通 {@code updateById} 在 {@code deleted=1} 行上会因 WHERE 追加 {@code deleted=0} 导致影响行数为 0 而静默失败。
+     * 此方法使用原生 {@code @Update} 直写，包含 {@code deleted} 列与全部可变字段。
+     * </p>
+     */
+    @Update("UPDATE template SET code = #{code}, name = #{name}, category = #{category}, "
+            + "thumbnail_url = #{thumbnailUrl}, description = #{description}, "
+            + "config = #{config,typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}, "
+            + "html_template = #{htmlTemplate}, render_engine = #{renderEngine}, "
+            + "is_builtin = #{isBuiltin}, is_premium = #{isPremium}, is_recommended = #{isRecommended}, "
+            + "sort_order = #{sortOrder}, status = #{status}, version = #{version}, deleted = #{deleted}, "
+            + "created_by = #{createdBy}, updated_at = #{updatedAt} WHERE id = #{id}")
+    int updateIncludingDeleted(Template template);
 }

@@ -93,10 +93,10 @@ class AiDailyQuotaServiceTest {
 
     @Test
     void refund_shouldSkipSilentlyWhenNoRowOrZeroUsed() {
-        // 无当日记录或 used_count=0 时 update 影响 0 行，refund 静默跳过
+        // 无当日记录或 used_count=0 时 update 影响 0 行，refund 静默跳过（会尝试今日+昨日两个日期）
         when(aiDailyQuotaMapper.update(any(), any())).thenReturn(0);
 
         assertDoesNotThrow(() -> service.refund("user_1", "resume-writing"));
-        verify(aiDailyQuotaMapper).update(any(), any());
+        verify(aiDailyQuotaMapper, org.mockito.Mockito.times(2)).update(any(), any());
     }
 }

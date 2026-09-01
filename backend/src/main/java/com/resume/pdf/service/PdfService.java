@@ -71,6 +71,7 @@ public class PdfService {
     private final Executor pdfTaskExecutor;
 
     private final Semaphore exportSemaphore = new Semaphore(MAX_CONCURRENT_EXPORTS);
+    private final java.util.concurrent.ConcurrentHashMap<String, Object> exportLocks = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Playwright 与 Chromium 进程复用：每次导出不再启动/销毁浏览器，
@@ -95,39 +96,47 @@ public class PdfService {
 
         validateResumeForExport(resume);
 
-        // 去重：同 (userId, resumeId) 已有进行中的任务时直接复用，避免重复提交产生冗余导出
-        PdfTask existing = findActiveTask(userId, resumeId);
-        if (existing != null) {
-            log.info("exportPdf deduplicated: reuse running task={}, userId={}, resumeId={}",
-                    existing.getId(), userId, resumeId);
-            Map<String, Object> reused = new java.util.HashMap<>();
-            reused.put("taskId", existing.getId());
-            reused.put("status", existing.getStatus());
-            return reused;
+        String lockKey = userId + ":" + resumeId;
+        Object lock = exportLocks.computeIfAbsent(lockKey, k -> new Object());
+        try {
+            synchronized (lock) {
+                // 去重：同 (userId, resumeId) 已有进行中的任务时直接复用，避免重复提交产生冗余导出；加锁防并发双插
+                PdfTask existing = findActiveTask(userId, resumeId);
+                if (existing != null) {
+                    log.info("exportPdf deduplicated: reuse running task={}, userId={}, resumeId={}",
+                            existing.getId(), userId, resumeId);
+                    Map<String, Object> reused = new java.util.HashMap<>();
+                    reused.put("taskId", existing.getId());
+                    reused.put("status", existing.getStatus());
+                    return reused;
+                }
+
+                String exportTemplateId = StringUtils.isNotBlank(templateId) ? templateId : resume.getTemplateId();
+                // 渲染场景容忍 inactive/deleted 模板，历史简历仍可导出
+                Template template = templateService.getTemplateEntityForRender(exportTemplateId);
+
+                PdfTask task = new PdfTask();
+                task.setUserId(userId);
+                task.setResumeId(resumeId);
+                task.setTemplateId(exportTemplateId);
+                task.setStatus(BizConstant.TASK_STATUS_PENDING);
+                task.setDeleted(BizConstant.NOT_DELETED);
+                task.setCreatedAt(LocalDateTime.now());
+                task.setUpdatedAt(LocalDateTime.now());
+                pdfTaskMapper.insert(task);
+                auditLogService.record(userId, "pdf_export", resumeId, "templateId=" + exportTemplateId);
+
+                // 异步导出必须在事务提交后触发：事务内立即提交线程池时，后台线程可能读不到未提交的任务行
+                submitExportAfterCommit(task.getId(), userId, resumeId, exportTemplateId);
+
+                Map<String, Object> result = new java.util.HashMap<>();
+                result.put("taskId", task.getId());
+                result.put("status", task.getStatus());
+                return result;
+            }
+        } finally {
+            exportLocks.remove(lockKey, lock);
         }
-
-        String exportTemplateId = StringUtils.isNotBlank(templateId) ? templateId : resume.getTemplateId();
-        // 渲染场景容忍 inactive/deleted 模板，历史简历仍可导出
-        Template template = templateService.getTemplateEntityForRender(exportTemplateId);
-
-        PdfTask task = new PdfTask();
-        task.setUserId(userId);
-        task.setResumeId(resumeId);
-        task.setTemplateId(exportTemplateId);
-        task.setStatus(BizConstant.TASK_STATUS_PENDING);
-        task.setDeleted(BizConstant.NOT_DELETED);
-        task.setCreatedAt(LocalDateTime.now());
-        task.setUpdatedAt(LocalDateTime.now());
-        pdfTaskMapper.insert(task);
-        auditLogService.record(userId, "pdf_export", resumeId, "templateId=" + exportTemplateId);
-
-        // 异步导出必须在事务提交后触发：事务内立即提交线程池时，后台线程可能读不到未提交的任务行
-        submitExportAfterCommit(task.getId(), userId, resumeId, exportTemplateId);
-
-        Map<String, Object> result = new java.util.HashMap<>();
-        result.put("taskId", task.getId());
-        result.put("status", task.getStatus());
-        return result;
     }
 
     /**

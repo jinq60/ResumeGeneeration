@@ -73,30 +73,35 @@ public class ShareService {
         validateExpiresAt(expiresAt);
         resumeServiceAccessCheck(userId, resumeId);
         Object lock = createLocks.computeIfAbsent(resumeId, k -> new Object());
-        synchronized (lock) {
-            // 关闭旧的分享（锁内串行化，避免并发双 active）
-            revokeShareRecords(userId, resumeId);
-            ResumeShare share = new ResumeShare();
-            share.setResumeId(resumeId);
-            share.setUserId(userId);
-            share.setToken(generateToken());
-            share.setStatus(SHARE_STATUS_ACTIVE);
-            share.setHideContact(hideContact);
-            share.setExpiresAt(expiresAt);
-            share.setDeleted(BizConstant.NOT_DELETED);
-            share.setCreatedAt(LocalDateTime.now());
-            share.setUpdatedAt(LocalDateTime.now());
-            try {
-                resumeShareMapper.insert(share);
-            } catch (org.springframework.dao.DuplicateKeyException e) {
-                // token 极小概率碰撞，重试一次
-                log.warn("Share token collision, retry: resumeId={}", resumeId);
+        try {
+            synchronized (lock) {
+                // 关闭旧的分享（锁内串行化，避免并发双 active）
+                revokeShareRecords(userId, resumeId);
+                ResumeShare share = new ResumeShare();
+                share.setResumeId(resumeId);
+                share.setUserId(userId);
                 share.setToken(generateToken());
-                resumeShareMapper.insert(share);
+                share.setStatus(SHARE_STATUS_ACTIVE);
+                share.setHideContact(hideContact);
+                share.setExpiresAt(expiresAt);
+                share.setDeleted(BizConstant.NOT_DELETED);
+                share.setCreatedAt(LocalDateTime.now());
+                share.setUpdatedAt(LocalDateTime.now());
+                try {
+                    resumeShareMapper.insert(share);
+                } catch (org.springframework.dao.DuplicateKeyException e) {
+                    // token 极小概率碰撞，重试一次
+                    log.warn("Share token collision, retry: resumeId={}", resumeId);
+                    share.setToken(generateToken());
+                    resumeShareMapper.insert(share);
+                }
+                log.info("Resume share created: resumeId={}, shareId={}, hideContact={}, expiresAt={}",
+                        resumeId, share.getId(), hideContact, expiresAt);
+                return toResponse(share);
             }
-            log.info("Resume share created: resumeId={}, shareId={}, hideContact={}, expiresAt={}",
-                    resumeId, share.getId(), hideContact, expiresAt);
-            return toResponse(share);
+        } finally {
+            // 防止 resumeId 维度内存泄漏：仅当值仍为当前 lock 时移除，避免误删并发新创建的锁
+            createLocks.remove(resumeId, lock);
         }
     }
 

@@ -81,7 +81,14 @@ public class AiGrammarService {
             throw ex;
         }
 
-        // 并发槽位限制（与 AI 写作同一模式）
+        // 并发槽位限制（与 AI 写作同一模式），超限时清理空闲条目而非全局 clear
+        if (inFlight.size() > 10000) {
+            log.warn("AiGrammar inFlight too large ({}), evicting idle", inFlight.size());
+            inFlight.entrySet().removeIf(e -> e.getValue().get() <= 0);
+            if (inFlight.size() > 10000) {
+                throw new BusinessException(ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED, "系统繁忙，请稍后再试。");
+            }
+        }
         AtomicInteger counter = inFlight.computeIfAbsent(userId, k -> new AtomicInteger());
         if (counter.incrementAndGet() > aiProperties.getRateLimit().getMaxConcurrentPerUser()) {
             counter.decrementAndGet();
@@ -115,13 +122,13 @@ public class AiGrammarService {
                         .build();
 
                 // 所有校验与解析完成后、发起 LLM 调用前才扣减配额
-                consumeQuota(userId, guest);
+                String quotaDate = consumeQuota(userId, guest);
                 GrammarCheckResponse result;
                 try {
                     result = doCheck(provider, request);
                 } catch (Exception ex) {
-                    // LLM 调用失败退还本次配额
-                    aiDailyQuotaService.refund(userId, FEATURE_KEY);
+                    // LLM 调用失败退还本次配额，按消费时的 quotaDate 精准退款
+                    aiDailyQuotaService.refund(userId, FEATURE_KEY, quotaDate);
                     throw ex;
                 }
 
@@ -168,19 +175,25 @@ public class AiGrammarService {
      * 释放并发计数，并在计数归零时清理内存条目，避免 inFlight Map 无限增长。
      */
     private void releaseInFlight(String userId, AtomicInteger counter) {
-        if (counter.decrementAndGet() <= 0) {
+        int v = counter.decrementAndGet();
+        if (v <= 0) {
+            if (v < 0) {
+                counter.set(0);
+            }
             inFlight.remove(userId, counter);
         }
     }
 
     /**
      * 按日配额扣减：游客与登录用户使用不同上限，与 AI 写作复用同一 quota 类型。
+     *
+     * @return 本次消费对应的 quotaDate
      */
-    private void consumeQuota(String userId, boolean guest) {
+    private String consumeQuota(String userId, boolean guest) {
         int dailyLimit = guest
                 ? aiProperties.getDailyQuota().getGuest()
                 : aiProperties.getDailyQuota().getUser();
-        aiDailyQuotaService.consume(userId, FEATURE_KEY, dailyLimit);
+        return aiDailyQuotaService.consume(userId, FEATURE_KEY, dailyLimit);
     }
 
     private String toJson(Object value) {

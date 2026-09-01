@@ -97,8 +97,12 @@ public class AiWritingService {
         validateOriginalText(request, originalText);
 
         if (inFlight.size() > 10000) {
-            log.warn("AiWriting inFlight map too large ({}), possible abuse, clearing", inFlight.size());
-            inFlight.clear();
+            log.warn("AiWriting inFlight map too large ({}), evicting idle entries", inFlight.size());
+            inFlight.entrySet().removeIf(e -> e.getValue().get() <= 0);
+            if (inFlight.size() > 10000) {
+                log.warn("AiWriting inFlight still too large after eviction ({}), rejecting", inFlight.size());
+                throw new BusinessException(ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED, "系统繁忙，请稍后再试。");
+            }
         }
         AtomicInteger counter = inFlight.computeIfAbsent(userId, k -> new AtomicInteger());
         if (counter.incrementAndGet() > aiProperties.getRateLimit().getMaxConcurrentPerUser()) {
@@ -118,12 +122,12 @@ public class AiWritingService {
             AiChatRequest aiRequest = buildChatRequest(model, prompt, featureConfig);
 
             // 所有校验与解析完成后、发起 LLM 调用前才扣减配额
-            consumeQuota(userId, guest);
+            String quotaDate = consumeQuota(userId, guest);
             try {
                 return doWrite(resume, request, originalText, provider, model, prompt, aiRequest);
             } catch (Exception e) {
-                // LLM 调用失败退还本次配额（used_count 下限保护为 0）
-                aiDailyQuotaService.refund(userId, FEATURE_KEY);
+                // LLM 调用失败退还本次配额（used_count 下限保护为 0），按消费时的 quotaDate 精准退款
+                aiDailyQuotaService.refund(userId, FEATURE_KEY, quotaDate);
                 throw e;
             }
         } finally {
@@ -146,8 +150,11 @@ public class AiWritingService {
         validateOriginalText(request, originalText);
 
         if (inFlight.size() > 10000) {
-            log.warn("AiWriting stream inFlight too large, clearing");
-            inFlight.clear();
+            log.warn("AiWriting stream inFlight too large, evicting idle", inFlight.size());
+            inFlight.entrySet().removeIf(e -> e.getValue().get() <= 0);
+            if (inFlight.size() > 10000) {
+                throw new BusinessException(ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED, "系统繁忙，请稍后再试。");
+            }
         }
         AtomicInteger counter = inFlight.computeIfAbsent(userId, k -> new AtomicInteger());
         if (counter.incrementAndGet() > aiProperties.getRateLimit().getMaxConcurrentPerUser()) {
@@ -156,6 +163,7 @@ public class AiWritingService {
                     "同时进行的 AI 请求过多，请稍后再试。");
         }
 
+        final java.util.concurrent.atomic.AtomicReference<String> quotaDateRef = new java.util.concurrent.atomic.AtomicReference<>();
         boolean quotaConsumed = false;
         try {
             LlmProvider provider = providerRouter.resolve(FEATURE_KEY);
@@ -174,23 +182,29 @@ public class AiWritingService {
             AtomicBoolean finalized = new AtomicBoolean(false);
 
             // 所有校验与解析完成后、发起 LLM 调用前才扣减配额
-            consumeQuota(userId, guest);
+            String quotaDate = consumeQuota(userId, guest);
+            quotaDateRef.set(quotaDate);
             quotaConsumed = true;
 
             return provider.stream(aiRequest)
                     .filter(StringUtils::isNotBlank)
-                    .doOnComplete(() -> finishStream(callLog, resume, request, start, true, finalized))
-                    .doOnError(error -> finishStream(callLog, resume, request, start, false, finalized))
+                    .doOnComplete(() -> finishStream(callLog, resume, request, start, true, finalized, quotaDateRef.get()))
+                    .doOnError(error -> finishStream(callLog, resume, request, start, false, finalized, quotaDateRef.get()))
                     .doFinally(signal -> {
                         if (signal == reactor.core.publisher.SignalType.CANCEL) {
-                            finishStream(callLog, resume, request, start, false, finalized);
+                            finishStream(callLog, resume, request, start, false, finalized, quotaDateRef.get());
                         }
                         releaseInFlight(userId, counter);
                     });
         } catch (RuntimeException e) {
             if (quotaConsumed) {
                 try {
-                    aiDailyQuotaService.refund(resume.getUserId(), FEATURE_KEY);
+                    String qd = quotaDateRef.get();
+                    if (qd != null) {
+                        aiDailyQuotaService.refund(resume.getUserId(), FEATURE_KEY, qd);
+                    } else {
+                        aiDailyQuotaService.refund(resume.getUserId(), FEATURE_KEY);
+                    }
                 } catch (Exception ignore) {}
             }
             releaseInFlight(userId, counter);
@@ -273,7 +287,11 @@ public class AiWritingService {
      * 释放并发计数，并在计数归零时清理内存条目，避免 inFlight Map 无限增长。
      */
     private void releaseInFlight(String userId, AtomicInteger counter) {
-        if (counter.decrementAndGet() <= 0) {
+        int v = counter.decrementAndGet();
+        if (v <= 0) {
+            if (v < 0) {
+                counter.set(0);
+            }
             inFlight.remove(userId, counter);
         }
     }
@@ -281,12 +299,14 @@ public class AiWritingService {
     /**
      * 按日配额扣减：游客与登录用户使用不同上限，超限直接拒绝。
      * 仅在所有校验与 provider 解析完成、即将发起 LLM 调用前调用。
+     *
+     * @return 本次消费对应的 quotaDate，失败时由调用方透传至 refund 精准回退
      */
-    private void consumeQuota(String userId, boolean guest) {
+    private String consumeQuota(String userId, boolean guest) {
         int dailyLimit = guest
                 ? aiProperties.getDailyQuota().getGuest()
                 : aiProperties.getDailyQuota().getUser();
-        aiDailyQuotaService.consume(userId, FEATURE_KEY, dailyLimit);
+        return aiDailyQuotaService.consume(userId, FEATURE_KEY, dailyLimit);
     }
 
     private void validateRequest(ResumeAiWriteRequest request) {
@@ -342,14 +362,22 @@ public class AiWritingService {
     }
 
     private void finishStream(AiCallLog callLog, Resume resume, ResumeAiWriteRequest request,
-                              long start, boolean success, AtomicBoolean finalized) {
+                              long start, boolean success, AtomicBoolean finalized, String quotaDate) {
         if (!finalized.compareAndSet(false, true)) return;
         callLog.setSuccess(success);
         callLog.setLatencyMs(System.currentTimeMillis() - start);
         if (!success) {
             callLog.setErrorMsg("AI stream failed");
-            // 流式调用失败退还本次配额（finalized 保证只退一次）
-            aiDailyQuotaService.refund(resume.getUserId(), FEATURE_KEY);
+            // 流式调用失败退还本次配额（finalized 保证只退一次），按消费时的 quotaDate 精准退款
+            try {
+                if (quotaDate != null) {
+                    aiDailyQuotaService.refund(resume.getUserId(), FEATURE_KEY, quotaDate);
+                } else {
+                    aiDailyQuotaService.refund(resume.getUserId(), FEATURE_KEY);
+                }
+            } catch (Exception ignore) {
+                log.warn("Refund quota on stream failure failed", ignore);
+            }
         } else {
             auditLogService.record(resume.getUserId(), "ai_write", resume.getId(),
                     "stream=true, section=" + request.getSectionType()

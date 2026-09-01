@@ -46,23 +46,19 @@ public class TemplateService {
             .build();
 
     /**
-     * 前台模板列表（60s Caffeine 缓存）。
+     * 前台模板列表（60s Caffeine 缓存，原子加载防击穿）。
      */
     public List<TemplateDTO> listActiveTemplates() {
-        List<TemplateDTO> cached = activeListCache.getIfPresent("active");
-        if (cached != null) {
-            return cached;
-        }
-        LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Template::getStatus, BizConstant.TEMPLATE_STATUS_ACTIVE)
-                .eq(Template::getDeleted, BizConstant.NOT_DELETED)
-                .orderByAsc(Template::getSortOrder)
-                .orderByDesc(Template::getCreatedAt);
-        List<TemplateDTO> result = templateMapper.selectList(wrapper).stream()
-                .map(this::toTemplateDTO)
-                .toList();
-        activeListCache.put("active", result);
-        return result;
+        return activeListCache.get("active", k -> {
+            LambdaQueryWrapper<Template> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Template::getStatus, BizConstant.TEMPLATE_STATUS_ACTIVE)
+                    .eq(Template::getDeleted, BizConstant.NOT_DELETED)
+                    .orderByAsc(Template::getSortOrder)
+                    .orderByDesc(Template::getCreatedAt);
+            return templateMapper.selectList(wrapper).stream()
+                    .map(this::toTemplateDTO)
+                    .toList();
+        });
     }
 
     private void invalidateActiveCache() {
@@ -205,6 +201,7 @@ public class TemplateService {
                 throw new BusinessException(ResultCode.TEMPLATE_CODE_EXISTS, "模板编码已存在。");
             }
             // 复活被逻辑删除的模板行，回收其占用的唯一索引；保留原创建人
+            // 使用原生 Update 绕过 @TableLogic，否则 updateById 因 WHERE deleted=0 导致影响行 0 而静默失败
             String originalCreatedBy = exist.getCreatedBy();
             applyRequestFields(exist, request, operatorId);
             exist.setCreatedBy(originalCreatedBy);
@@ -212,7 +209,10 @@ public class TemplateService {
             exist.setVersion(exist.getVersion() == null ? 1 : exist.getVersion() + 1);
             exist.setDeleted(BizConstant.NOT_DELETED);
             exist.setUpdatedAt(LocalDateTime.now());
-            templateMapper.updateById(exist);
+            int revived = templateMapper.updateIncludingDeleted(exist);
+            if (revived == 0) {
+                throw new BusinessException(ResultCode.INTERNAL_ERROR, "模板复活失败，请重试。");
+            }
             invalidateActiveCache();
             return toAdminTemplateDTO(exist);
         }
@@ -281,9 +281,11 @@ public class TemplateService {
         template.setIsRecommended(request.getIsRecommended() != null && request.getIsRecommended()
                 ? BizConstant.BUILTIN_YES : BizConstant.BUILTIN_NO);
         template.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : template.getSortOrder());
-        template.setVersion(template.getVersion() + 1);
         template.setUpdatedAt(LocalDateTime.now());
-        templateMapper.updateById(template);
+        // @Version 由 OptimisticLocker 负责 CAS 递增，若并发修改则 update 影响行数为 0
+        if (templateMapper.updateById(template) == 0) {
+            throw new BusinessException(ResultCode.RESUME_VERSION_CONFLICT, "模板已被其他管理员修改，请刷新后重试。");
+        }
         invalidateActiveCache();
         return toAdminTemplateDTO(template);
     }
@@ -302,7 +304,9 @@ public class TemplateService {
         }
         template.setStatus(status);
         template.setUpdatedAt(LocalDateTime.now());
-        templateMapper.updateById(template);
+        if (templateMapper.updateById(template) == 0) {
+            throw new BusinessException(ResultCode.RESUME_VERSION_CONFLICT, "模板状态更新冲突，请刷新后重试。");
+        }
         invalidateActiveCache();
     }
 

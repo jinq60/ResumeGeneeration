@@ -20,7 +20,7 @@ public class CreateResumeRequest {
     @Size(max = 128, message = "目标岗位过长。")
     private String targetPosition;
 
-    @Size(max = 64, message = "目标行业过长。")
+    @Size(max = 128, message = "目标行业过长。")
     private String targetIndustry;
 
     @NotBlank(message = "模板 ID 为必填项。")

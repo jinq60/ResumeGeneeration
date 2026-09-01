@@ -36,6 +36,7 @@ public class Template {
     private Integer sortOrder;
     private String status;
     private String createdBy;
+    @Version
     private Integer version;
 
     /**

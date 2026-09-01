@@ -31,16 +31,26 @@ public class QwenLlmProvider implements LlmProvider {
     private final AiProperties aiProperties;
     private final ObjectMapper objectMapper;
 
-    private WebClient webClient;
+    private volatile WebClient webClient;
 
     private WebClient getClient() {
-        if (webClient == null) {
-            webClient = WebClient.builder()
-                    .baseUrl(aiProperties.getQwen().getBaseUrl())
-                    .defaultHeader("Authorization", "Bearer " + aiProperties.getQwen().getApiKey())
-                    .build();
+        WebClient client = webClient;
+        if (client != null) {
+            return client;
         }
-        return webClient;
+        synchronized (this) {
+            if (webClient == null) {
+                webClient = WebClient.builder()
+                        .baseUrl(aiProperties.getQwen().getBaseUrl())
+                        .defaultHeader("Authorization", "Bearer " + aiProperties.getQwen().getApiKey())
+                        .clientConnector(new org.springframework.http.client.reactive.ReactorClientHttpConnector(
+                                reactor.netty.http.client.HttpClient.create()
+                                        .option(io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
+                                        .responseTimeout(java.time.Duration.ofSeconds(120))))
+                        .build();
+            }
+            return webClient;
+        }
     }
 
     @Override
@@ -55,10 +65,16 @@ public class QwenLlmProvider implements LlmProvider {
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(String.class)
-                    // 仅对 5xx（服务端/网络瞬时故障）重试，4xx（参数/鉴权错误）直接失败
+                    // 5xx/429/408/网络超时 为瞬时故障可重试，4xx 鉴权/参数错误直接失败
                     .retryWhen(Retry.backoff(retry, Duration.ofSeconds(1))
-                            .filter(e -> e instanceof org.springframework.web.reactive.function.client.WebClientResponseException w
-                                    && w.getStatusCode().is5xxServerError()))
+                            .filter(e -> {
+                                if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException w) {
+                                    return w.getStatusCode().is5xxServerError()
+                                            || w.getStatusCode().value() == 429
+                                            || w.getStatusCode().value() == 408;
+                                }
+                                return e instanceof WebClientRequestException;
+                            }))
                     .block(timeout);
 
             return parseResponse(raw, start);

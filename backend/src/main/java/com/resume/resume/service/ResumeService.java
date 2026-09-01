@@ -9,6 +9,7 @@ import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.common.enums.SectionType;
 import com.resume.common.service.AuditLogService;
+import com.resume.common.service.RichTextSanitizer;
 import com.resume.pdf.service.PdfService;
 import com.resume.resume.dto.*;
 import com.resume.resume.dto.AdminResumeListItemResponse;
@@ -235,6 +236,7 @@ public class ResumeService {
                         userId, resumeId);
                 throw new BusinessException(ResultCode.RESUME_SECTION_INVALID, "简历模块不能为空。");
             }
+            sanitizeSections(request.getSections());
             resumeSectionValidator.validateDraft(request.getSections());
             resume.setSections(request.getSections());
         }
@@ -401,6 +403,17 @@ public class ResumeService {
         if (StringUtils.isBlank(userId) || StringUtils.isBlank(resumeId) || StringUtils.isBlank(avatarUrl)) {
             return;
         }
+        // 防御：仅允许 http/https 或站内 /uploads/，且需通过路径穿越校验
+        String trimmed = avatarUrl.trim();
+        String lower = trimmed.toLowerCase();
+        if (!(lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("/uploads/"))) {
+            log.warn("fillAvatarUrl skipped: illegal url scheme, userId={}, resumeId={}", userId, resumeId);
+            return;
+        }
+        if (lower.contains("..") || lower.contains("\\") || lower.contains("%2e")) {
+            log.warn("fillAvatarUrl skipped: illegal url content, userId={}, resumeId={}", userId, resumeId);
+            return;
+        }
         Resume resume = resumeMapper.selectById(resumeId);
         if (resume == null || BizConstant.DELETED.equals(resume.getDeleted())
                 || !userId.equals(resume.getUserId())) {
@@ -455,10 +468,11 @@ public class ResumeService {
 
     private String buildDuplicateTitle(String sourceTitle) {
         String suffix = " 副本";
-        String title = StringUtils.defaultString(sourceTitle, "") + suffix;
+        String safe = StringUtils.defaultString(sourceTitle, "");
+        String title = safe + suffix;
         if (title.length() > MAX_TITLE_LENGTH) {
             int keep = Math.max(0, MAX_TITLE_LENGTH - suffix.length());
-            title = sourceTitle.substring(0, keep) + suffix;
+            title = safe.substring(0, keep) + suffix;
         }
         return title;
     }
@@ -541,5 +555,40 @@ public class ResumeService {
         response.setTemplateName(StringUtils.defaultIfBlank(
                 templateNameMap.get(resume.getTemplateId()), "未知模板"));
         return response;
+    }
+
+    /**
+     * 净化富文本字段，防止存储型 XSS 持久化。
+     * 通用：对所有以 Html 结尾的字段做白名单清洗，新增富文本字段无需额外维护。
+     * 覆盖 introduction.contentHtml、work/project descriptionHtml/achievementsHtml 及未来扩展。
+     */
+    private void sanitizeSections(List<SectionDTO> sections) {
+        if (sections == null) return;
+        for (SectionDTO section : sections) {
+            Object data = section.getData();
+            if (data instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> map = (Map<String, Object>) data;
+                for (Map.Entry<String, Object> e : map.entrySet()) {
+                    if (e.getKey() != null && e.getKey().endsWith("Html") && e.getValue() instanceof String html) {
+                        map.put(e.getKey(), RichTextSanitizer.sanitize(html));
+                    }
+                }
+            } else if (data instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Object> items = (List<Object>) data;
+                for (Object obj : items) {
+                    if (obj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> item = (Map<String, Object>) obj;
+                        for (Map.Entry<String, Object> e : item.entrySet()) {
+                            if (e.getKey() != null && e.getKey().endsWith("Html") && e.getValue() instanceof String html) {
+                                item.put(e.getKey(), RichTextSanitizer.sanitize(html));
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

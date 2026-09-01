@@ -89,9 +89,9 @@ public class ResumeSectionValidator {
             }
             try {
                 String json = objectMapper.writeValueAsString(section);
-                totalContentLength += json.length();
+                totalContentLength += json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
             } catch (Exception e) {
-                totalContentLength += section.getData().toString().length();
+                totalContentLength += section.getData().toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
             }
             if (totalContentLength > MAX_TOTAL_CONTENT_LENGTH) {
                 throw new BusinessException(ResultCode.RESUME_CONTENT_TOO_LONG,
@@ -358,9 +358,23 @@ public class ResumeSectionValidator {
         if (StringUtils.isBlank(value)) {
             return;
         }
-        // 站内相对路径 /uploads/** 来自头像上传，视为合法（避免头像回填后保存校验失败）
+        // 站内相对路径 /uploads/** 来自头像上传，视为合法（避免头像回填后保存校验失败），但需防路径穿越
         if (value.startsWith("/uploads/")) {
             if (value.length() > 512) {
+                throw new BusinessException(ResultCode.RESUME_PROFILE_URL_INVALID, "请输入正确的网址格式。");
+            }
+            String lower = value.toLowerCase();
+            if (lower.contains("..") || lower.contains("\\") || lower.contains("//")
+                    || lower.contains("%2e") || lower.contains("%2f") || lower.contains("%5c")) {
+                throw new BusinessException(ResultCode.RESUME_PROFILE_URL_INVALID, "请输入正确的网址格式。");
+            }
+            // 归一化后仍需以 /uploads/ 开头
+            try {
+                String normalized = java.nio.file.Paths.get(value).normalize().toString().replace("\\", "/");
+                if (normalized.contains("..") || !normalized.startsWith("/uploads/")) {
+                    throw new BusinessException(ResultCode.RESUME_PROFILE_URL_INVALID, "请输入正确的网址格式。");
+                }
+            } catch (Exception e) {
                 throw new BusinessException(ResultCode.RESUME_PROFILE_URL_INVALID, "请输入正确的网址格式。");
             }
             return;
