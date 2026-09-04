@@ -1,32 +1,43 @@
 package com.resume.common.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
 import com.resume.common.service.MinioStorageService;
+import com.resume.resume.share.entity.ResumeShare;
+import com.resume.resume.share.mapper.ResumeShareMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 /**
  * MinIO 文件代理 —— 将 /uploads/avatars/* 和 /uploads/templates/* 请求转发到 MinIO。
+ * 头像为隐私资源：已登录可直接访问；匿名需提供合法 shareToken（公开分享旁路）或来自 /share/ 的 Referer。
  */
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 public class StaticResourceController {
 
     private final MinioStorageService minioStorageService;
+    private final ResumeShareMapper resumeShareMapper;
 
     @GetMapping("/uploads/avatars/**")
     public ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> serveAvatar(HttpServletRequest request) {
         String objectName = extractObjectName(request, "/uploads/avatars/");
         validateObjectName(objectName);
+        enforceAvatarAccess(request, objectName);
         java.io.InputStream is = minioStorageService.downloadStream(minioStorageService.getBucketAvatars(), objectName);
         String contentType = guessContentType(objectName);
         org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody body = out -> {
@@ -102,26 +113,65 @@ public class StaticResourceController {
         return "";
     }
 
+    private void enforceAvatarAccess(HttpServletRequest request, String objectName) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean authenticated = auth != null && auth.isAuthenticated()
+                && !(auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken);
+        if (authenticated) return;
+        String shareToken = request.getParameter("shareToken");
+        if (StringUtils.isNotBlank(shareToken)) {
+            ResumeShare share = resumeShareMapper.selectOne(
+                    new LambdaQueryWrapper<ResumeShare>().eq(ResumeShare::getToken, shareToken.trim()));
+            if (share != null && "active".equals(share.getStatus()) && Integer.valueOf(0).equals(share.getDeleted())
+                    && (share.getExpiresAt() == null || share.getExpiresAt().isAfter(LocalDateTime.now()))) {
+                // 归属绑定：头像对象名为 {userId}/avatars/...，仅允许同用户分享 token 访问
+                if (StringUtils.isNotBlank(share.getUserId())
+                        && objectName.startsWith(share.getUserId() + "/")) {
+                    return;
+                }
+                log.warn("ShareToken user mismatch for avatar access");
+                throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "资源不存在。");
+            }
+            log.warn("Invalid shareToken for avatar access");
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "分享不存在或已过期。");
+        }
+        // 匿名无凭证统一 404，避免 401/404 预言机；Referer 可伪造，不再作为旁路
+        throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND, "资源不存在。");
+    }
+
     private void validateObjectName(String objectName) {
         if (StringUtils.isBlank(objectName) || objectName.length() > 512) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
         }
-        String decoded;
+        // 原文含 % 即可能是编码穿越（%2e/%2f/%252e），直接拒绝，避免单次解码绕过
+        String lowered = objectName.toLowerCase();
+        if (lowered.contains("%")) {
+            throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
+        }
+        String decoded = objectName;
         try {
-            decoded = java.net.URLDecoder.decode(objectName, java.nio.charset.StandardCharsets.UTF_8);
+            // 循环解码至稳定（上限2次），防 %252e 双重编码绕过
+            for (int i = 0; i < 2; i++) {
+                String next = java.net.URLDecoder.decode(decoded, java.nio.charset.StandardCharsets.UTF_8);
+                if (next.equals(decoded)) break;
+                decoded = next;
+            }
         } catch (Exception e) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
         }
         if (decoded.contains("..") || decoded.contains("\\") || decoded.contains("//") || decoded.startsWith("/")) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
         }
+        // 拒绝控制字符与空字节
+        for (int i = 0; i < decoded.length(); i++) {
+            char c = decoded.charAt(i);
+            if (c <= 0x1F || c == 0x7F) {
+                throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
+            }
+        }
         java.nio.file.Path normalized = java.nio.file.Paths.get(decoded).normalize();
         String normStr = normalized.toString().replace("\\", "/");
         if (normStr.contains("..") || normStr.startsWith("/") || normStr.startsWith("\\")) {
-            throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
-        }
-        String lowered = objectName.toLowerCase();
-        if (lowered.contains("%2e") || lowered.contains("%2f") || lowered.contains("%5c")) {
             throw new BusinessException(ResultCode.PARAM_INVALID, "文件路径不合法。");
         }
     }

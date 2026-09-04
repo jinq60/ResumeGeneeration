@@ -29,13 +29,17 @@ class StaticResourceControllerTest {
     @MockBean
     private MinioStorageService minioStorageService;
 
+    @MockBean
+    private com.resume.resume.share.mapper.ResumeShareMapper resumeShareMapper;
+
     @Test
+    @com.resume.common.security.WithMockJwt(userId = "user_1")
     void shouldServeUploadsUnderContextPath() throws Exception {
         when(minioStorageService.getBucketAvatars()).thenReturn("resume-avatars");
         when(minioStorageService.downloadStream("resume-avatars", "user_1/avatars/a.png"))
                 .thenReturn(new java.io.ByteArrayInputStream(new byte[]{1, 2, 3}));
 
-        // 未携带 token 也应放行（/uploads/** permitAll），且能到达控制器
+        // 已登录可直接访问头像私有资源
         mockMvc.perform(get("/api/uploads/avatars/user_1/avatars/a.png").contextPath("/api"))
                 .andExpect(status().isOk())
                 .andExpect(content().bytes(new byte[]{1, 2, 3}));
@@ -47,6 +51,72 @@ class StaticResourceControllerTest {
 
         mockMvc.perform(get("/api/uploads/avatars/../secret.png").contextPath("/api"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectForgedReferer() throws Exception {
+        when(minioStorageService.getBucketAvatars()).thenReturn("resume-avatars");
+        when(minioStorageService.downloadStream("resume-avatars", "u/a.png"))
+                .thenReturn(new java.io.ByteArrayInputStream(new byte[]{1}));
+
+        // 伪造 Referer 不应再被放行，统一 404 避免匿名枚举
+        mockMvc.perform(get("/api/uploads/avatars/u/a.png").contextPath("/api")
+                        .header("Referer", "https://evil.example/share/fake"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectDoubleEncodedTraversal() throws Exception {
+        when(minioStorageService.getBucketAvatars()).thenReturn("resume-avatars");
+
+        mockMvc.perform(get("/api/uploads/avatars/%252e%252e/secret.png").contextPath("/api"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn404ForAnonymousWithoutToken() throws Exception {
+        when(minioStorageService.getBucketAvatars()).thenReturn("resume-avatars");
+
+        // 无凭证匿名访问统一 404（消除 401/404 预言机）
+        mockMvc.perform(get("/api/uploads/avatars/u/a.png").contextPath("/api"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectCrossUserShareToken() throws Exception {
+        when(minioStorageService.getBucketAvatars()).thenReturn("resume-avatars");
+        when(minioStorageService.downloadStream("resume-avatars", "user_2/avatars/a.png"))
+                .thenReturn(new java.io.ByteArrayInputStream(new byte[]{1}));
+        com.resume.resume.share.entity.ResumeShare share = new com.resume.resume.share.entity.ResumeShare();
+        share.setUserId("user_1");
+        share.setResumeId("resume_1");
+        share.setToken("tok-user1");
+        share.setStatus("active");
+        share.setDeleted(0);
+        when(resumeShareMapper.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(share);
+
+        // user_1 的分享 token 不得读取 user_2 的头像
+        mockMvc.perform(get("/api/uploads/avatars/user_2/avatars/a.png").contextPath("/api")
+                        .param("shareToken", "tok-user1"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldAllowSameUserShareToken() throws Exception {
+        when(minioStorageService.getBucketAvatars()).thenReturn("resume-avatars");
+        when(minioStorageService.downloadStream("resume-avatars", "user_1/avatars/a.png"))
+                .thenReturn(new java.io.ByteArrayInputStream(new byte[]{1, 2, 3}));
+        com.resume.resume.share.entity.ResumeShare share = new com.resume.resume.share.entity.ResumeShare();
+        share.setUserId("user_1");
+        share.setResumeId("resume_1");
+        share.setToken("tok-user1");
+        share.setStatus("active");
+        share.setDeleted(0);
+        when(resumeShareMapper.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(share);
+
+        mockMvc.perform(get("/api/uploads/avatars/user_1/avatars/a.png").contextPath("/api")
+                        .param("shareToken", "tok-user1"))
+                .andExpect(status().isOk());
     }
 
     @Test

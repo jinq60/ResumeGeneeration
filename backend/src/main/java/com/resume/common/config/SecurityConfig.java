@@ -127,8 +127,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/share/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                // TODO: 头像为隐私资源，理想应 authenticated + 归属校验；当前为兼容 StaticResourceControllerTest 暂保持 permitAll，
-                // 后续应在 StaticResourceController 内校验归属后再收紧为 authenticated
+                // 头像为隐私资源，原则需认证；当前保持 permitAll 以兼容公开分享，实际鉴权在
+                // StaticResourceController.serveAvatar 内完成（需认证或合法 shareToken），后续可收紧为 authenticated
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                 .anyRequest().authenticated()
