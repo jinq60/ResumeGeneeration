@@ -149,6 +149,8 @@ public class ShareService {
         String body = Boolean.TRUE.equals(share.getHideContact())
                 ? resumeRenderService.render(resume, template, ResumeRenderService.RenderOptions.withHiddenContact())
                 : resumeRenderService.render(resume, template);
+        // 头像为隐私资源：公开分享页需为匿名访问拼接 shareToken 旁路，否则 StaticResourceController 会 404
+        body = appendShareTokenToAvatars(body, token);
         return wrapSharePage(resume.getTitle(), body);
     }
 
@@ -173,6 +175,29 @@ public class ShareService {
     /**
      * 分享页壳：noindex + 简洁页脚。
      */
+    String appendShareTokenToAvatars(String body, String token) {
+        if (body == null || !body.contains("/uploads/avatars/") || StringUtils.isBlank(token)) {
+            return body;
+        }
+        String encoded;
+        try {
+            encoded = java.net.URLEncoder.encode(token.trim(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            encoded = token.trim();
+        }
+        org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parseBodyFragment(body);
+        boolean changed = false;
+        for (org.jsoup.nodes.Element img : doc.select("img[src*=/uploads/avatars/]")) {
+            String src = img.attr("src");
+            if (StringUtils.isBlank(src) || src.contains("shareToken=")) continue;
+            String sep = src.contains("?") ? "&" : "?";
+            img.attr("src", src + sep + "shareToken=" + encoded);
+            changed = true;
+        }
+        if (!changed) return body;
+        return doc.body().html();
+    }
+
     private String wrapSharePage(String title, String body) {
         String safeTitle = StringUtils.defaultString(title, "简历分享");
         return "<!DOCTYPE html>\n"

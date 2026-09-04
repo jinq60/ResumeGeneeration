@@ -221,6 +221,43 @@ class ShareServiceTest {
         assertEquals(ResultCode.RESOURCE_NOT_FOUND, ex.getErrorCode());
     }
 
+    private void stubRender(String bodyHtml) {
+        ResumeShare share = new ResumeShare();
+        share.setResumeId("resume_1");
+        share.setStatus(ShareService.SHARE_STATUS_ACTIVE);
+        share.setDeleted(BizConstant.NOT_DELETED);
+        when(resumeShareMapper.selectOne(any())).thenReturn(share);
+        when(resumeMapper.selectById("resume_1")).thenReturn(buildResume("user_1", "resume_1"));
+        Template template = new Template();
+        template.setId("template_classic_single");
+        when(templateService.getTemplateEntityForRender("template_classic_single")).thenReturn(template);
+        when(resumeRenderService.render(any(), any())).thenReturn(bodyHtml);
+    }
+
+    @Test
+    void renderSharePage_shouldNotDuplicateShareToken() {
+        stubRender("<img src=\"/uploads/avatars/u/a.png?shareToken=old\">");
+        String html = shareService.renderSharePage("new-token");
+        int count = html.split("shareToken=", -1).length - 1;
+        assertEquals(1, count, "不应重复拼接 shareToken: " + html);
+    }
+
+    @Test
+    void renderSharePage_shouldUseAmpersandWhenQueryExists() {
+        stubRender("<img src=\"/uploads/avatars/u/a.png?v=1\">");
+        String html = shareService.renderSharePage("tok123");
+        // Jsoup 会把 & 转义为 &amp;，两种写法都接受
+        assertTrue(html.contains("/uploads/avatars/u/a.png?v=1&shareToken=tok123")
+                || html.contains("/uploads/avatars/u/a.png?v=1&amp;shareToken=tok123"), html);
+    }
+
+    @Test
+    void renderSharePage_shouldAppendShareToken() {
+        stubRender("<img src=\"/uploads/avatars/u/a.png\">");
+        String html = shareService.renderSharePage("tok123");
+        assertTrue(html.contains("/uploads/avatars/u/a.png?shareToken=tok123"), html);
+    }
+
     @Test
     void renderSharePage_shouldRejectWhenResumeDeleted() {
         ResumeShare share = new ResumeShare();
