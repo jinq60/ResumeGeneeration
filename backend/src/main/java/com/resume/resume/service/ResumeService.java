@@ -104,12 +104,29 @@ public class ResumeService {
     /**
      * 获取简历列表。
      */
-    public Page<ResumeListItemResponse> listResumes(String userId, int page, int size) {
+    public Page<ResumeListItemResponse> listResumes(String userId, int page, int size, String keyword, String scene, String targetPosition) {
+        // 防御：Service 层再钳制，避免内部调用绕过 Controller 校验导致深分页/超长 LIKE
+        int safePage = Math.max(1, Math.min(page, 1000));
+        int safeSize = Math.max(1, Math.min(size, 100));
         LambdaQueryWrapper<Resume> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Resume::getUserId, userId)
-                .eq(Resume::getDeleted, BizConstant.NOT_DELETED)
-                .orderByDesc(Resume::getLastEditedAt);
-        Page<Resume> pageParam = new Page<>(page, size);
+                .eq(Resume::getDeleted, BizConstant.NOT_DELETED);
+        if (StringUtils.isNotBlank(scene)) {
+            wrapper.eq(Resume::getScene, scene.trim().toLowerCase());
+        }
+        if (StringUtils.isNotBlank(targetPosition)) {
+            String tp = escapeLike(targetPosition.trim());
+            if (tp.length() > 64) tp = tp.substring(0, 64);
+            wrapper.like(Resume::getTargetPosition, tp);
+        }
+        if (StringUtils.isNotBlank(keyword)) {
+            String kw = escapeLike(keyword.trim());
+            if (kw.length() > 64) kw = kw.substring(0, 64);
+            final String fkw = kw;
+            wrapper.and(w -> w.like(Resume::getTitle, fkw).or().like(Resume::getTargetPosition, fkw).or().like(Resume::getScene, fkw));
+        }
+        wrapper.orderByDesc(Resume::getLastEditedAt);
+        Page<Resume> pageParam = new Page<>(safePage, safeSize);
         Page<Resume> result = resumeMapper.selectPage(pageParam, wrapper);
 
         List<ResumeListItemResponse> list = result.getRecords().stream()
@@ -122,6 +139,10 @@ public class ResumeService {
         responsePage.setSize(result.getSize());
         responsePage.setPages(result.getPages());
         return responsePage;
+    }
+
+    public Page<ResumeListItemResponse> listResumes(String userId, int page, int size) {
+        return listResumes(userId, page, size, null, null, null);
     }
 
     /**
@@ -562,6 +583,10 @@ public class ResumeService {
      * 通用：对所有以 Html 结尾的字段做白名单清洗，新增富文本字段无需额外维护。
      * 覆盖 introduction.contentHtml、work/project descriptionHtml/achievementsHtml 及未来扩展。
      */
+    String escapeLike(String s) {
+        return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
     private void sanitizeSections(List<SectionDTO> sections) {
         if (sections == null) return;
         for (SectionDTO section : sections) {

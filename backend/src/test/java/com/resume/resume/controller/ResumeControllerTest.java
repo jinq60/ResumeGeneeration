@@ -94,7 +94,7 @@ class ResumeControllerTest {
         page.setTotal(1);
         page.setCurrent(1);
 
-        when(resumeService.listResumes(eq("user123"), eq(1), eq(20))).thenReturn(page);
+        when(resumeService.listResumes(eq("user123"), eq(1), eq(20), any(), any(), any())).thenReturn(page);
 
         mockMvc.perform(get("/resumes")
                 .param("page", "1")

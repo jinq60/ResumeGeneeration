@@ -41,8 +41,11 @@ public class ResumeController {
     @GetMapping
     public R<Page<ResumeListItemResponse>> list(@AuthenticationPrincipal String userId,
                                                  @RequestParam(defaultValue = "1") @Min(1) int page,
-                                                 @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return R.success(resumeService.listResumes(userId, page, size));
+                                                 @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+                                                 @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 64) String keyword,
+                                                 @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 64) String scene,
+                                                 @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 64) String targetPosition) {
+        return R.success(resumeService.listResumes(userId, page, size, keyword, scene, targetPosition));
     }
 
     @GetMapping("/{id}")
