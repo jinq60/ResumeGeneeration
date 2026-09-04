@@ -9,6 +9,7 @@ import com.resume.ai.mapper.AiCallLogMapper;
 import com.resume.ai.provider.LlmProvider;
 import com.resume.ai.provider.ProviderRouter;
 import com.resume.ai.util.AiCallLogDefaults;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.resume.avatar.entity.AvatarTask;
 import com.resume.avatar.mapper.AvatarTaskMapper;
 import com.resume.common.constant.BizConstant;
@@ -64,9 +65,18 @@ public class AiAvatarService {
             return;
         }
 
+        // CAS：仅 pending 可转 processing，避免复活 sweeper 已置 failed
+        LambdaUpdateWrapper<AvatarTask> processingGuard = new LambdaUpdateWrapper<>();
+        processingGuard.eq(AvatarTask::getId, taskId)
+                .eq(AvatarTask::getStatus, BizConstant.TASK_STATUS_PENDING)
+                .set(AvatarTask::getStatus, BizConstant.TASK_STATUS_PROCESSING)
+                .set(AvatarTask::getUpdatedAt, LocalDateTime.now());
+        Integer processingAffected = avatarTaskMapper.update(null, processingGuard);
+        if (processingAffected == null || processingAffected == 0) {
+            log.warn("Avatar task processing CAS missed (swept?): taskId={}", taskId);
+            return;
+        }
         task.setStatus(BizConstant.TASK_STATUS_PROCESSING);
-        task.setUpdatedAt(LocalDateTime.now());
-        avatarTaskMapper.updateById(task);
 
         long start = System.currentTimeMillis();
         AiCallLog callLog = new AiCallLog();
@@ -142,10 +152,28 @@ public class AiAvatarService {
             callLog.setLatencyMs(System.currentTimeMillis() - start);
         } finally {
             task.setUpdatedAt(LocalDateTime.now());
-            avatarTaskMapper.updateById(task);
+            // CAS：仅 pending/processing 可转终态
+            LambdaUpdateWrapper<AvatarTask> finalGuard = new LambdaUpdateWrapper<>();
+            finalGuard.eq(AvatarTask::getId, taskId)
+                    .in(AvatarTask::getStatus, List.of(BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING));
+            if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
+                finalGuard.set(AvatarTask::getStatus, BizConstant.TASK_STATUS_SUCCESS)
+                        .set(AvatarTask::getResultImageUrl, task.getResultImageUrl())
+                        .set(AvatarTask::getCompletedAt, LocalDateTime.now())
+                        .set(AvatarTask::getUpdatedAt, task.getUpdatedAt());
+            } else {
+                finalGuard.set(AvatarTask::getStatus, BizConstant.TASK_STATUS_FAILED)
+                        .set(AvatarTask::getErrorMsg, task.getErrorMsg())
+                        .set(AvatarTask::getUpdatedAt, task.getUpdatedAt());
+            }
+            Integer finalAffected = avatarTaskMapper.update(null, finalGuard);
+            boolean casWon = finalAffected != null && finalAffected > 0;
+            if (!casWon) {
+                log.warn("Avatar task final CAS missed (swept?): taskId={}", taskId);
+            }
 
-            // 成功后回填一寸照地址到简历 profile.avatarUrl（失败不影响任务结果）
-            if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())
+            // 成功后回填一寸照地址到简历 profile.avatarUrl（失败不影响任务结果；CAS 未命中则跳过回填/通知）
+            if (casWon && BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())
                     && StringUtils.isNotBlank(task.getResumeId())
                     && StringUtils.isNotBlank(task.getResultImageUrl())) {
                 try {
@@ -156,7 +184,7 @@ public class AiAvatarService {
                 }
             }
 
-            if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus()) && task.getUserId() != null) {
+            if (casWon && BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus()) && task.getUserId() != null) {
                 notificationService.notify(task.getUserId(), "avatar", "头像优化完成",
                         "你的头像一寸照优化已完成，可前往下载中心查看。");
             }

@@ -8,6 +8,8 @@ import com.resume.resume.entity.ResumeReview;
 import com.resume.resume.mapper.ResumeReviewMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +28,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AiZombieTaskSweeper {
+public class AiZombieTaskSweeper implements ApplicationRunner {
 
     /** 超过该时长仍未流转的任务视为僵尸任务。 */
     public static final Duration ZOMBIE_THRESHOLD = Duration.ofMinutes(30);
@@ -36,6 +38,12 @@ public class AiZombieTaskSweeper {
 
     private final ResumeOptimizeTaskMapper optimizeTaskMapper;
     private final ResumeReviewMapper resumeReviewMapper;
+
+    @Override
+    public void run(ApplicationArguments args) {
+        // 启动恢复一次，避免重启后僵尸最长滞留 40min 才被周期任务清掉
+        sweepZombieTasks();
+    }
 
     /**
      * 每 10 分钟扫描一次，把 updated_at 超过 30 分钟仍 pending/processing 的

@@ -38,8 +38,8 @@ public class AvatarTaskRecoveryJob implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        // 启动恢复不设时间下限：所有遗留非终态任务都由本次进程接管前清理
-        int recovered = failAllStaleTasks();
+        // 启动只清僵尸（updated_at < cutoff），避免滚动发布误杀健康任务
+        int recovered = failStaleTasks(LocalDateTime.now().minusMinutes(staleTaskMinutes));
         if (recovered > 0) {
             log.warn("Avatar task recovery on startup: marked {} leftover non-terminal tasks as failed", recovered);
         }
