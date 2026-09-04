@@ -1,6 +1,7 @@
 package com.resume.pdf.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.resume.common.constant.BizConstant;
 import com.resume.common.constant.ResultCode;
 import com.resume.common.exception.BusinessException;
@@ -135,7 +136,7 @@ public class PdfService {
                 return result;
             }
         } finally {
-            exportLocks.remove(lockKey, lock);
+            // 不 remove：同 AiResumeOptimizeService ABA 原因，去重锁常驻；key 为 user:resume 有界。
         }
     }
 
@@ -219,12 +220,7 @@ public class PdfService {
             } catch (RejectedExecutionException e) {
                 exportSemaphore.release();
                 log.warn("PDF export queue full: taskId={}", taskId);
-                PdfTask failed = new PdfTask();
-                failed.setId(taskId);
-                failed.setStatus(BizConstant.TASK_STATUS_FAILED);
-                failed.setErrorMsg("导出任务过多，请稍后再试。");
-                failed.setUpdatedAt(LocalDateTime.now());
-                pdfTaskMapper.updateById(failed);
+                markTaskFailed(taskId, "导出任务过多，请稍后再试。");
             }
         };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -259,12 +255,14 @@ public class PdfService {
     }
 
     private void markTaskFailed(String taskId, String errorMsg) {
-        PdfTask failed = new PdfTask();
-        failed.setId(taskId);
-        failed.setStatus(BizConstant.TASK_STATUS_FAILED);
-        failed.setErrorMsg(errorMsg);
-        failed.setUpdatedAt(LocalDateTime.now());
-        pdfTaskMapper.updateById(failed);
+        // CAS：仅 pending/processing 可转 failed，已 success 的不再覆盖
+        LambdaUpdateWrapper<PdfTask> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(PdfTask::getId, taskId)
+                .in(PdfTask::getStatus, List.of(BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING))
+                .set(PdfTask::getStatus, BizConstant.TASK_STATUS_FAILED)
+                .set(PdfTask::getErrorMsg, errorMsg)
+                .set(PdfTask::getUpdatedAt, LocalDateTime.now());
+        pdfTaskMapper.update(null, wrapper);
     }
 
     /**
@@ -419,15 +417,21 @@ public class PdfService {
                         in, pdfPath.toFile().length(), "application/pdf");
             }
 
-            PdfTask update = new PdfTask();
-            update.setId(taskId);
-            update.setFilePath(objectName);
-            update.setFileName(fileName);
-            update.setFileSize(pdfPath.toFile().length());
-            update.setStatus(BizConstant.TASK_STATUS_SUCCESS);
-            update.setCompletedAt(LocalDateTime.now());
-            update.setUpdatedAt(LocalDateTime.now());
-            pdfTaskMapper.updateById(update);
+            // CAS：仅 pending/processing 可转 success；若 sweeper 已置 failed 则不再复活
+            LambdaUpdateWrapper<PdfTask> successWrapper = new LambdaUpdateWrapper<>();
+            successWrapper.eq(PdfTask::getId, taskId)
+                    .in(PdfTask::getStatus, List.of(BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING))
+                    .set(PdfTask::getFilePath, objectName)
+                    .set(PdfTask::getFileName, fileName)
+                    .set(PdfTask::getFileSize, pdfPath.toFile().length())
+                    .set(PdfTask::getStatus, BizConstant.TASK_STATUS_SUCCESS)
+                    .set(PdfTask::getCompletedAt, LocalDateTime.now())
+                    .set(PdfTask::getUpdatedAt, LocalDateTime.now());
+            Integer successAffected = pdfTaskMapper.update(null, successWrapper);
+            if (successAffected == null || successAffected == 0) {
+                log.warn("PDF task success CAS missed (swept to failed?): taskId={}", taskId);
+                return;
+            }
             try {
                 notificationService.notify(resume.getUserId(), "pdf", "PDF 导出完成",
                         "你的简历《" + resume.getTitle() + "》已导出为 PDF，可前往下载中心下载。");
@@ -435,7 +439,7 @@ public class PdfService {
                 log.warn("PDF success notification failed, ignore: taskId={}", taskId, ne);
             }
             log.info("generatePdf success: taskId={}, fileSize={}, fileName={}",
-                    taskId, update.getFileSize(), update.getFileName());
+                    taskId, pdfPath.toFile().length(), fileName);
         } catch (Exception e) {
             log.error("Generate PDF failed: taskId={}", taskId, e);
             // Chromium 崩溃/关闭后丢弃共享实例，下次导出时重建，避免复用已损坏的浏览器
@@ -562,12 +566,21 @@ public class PdfService {
     }
 
     private void updateTaskStatus(String taskId, String status, String errorMsg) {
-        PdfTask update = new PdfTask();
-        update.setId(taskId);
-        update.setStatus(status);
-        update.setErrorMsg(errorMsg);
-        update.setUpdatedAt(LocalDateTime.now());
-        pdfTaskMapper.updateById(update);
+        // CAS：processing 推进仅当仍为 pending；失败终态仅当仍为 pending/processing
+        LambdaUpdateWrapper<PdfTask> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(PdfTask::getId, taskId);
+        if (BizConstant.TASK_STATUS_PROCESSING.equals(status)) {
+            wrapper.eq(PdfTask::getStatus, BizConstant.TASK_STATUS_PENDING);
+        } else {
+            wrapper.in(PdfTask::getStatus, List.of(BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING));
+        }
+        wrapper.set(PdfTask::getStatus, status)
+                .set(PdfTask::getErrorMsg, errorMsg)
+                .set(PdfTask::getUpdatedAt, LocalDateTime.now());
+        Integer affected = pdfTaskMapper.update(null, wrapper);
+        if ((affected == null || affected == 0) && BizConstant.TASK_STATUS_PROCESSING.equals(status)) {
+            log.warn("PDF task status CAS missed (already swept?): taskId={}, target={}", taskId, status);
+        }
     }
 
     private void validateResumeForExport(Resume resume) {

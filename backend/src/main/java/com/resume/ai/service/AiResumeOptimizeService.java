@@ -1,6 +1,7 @@
 package com.resume.ai.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -86,8 +87,8 @@ public class AiResumeOptimizeService {
                 return task;
             }
         } finally {
-            // 避免锁对象泄漏：仅当无其他线程持有时惰性清理由其他并发锁持有场景下的重复创建开销可接受
-            // 为简化，不立即 remove，依赖 optimizeLocks 的惰性清理或上限控制（此处保持与 Pdf 锁不同的策略以减少抖动）
+            // 不 remove：remove 会引入 ABA（A 持 L1、B 阻塞 L1、A 删 L1、C 建 L2 与 B 并发），
+            // 突破 MAX_CONCURRENT 限流。用户量有界时锁对象常驻可接受；多实例需 Redis NX。
         }
     }
 
@@ -126,12 +127,13 @@ public class AiResumeOptimizeService {
      * 线程池队列已满、异步任务被拒绝时的补偿：将任务标记为 failed，让用户可感知。
      */
     public void markTaskRejected(String taskId) {
-        ResumeOptimizeTask update = new ResumeOptimizeTask();
-        update.setId(taskId);
-        update.setStatus(BizConstant.TASK_STATUS_FAILED);
-        update.setErrorMsg("AI 服务繁忙，请稍后再试。");
-        update.setUpdatedAt(LocalDateTime.now());
-        optimizeTaskMapper.updateById(update);
+        LambdaUpdateWrapper<ResumeOptimizeTask> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(ResumeOptimizeTask::getId, taskId)
+                .in(ResumeOptimizeTask::getStatus, List.of(BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING))
+                .set(ResumeOptimizeTask::getStatus, BizConstant.TASK_STATUS_FAILED)
+                .set(ResumeOptimizeTask::getErrorMsg, "AI 服务繁忙，请稍后再试。")
+                .set(ResumeOptimizeTask::getUpdatedAt, LocalDateTime.now());
+        optimizeTaskMapper.update(null, wrapper);
     }
 
     @Async("aiTaskExecutor")
@@ -142,9 +144,18 @@ public class AiResumeOptimizeService {
             return;
         }
 
+        // CAS：仅 pending 可转 processing；若 sweeper 已置 failed 则直接返回不再复活
+        LambdaUpdateWrapper<ResumeOptimizeTask> processingGuard = new LambdaUpdateWrapper<>();
+        processingGuard.eq(ResumeOptimizeTask::getId, taskId)
+                .eq(ResumeOptimizeTask::getStatus, BizConstant.TASK_STATUS_PENDING)
+                .set(ResumeOptimizeTask::getStatus, BizConstant.TASK_STATUS_PROCESSING)
+                .set(ResumeOptimizeTask::getUpdatedAt, LocalDateTime.now());
+        Integer processingAffected = optimizeTaskMapper.update(null, processingGuard);
+        if (processingAffected == null || processingAffected == 0) {
+            log.warn("Optimize task processing CAS missed (swept?): taskId={}", taskId);
+            return;
+        }
         task.setStatus(BizConstant.TASK_STATUS_PROCESSING);
-        task.setUpdatedAt(LocalDateTime.now());
-        optimizeTaskMapper.updateById(task);
 
         long start = System.currentTimeMillis();
         AiCallLog callLog = new AiCallLog();
@@ -211,7 +222,34 @@ public class AiResumeOptimizeService {
             if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
                 task.setCompletedAt(LocalDateTime.now());
             }
-            optimizeTaskMapper.updateById(task);
+            // CAS：仅 pending/processing 可转终态，避免覆盖 sweeper 已置 failed
+            LambdaUpdateWrapper<ResumeOptimizeTask> finalGuard = new LambdaUpdateWrapper<>();
+            finalGuard.eq(ResumeOptimizeTask::getId, taskId)
+                    .in(ResumeOptimizeTask::getStatus, List.of(BizConstant.TASK_STATUS_PENDING, BizConstant.TASK_STATUS_PROCESSING));
+            if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
+                finalGuard.set(ResumeOptimizeTask::getStatus, BizConstant.TASK_STATUS_SUCCESS)
+                        .set(ResumeOptimizeTask::getCompletedAt, task.getCompletedAt())
+                        .set(ResumeOptimizeTask::getUpdatedAt, task.getUpdatedAt());
+            } else {
+                finalGuard.set(ResumeOptimizeTask::getStatus, BizConstant.TASK_STATUS_FAILED)
+                        .set(ResumeOptimizeTask::getErrorMsg, task.getErrorMsg())
+                        .set(ResumeOptimizeTask::getUpdatedAt, task.getUpdatedAt());
+            }
+            // 结果明细（优化内容）仍需落库：先 CAS 状态，成功后再按 id 更新业务字段（此时状态已为终态，不再竞争）
+            Integer finalAffected = optimizeTaskMapper.update(null, finalGuard);
+            if (finalAffected == null || finalAffected == 0) {
+                log.warn("Optimize task final CAS missed (swept?): taskId={}", taskId);
+            } else if (BizConstant.TASK_STATUS_SUCCESS.equals(task.getStatus())) {
+                ResumeOptimizeTask detail = new ResumeOptimizeTask();
+                detail.setId(taskId);
+                detail.setMatchScore(task.getMatchScore());
+                detail.setDimensionScores(task.getDimensionScores());
+                detail.setOptimizations(task.getOptimizations());
+                detail.setMissingSkills(task.getMissingSkills());
+                detail.setRecommendations(task.getRecommendations());
+                detail.setModelName(task.getModelName());
+                optimizeTaskMapper.updateById(detail);
+            }
             notifyTaskResult(task, resume);
             try {
                 // 失败调用也要落审计表：NOT NULL 列兜底
