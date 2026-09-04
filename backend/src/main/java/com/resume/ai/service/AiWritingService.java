@@ -246,8 +246,12 @@ public class AiWritingService {
                 throw new BusinessException(ResultCode.AI_RESPONSE_PARSE_FAILED, "AI 未返回内容，请重试。");
             }
 
-            auditLogService.record(resume.getUserId(), "ai_write", resume.getId(),
-                    "section=" + request.getSectionType() + ", field=" + request.getField() + ", action=" + request.getAction());
+            try {
+                auditLogService.record(resume.getUserId(), "ai_write", resume.getId(),
+                        "section=" + request.getSectionType() + ", field=" + request.getField() + ", action=" + request.getAction());
+            } catch (Exception auditEx) {
+                log.warn("AI writing audit failed, ignore for billing: resumeId={}", resume.getId(), auditEx);
+            }
             return new ResumeAiWriteResponse(content);
         } catch (Exception e) {
             callLog.setSuccess(false);

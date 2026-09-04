@@ -133,8 +133,8 @@ public class GlobalExceptionHandler {
             code = ResultCode.TEMPLATE_CODE_EXISTS;
             errMsg = "模板编码已存在。";
         } else if (msg.contains("uk_share_token") || msg.contains("uk_resume_share_token")) {
-            code = ResultCode.TEMPLATE_CODE_EXISTS;
-            errMsg = "分享已存在，请重试。";
+            code = ResultCode.RESOURCE_NOT_FOUND;
+            errMsg = "分享冲突，请重试。";
         } else if (msg.contains("uk_ai_daily_quota")) {
             code = ResultCode.AI_DAILY_QUOTA_EXCEEDED;
             errMsg = "今日配额已达上限。";
@@ -187,8 +187,11 @@ public class GlobalExceptionHandler {
                  ResultCode.AI_DAILY_QUOTA_EXCEEDED,
                  ResultCode.AI_CONCURRENT_LIMIT_EXCEEDED -> 429;
             case ResultCode.AUTH_EMAIL_CODE_SEND_FAILED -> 503;
-            case ResultCode.PDF_EXPORT_FAILED -> 500;
-            case ResultCode.INTERNAL_ERROR -> 500;
+            case ResultCode.PDF_EXPORT_FAILED,
+                 ResultCode.AVATAR_OPTIMIZE_FAILED,
+                 ResultCode.INTERNAL_ERROR -> 500;
+            case ResultCode.AI_MODEL_CALL_FAILED,
+                 ResultCode.AI_RESPONSE_PARSE_FAILED -> 502;
             // 参数/业务类错误（含验证码错误、密码强度不足等）统一按 400 返回
             default -> 400;
         };
