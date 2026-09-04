@@ -35,9 +35,9 @@
     format: 'json',
     content: '',
     title: '',
-    scene: '',
+    scene: 'social_recruitment',
     targetPosition: '',
-    templateId: '',
+    templateId: 'template_classic_single',
   })
   const importTemplates = ref<{ id: string; name: string }[]>([])
 
@@ -170,7 +170,10 @@
   async function fetchPage() {
     loading.value = true
     try {
-      await store.fetchList(currentPage.value, pageSize.value)
+      await store.fetchList(currentPage.value, pageSize.value, {
+        keyword: searchQuery.value || undefined,
+        scene: sceneFilter.value,
+      })
     } catch (e) {
       console.warn('[resumes] fetch failed', e)
     } finally {
@@ -184,6 +187,10 @@
       const raw: any = data?.data ?? data ?? []
       if (Array.isArray(raw) && raw.length > 0) {
         importTemplates.value = raw.map((tpl: any) => ({ id: tpl.id, name: tpl.name }))
+        if (!importTemplates.value.find((t) => t.id === importForm.value.templateId)) {
+          importForm.value.templateId = importTemplates.value[0].id
+        }
+        if (!importForm.value.scene) importForm.value.scene = 'social_recruitment'
       } else {
         importTemplates.value = []
       }
@@ -236,11 +243,11 @@
       const payload: Record<string, string> = {
         format: f.format,
         content: f.content,
+        templateId: f.templateId || 'template_classic_single',
+        scene: f.scene || 'social_recruitment',
       }
       if (f.title.trim()) payload.title = f.title.trim()
-      if (f.scene) payload.scene = f.scene
       if (f.targetPosition.trim()) payload.targetPosition = f.targetPosition.trim()
-      if (f.templateId) payload.templateId = f.templateId
       const { data } = await client.post('/resumes/import', payload)
       // R<ResumeDetailResponse> → data is R, data.data is detail
       if (data && typeof data.code === 'number' && data.code !== 200) {

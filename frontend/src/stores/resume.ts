@@ -14,9 +14,14 @@ export const useResumeStore = defineStore('resume', () => {
   const total = ref(0)
   const current = ref<ResumeDetailResponse | null>(null)
 
-  async function fetchList(page = 1, size = 20) {
-    const { data } = await client.get('/resumes', { params: { page, size } })
-    const p: Page<ResumeListItemResponse> = data.data
+  async function fetchList(page = 1, size = 20, opts?: { keyword?: string; scene?: string; targetPosition?: string }) {
+    const params: Record<string, any> = { page, size }
+    if (opts?.keyword?.trim()) params.keyword = opts.keyword.trim()
+    if (opts?.scene && opts.scene !== 'all') params.scene = opts.scene
+    if (opts?.targetPosition?.trim()) params.targetPosition = opts.targetPosition.trim()
+    const { data } = await client.get('/resumes', { params })
+    const p = data?.data as Page<ResumeListItemResponse> | undefined
+    if (!p || !Array.isArray(p.records)) throw new Error('简历列表契约破裂')
     list.value = p.records
     total.value = p.total
     return p

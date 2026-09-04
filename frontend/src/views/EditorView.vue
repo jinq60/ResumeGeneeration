@@ -8,6 +8,7 @@
   import AtModal from '@/components/atelier/AtModal.vue'
   import SectionEditor from '@/components/editor/SectionEditor.vue'
   import { pushToast, toastState } from '@/composables/useToast'
+  import DOMPurify from 'dompurify'
 
   const { t } = useI18n()
 
@@ -16,6 +17,12 @@
   const store = useResumeStore()
 
   const html = ref('')
+  const safeHtml = computed(() =>
+    DOMPurify.sanitize(html.value || '', {
+      ALLOWED_TAGS: ['div','span','p','br','b','i','u','strong','em','ul','ol','li','a','h1','h2','h3','h4','img','table','thead','tbody','tr','td','th'],
+      ALLOWED_ATTR: ['href','target','src','alt','style','class'],
+    }),
+  )
   const saving = ref(false)
   let timer: any = null
   let rsTimer: any = null
@@ -202,28 +209,43 @@
   watch(() => store.current?.sections, (v) => { if (!v) return; scheduleSave({ sections: v }, 1800) }, { deep: true })
   watch(() => store.current?.renderSettings, (v) => { if (!v) return; scheduleSave({ renderSettings: v }, 1800) }, { deep: true })
 
-  let pdfTimer: ReturnType<typeof setInterval> | null = null
+  let pdfTimer: ReturnType<typeof setTimeout> | null = null
+  let pdfCancelled = false
+  async function pollPdf(taskId: string, attempts = 0) {
+    const maxAttempts = 60
+    if (pdfCancelled) return
+    if (attempts > maxAttempts) {
+      pushToast('导出超时，请稍后重试')
+      return
+    }
+    try {
+      const t = (await client.get(`/pdf/tasks/${taskId}`)).data.data
+      if (pdfCancelled) return
+      if (t.status === 'success') {
+        const base = ((import.meta as any).env?.VITE_API_BASE || '/api').replace(/\/+$/, '')
+        window.open(`${base}/pdf/download/${taskId}`)
+        return
+      } else if (t.status === 'failed') {
+        pushToast('导出失败: ' + (t.errorMsg || 'unknown'))
+        return
+      }
+    } catch {
+      if (pdfCancelled) return
+    }
+    if (pdfCancelled) return
+    pdfTimer = setTimeout(() => pollPdf(taskId, attempts + 1), 1000)
+  }
   async function exportPdf() {
     const { data } = await client.post('/pdf/export', { resumeId: id })
     const taskId = data.data.taskId
-    if (pdfTimer) clearInterval(pdfTimer)
-    pdfTimer = setInterval(async () => {
-      const t = (await client.get(`/pdf/tasks/${taskId}`)).data.data
-      if (t.status === 'success') {
-        if (pdfTimer) clearInterval(pdfTimer)
-        pdfTimer = null
-        const base = (import.meta as any).env?.VITE_API_BASE || '/api'
-        window.open(`${base}/pdf/download/${taskId}`)
-      }
-      if (t.status === 'failed') {
-        if (pdfTimer) clearInterval(pdfTimer)
-        pdfTimer = null
-        pushToast('导出失败: ' + (t.errorMsg || 'unknown'))
-      }
-    }, 1000)
+    if (pdfTimer) clearTimeout(pdfTimer)
+    pdfCancelled = false
+    pushToast('已提交导出任务，处理中…')
+    pollPdf(taskId, 0)
   }
   onUnmounted(() => {
-    if (pdfTimer) clearInterval(pdfTimer)
+    pdfCancelled = true
+    if (pdfTimer) clearTimeout(pdfTimer)
   })
 
   function setZoom(d: number) {
@@ -1096,8 +1118,8 @@ Focused on human-computer interaction, tangible interfaces, and generative typog
             >
               <!-- Rendered html from backend -->
               <div
-                v-if="html"
-                v-html="html"
+                v-if="safeHtml"
+                v-html="safeHtml"
                 class="prose max-w-none prose-p:leading-relaxed prose-headings:font-[Newsreader]"
               ></div>
 

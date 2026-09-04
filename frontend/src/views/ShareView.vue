@@ -1,12 +1,19 @@
 <script setup lang="ts">
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, computed } from 'vue'
   import { useRoute } from 'vue-router'
+  import DOMPurify from 'dompurify'
   const route = useRoute()
   const html = ref('')
+  const safeHtml = computed(() =>
+    DOMPurify.sanitize(html.value || '', {
+      ALLOWED_TAGS: ['div','span','p','br','b','i','u','strong','em','ul','ol','li','a','h1','h2','h3','h4','img','table','thead','tbody','tr','td','th'],
+      ALLOWED_ATTR: ['href','target','src','alt','style','class'],
+    }),
+  )
   const loading = ref(true)
   onMounted(async () => {
     try {
-      const base = (import.meta as any).env?.VITE_API_BASE || '/api'
+      const base = ((import.meta as any).env?.VITE_API_BASE || '/api').replace(/\/+$/, '')
       const res = await fetch(`${base}/share/${route.params.token as string}`)
       if (res.ok) html.value = await res.text()
       else
@@ -36,7 +43,7 @@
     </div>
     <div
       v-else
-      v-html="html"
+      v-html="safeHtml"
       class="max-w-[210mm] mx-auto my-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] bg-white"
     ></div>
     <footer class="text-center py-8 font-[JetBrains_Mono] text-[11px] text-[#777871]">
